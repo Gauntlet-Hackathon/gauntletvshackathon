@@ -1,1 +1,2 @@
 - 2026-11-06 | backend | #2 | Added greet() in server/greeting.py with unittest coverage in server/test_greeting.py
+- 2026-11-06 | backend | #3 | Added farewell() and server/cli.py (greet + farewell) with tests
