@@ -1,0 +1,28 @@
+# Template CI. Replace the test step with your stack's real commands once Wave 0 picks the stack.
+# The night-shift picker reads this workflow's runs on main to decide whether main is green,
+# so keep the file name (or set the CI_WORKFLOW repo variable to the new name).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Picker unit tests
+        run: python3 -m unittest discover -s .github/night-shift/tests -v
+      # >>> EDIT: add your project's install, lint, unit, contract and e2e-smoke commands, e.g.
+      # - uses: actions/setup-node@v4
+      #   with: { node-version: 22, cache: npm }
+      # - run: npm ci
+      # - run: npm run lint
+      # - run: npm test
