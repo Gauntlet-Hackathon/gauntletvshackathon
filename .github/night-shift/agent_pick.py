@@ -30,6 +30,8 @@ import sys
 
 ATTEMPT_MARKER = "<!-- agent-attempt -->"
 INFRA_MARKER = "<!-- agent-infra -->"   # a run that never really started; capped separately
+BLOCK_MARKER = "<!-- agent-blocked -->"  # attempts before the latest block notice don't count
+LEGACY_BLOCK_TEXT = "marking blocked for a human"
 SKIP_LABELS = {"blocked", "needs-human"}
 FAILED_CONCLUSIONS = {"FAILURE", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED", "STARTUP_FAILURE", "ERROR"}
 PENDING_STATES = {"QUEUED", "IN_PROGRESS", "PENDING", "WAITING", "REQUESTED", "EXPECTED"}
@@ -188,7 +190,14 @@ def marker_comment_ids(cfg: Config, number: int, marker: str) -> list[int]:
 
 
 def count_markers(cfg: Config, number: int, marker: str) -> int:
-    return len(marker_comment_ids(cfg, number, marker))
+    """Markers since the latest block notice. Removing `blocked` therefore gives an issue fresh attempts."""
+    ids = marker_comment_ids(cfg, number, marker)
+    if not ids:
+        return 0
+    blocks = (marker_comment_ids(cfg, number, BLOCK_MARKER)
+              + marker_comment_ids(cfg, number, LEGACY_BLOCK_TEXT))
+    last_block = max(blocks, default=0)
+    return sum(1 for i in ids if i > last_block)
 
 
 def refund_last_attempt(cfg: Config, number: int, why: str) -> None:
@@ -202,13 +211,14 @@ def refund_last_attempt(cfg: Config, number: int, why: str) -> None:
 # --- checks ---------------------------------------------------------------------------
 
 def handle_open_prs(cfg: Config) -> str | None:
-    """Return a skip reason if the lane is busy, else None."""
+    """Return a skip reason if the lane is busy (or just merged something), else None."""
     prs = gh_json([
         "pr", "list", "-R", cfg.repo, "--state", "open",
         "--label", "agent", "--label", cfg.lane_label,
         "--json", "number,headRefName,mergeable,statusCheckRollup,createdAt,labels",
     ]) or []
     busy = None
+    merged = []
     for pr in prs:
         num = pr["number"]
         state = checks_state(pr.get("statusCheckRollup"))
@@ -231,10 +241,15 @@ def handle_open_prs(cfg: Config) -> str | None:
         if state == "passed":
             try:
                 run_gh(["pr", "merge", str(num), "-R", cfg.repo, "--squash", "--delete-branch"])
+                merged.append(num)
                 continue
             except RuntimeError as err:
                 print(f"warning: could not merge green PR #{num}: {err}", file=sys.stderr)
         busy = f"PR #{num} in lane {cfg.lane} is still in review"
+    if busy is None and merged:
+        # GitHub closes the linked issue a moment after the merge; picking now could re-pick it.
+        # The merge pushes to main, which starts a fresh run that continues the lane.
+        busy = f"merged PR #{merged[0]}; the next run continues lane {cfg.lane}"
     return busy
 
 
@@ -303,7 +318,8 @@ def next_issue(cfg: Config) -> tuple[int | None, str, str]:
                    else f"{infra} runs that never started (check the lane token and usage)")
             run_gh(["issue", "edit", str(issue["number"]), "-R", cfg.repo, "--add-label", "blocked"])
             run_gh(["issue", "comment", str(issue["number"]), "-R", cfg.repo, "--body",
-                    f"Night shift: {why}; marking blocked for a human."])
+                    f"{BLOCK_MARKER}\nNight shift: {why}; marking blocked for a human. "
+                    "Remove the `blocked` label to give it fresh attempts."])
             continue
         model = model_for(cfg, issue, tried)
         return issue["number"], f"picked #{issue['number']}: {issue['title']} (model {model})", model

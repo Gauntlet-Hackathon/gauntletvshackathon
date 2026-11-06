@@ -229,11 +229,27 @@ class PickTests(unittest.TestCase):
         self.assertEqual(ap.decide(cfg())["issue"], "2")
         self.assertTrue(fake.wrote(["pr", "close"]))
 
-    def test_green_pr_is_merged(self):
+    def test_green_pr_is_merged_and_run_stops(self):
         checks = RUN_OK + [{"__typename": "StatusContext", "state": "SUCCESS"}]
-        fake = self.use(FakeGH(prs=[pr(checks)], issues=[issue(2)]))
-        self.assertEqual(ap.decide(cfg())["issue"], "2")
+        fake = self.use(FakeGH(prs=[pr(checks)], issues=[issue(1), issue(2)]))
+        result = ap.decide(cfg())
         self.assertTrue(fake.wrote(["pr", "merge"]))
+        self.assertEqual(result["mode"], "skip")          # never re-picks #1 before GitHub closes it
+        self.assertIn("merged PR #10", result["reason"])
+
+    def test_unblocking_gives_fresh_attempts(self):
+        history = [(BOT, ap.ATTEMPT_MARKER)] * 3 + [(BOT, "Night shift: 3 failed attempts; marking blocked for a human.")]
+        self.use(FakeGH(issues=[issue(1)], comments={1: history}))
+        result = ap.decide(cfg())
+        self.assertEqual(result["issue"], "1")
+        self.assertEqual(result["model"], "sonnet")       # fresh start: no escalation either
+
+    def test_attempts_after_unblock_still_count(self):
+        history = ([(BOT, ap.ATTEMPT_MARKER)] * 3 + [(BOT, ap.BLOCK_MARKER + " blocked")]
+                   + [(BOT, ap.ATTEMPT_MARKER)] * 3)
+        fake = self.use(FakeGH(issues=[issue(1)], comments={1: history}))
+        self.assertEqual(ap.decide(cfg())["mode"], "skip")
+        self.assertTrue(fake.wrote(["issue", "edit"]))
 
     # --- main health ------------------------------------------------------------------
     def test_red_main_fix_lane(self):
