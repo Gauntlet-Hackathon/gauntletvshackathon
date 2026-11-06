@@ -1,2 +1,0 @@
-- 2026-11-06 | backend | #2 | Added greet() in server/greeting.py with unittest coverage in server/test_greeting.py
-- 2026-11-06 | frontend | #4 | Added static landing page web/index.html with html.parser test in web/test_page.py
