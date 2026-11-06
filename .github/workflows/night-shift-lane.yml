@@ -180,7 +180,7 @@ jobs:
           git config user.email "night-shift@users.noreply.github.com"
           git switch -c "$BRANCH"
           PROMPT="$(sed -e "s|__LANE__|$LANE|g" -e "s|__TASK_FILE__|$TASK_FILE|g" .github/night-shift/worker-prompt.md)"
-          SCHEMA='{"type":"object","properties":{"status":{"type":"string","enum":["done","stuck","needs-human"]},"summary":{"type":"string"},"tests_passed":{"type":"boolean"}},"required":["status","summary","tests_passed"]}'
+          SCHEMA='{"type":"object","properties":{"status":{"type":"string","enum":["done","stuck"]},"summary":{"type":"string"},"assumptions":{"type":"array","items":{"type":"string"}},"tests_passed":{"type":"boolean"}},"required":["status","summary","assumptions","tests_passed"]}'
           # shellcheck disable=SC2086  # PERMISSION_FLAGS is intentionally word-split
           claude -p "$PROMPT" --output-format json --json-schema "$SCHEMA" \
             --model "$MODEL" --max-turns "$MAX_TURNS" $PERMISSION_FLAGS > "$OUT/result.json" 2> "$OUT/claude.stderr"
@@ -250,12 +250,14 @@ jobs:
           elif jq -e '.structured_output.status' "$RESULT" >/dev/null 2>&1; then
             STATUS="$(jq -r '.structured_output.status' "$RESULT")"
             SUMMARY="$(jq -r '.structured_output.summary // ""' "$RESULT")"
+            ASSUMPTIONS="$(jq -r '(.structured_output.assumptions // []) | map("- " + .) | join("\n")' "$RESULT")"
           elif [ "$(jq -r '.num_turns // 0' "$RESULT")" -lt 2 ]; then
             STATUS="infra-error"; SUMMARY="$(jq -r '.result // "no result"' "$RESULT" | head -c 500)"
           else
             STATUS="stuck"; SUMMARY="Run ended without a structured result (likely hit the turn limit)."
           fi
           COST="$(jq -r '.total_cost_usd // empty' "$RESULT" 2>/dev/null || true)"
+          ASSUMPTIONS="${ASSUMPTIONS:-}"
           OUTCOME="$STATUS"
 
           if [ "$STATUS" = "done" ]; then
@@ -276,6 +278,11 @@ jobs:
                 echo "**Lane:** \`$LANE\` (night shift) · **Model:** \`$MODEL\`"
                 echo
                 echo "$SUMMARY"
+                if [ -n "$ASSUMPTIONS" ]; then
+                  echo
+                  echo "**Assumptions the agent made (review in the morning):**"
+                  echo "$ASSUMPTIONS"
+                fi
               } > "$BODY"
               LABELS=(--label agent --label "lane:$LANE")
               if [ "$MODE" = "fix-main" ]; then LABELS+=(--label fix-main); fi
@@ -303,7 +310,6 @@ jobs:
               *) printf 'Night shift lane `%s`: **%s**\n\n%s\n' "$LANE" "$OUTCOME" "$SUMMARY" \
                    | gh issue comment "$ISSUE" -R "$REPO" --body-file - || true ;;
             esac
-            if [ "$STATUS" = "needs-human" ]; then gh issue edit "$ISSUE" -R "$REPO" --add-label needs-human || true; fi
             gh issue edit "$ISSUE" -R "$REPO" --remove-label agent:in-progress || true
           fi
 
