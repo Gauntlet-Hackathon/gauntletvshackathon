@@ -29,7 +29,7 @@ Paste this section into the project's CLAUDE.md (and AGENTS.md for non-Claude ha
 
 ## Definition of done
 - Tests written or updated for the change, and the full suite passes locally.
-- One line appended to `progress.md`: date, lane, issue, what changed.
+- One line appended to `progress/<lane>.md` (one file per lane, so parallel PRs never conflict): date, lane, issue, what changed.
 - A failure seen twice becomes a new rule in this file. Agents propose the rule in their PR summary; a human adds it, because agent PRs cannot change CLAUDE.md, AGENTS.md, `.claude/` or `.github/`.
 
 ## Night shift
