@@ -9,8 +9,8 @@ Paste this section into the project's CLAUDE.md (and AGENTS.md for non-Claude ha
 
 | Lane | Owns |
 |---|---|
-| `api` | `server/`, `contracts/api/` tests only |
-| `web` | `web/` |
+| `backend` | `server/` |
+| `frontend` | `web/` |
 | `data` | `data/`, `jobs/` |
 <!-- EDIT the table once Wave 0 fixes the folder layout. -->
 
