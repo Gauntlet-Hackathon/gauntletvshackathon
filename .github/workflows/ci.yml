@@ -20,6 +20,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: Picker unit tests
         run: python3 -m unittest discover -s .github/night-shift/tests -v
+      # REHEARSAL stack: plain-Python tests in each lane folder. Replace in Wave 0 with the real stack.
+      - name: Lane tests
+        run: |
+          for d in server web data; do
+            if [ -d "$d" ]; then python3 -m unittest discover -s "$d" -p 'test_*.py' -v; fi
+          done
       # >>> EDIT: add your project's install, lint, unit, contract and e2e-smoke commands, e.g.
       # - uses: actions/setup-node@v4
       #   with: { node-version: 22, cache: npm }
