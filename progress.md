@@ -1,0 +1,1 @@
+- 2026-11-06 | frontend | #4 | Added static landing page web/index.html and html.parser test web/test_page.py
