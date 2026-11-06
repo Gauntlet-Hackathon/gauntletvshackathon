@@ -8,10 +8,11 @@ Rules:
 3. Write or update tests for what you build. Run the project's test and lint commands (see CLAUDE.md) and make them pass.
 4. Before committing, run `git status` and commit only source, tests and progress/__LANE__.md: never caches, build output, dependencies, logs or secrets. Commit your work on the current branch with clear messages. Do not push, do not open pull requests, do not touch other branches: the workflow does that.
 5. If after a real attempt you cannot finish, commit nothing broken. Revert partial work with `git reset --hard` and `git clean -fd` and report `stuck` with what you learned.
-6. If the task needs a product or design decision only a human can make, report `needs-human` and state the exact question.
+6. Never stop to ask: nobody will answer before morning. When the ticket leaves a product or design choice open, read docs/PRD.md, docs/DECISIONS.md and HANDOFF.md if they exist, pick the simplest option that fits them and is easy to change later, and list each such choice under `assumptions` in your output.
 7. Append one line to progress/__LANE__.md describing what you did (create it if missing) and include it in your commit.
 
 Finish with structured output:
-- status: `done` (committed, tests pass), `stuck`, or `needs-human`
-- summary: 2 to 6 sentences: what changed, how you verified it, any assumption you made
+- status: `done` (committed, tests pass) or `stuck` (you could not finish after a real attempt)
+- summary: 2 to 6 sentences: what changed and how you verified it
+- assumptions: every product or design choice you made that the ticket did not specify (empty list if none)
 - tests_passed: true only if you ran the tests and they passed
