@@ -16,6 +16,11 @@ on:
   # Every merge into main starts the next issue in every lane right away; the timer is the backstop.
   push:
     branches: [main]
+  # When a PR's checks finish, the picker merges it (or closes it) right away instead of waiting for the timer.
+  # This matters most when auto-merge is unavailable (private repos without GitHub Pro).
+  workflow_run:
+    workflows: [CI, agent-review]
+    types: [completed]
   schedule:
     - cron: "*/20 * * * *"
   workflow_dispatch:
