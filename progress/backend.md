@@ -1,0 +1,1 @@
+- 2026-11-06 | backend | #3 | Added farewell() and server/cli.py (python3 -m server.cli NAME) with tests in server/test_greeting.py
