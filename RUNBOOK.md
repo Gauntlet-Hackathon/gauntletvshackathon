@@ -101,7 +101,7 @@ fly postgres attach <app>-db --app <app>
 fly secrets set --app <app> \
   SECRET_KEY_BASE="$(mix phx.gen.secret)" \
   PHX_HOST="<app>.fly.dev" \
-  DEVICE_TOKENS="laptop-dev-01:<long-random-token>,laptop-02:<long-random-token>"
+  DEVICE_TOKENS="laptop-dev-01:<long-random-token>,demo-field-01:<long-random-token>,laptop-02:<long-random-token>"
 
 # 4. Deploy (builds the image, runs bin/migrate, starts the machine once /healthz passes).
 fly deploy --app <app>
@@ -112,6 +112,7 @@ curl -i https://<app>.fly.dev/healthz  # HTTP 200 {"status":"ok"...}; 503 means 
 fly logs --app <app>                   # if the release_command or the check fails
 ```
 
+Prod loads none of the committed dev tokens (`config/devices.exs`), so `DEVICE_TOKENS` must list every device that syncs, including `demo-field-01` for the demo; a device left out gets 401.
 Then point each field laptop at it: `CLOUD_URL=https://<app>.fly.dev`, `DEVICE_ID`/`DEVICE_TOKEN` matching a `DEVICE_TOKENS` pair.
 If the deploy fails at `release_command` with a connection error, check `fly secrets list --app <app>` shows `DATABASE_URL` (re-run `fly postgres attach`) and that `ECTO_IPV6` is still in `[env]`.
 

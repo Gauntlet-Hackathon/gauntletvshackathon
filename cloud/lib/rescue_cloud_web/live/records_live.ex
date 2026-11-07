@@ -130,8 +130,11 @@ defmodule RescueCloudWeb.RecordsLive do
               </.link>
             </td>
             <td data-role="tier">
-              <.status_badge :if={r.priority_tier} kind={tier_kind(r.priority_tier)}>
-                {r.priority_tier}
+              <.status_badge
+                :if={tier_label(r)}
+                kind={tier_kind(r.priority_tier || r.provisional_tier)}
+              >
+                {tier_label(r)}
               </.status_badge>
             </td>
             <td data-role="status">
@@ -162,10 +165,10 @@ defmodule RescueCloudWeb.RecordsLive do
           <dt>Tier</dt>
           <dd data-role="tier">
             <.status_badge
-              :if={@record.request.priority_tier}
-              kind={tier_kind(@record.request.priority_tier)}
+              :if={tier_label(@record.request)}
+              kind={tier_kind(@record.request.priority_tier || @record.request.provisional_tier)}
             >
-              {@record.request.priority_tier}
+              {tier_label(@record.request)}
             </.status_badge>
           </dd>
           <dt>Rule</dt>
@@ -229,6 +232,11 @@ defmodule RescueCloudWeb.RecordsLive do
     </Layouts.app>
     """
   end
+
+  # An abstain has no priority_tier; show its provisional tier marked as unconfirmed ("P1?").
+  defp tier_label(%{priority_tier: tier}) when is_binary(tier), do: tier
+  defp tier_label(%{provisional_tier: tier}) when is_binary(tier), do: tier <> "?"
+  defp tier_label(_), do: nil
 
   defp fmt(nil), do: ""
   defp fmt(%DateTime{} = dt), do: Calendar.strftime(dt, "%Y-%m-%d %H:%M:%S UTC")

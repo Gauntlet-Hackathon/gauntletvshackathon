@@ -137,6 +137,7 @@ defmodule RescueCloud.Events.Payload do
     obj(%{
       "outcome" => enum(~w(prioritized abstain not_a_request duplicate)),
       "priority_tier" => nullable(enum(@tiers)),
+      "provisional_tier" => nullable(enum(@tiers)),
       "rule_id" => {:pattern, @rule_id},
       "duplicate_of" => nullable({:pattern, @ulid}),
       "abstain_reason" => nullable(enum(@abstain)),
@@ -146,8 +147,9 @@ defmodule RescueCloud.Events.Payload do
   end
 
   # Outcome-dependent rules from engine_output.schema.json.
-  defp outcome_rules(%{"outcome" => outcome} = out, path) do
+  defp outcome_rules(%{"outcome" => outcome} = out, path, legacy?) do
     tier = out["priority_tier"]
+    provisional = out["provisional_tier"]
     dup = out["duplicate_of"]
     reason = out["abstain_reason"]
     q = out["follow_up_question"]
@@ -157,6 +159,7 @@ defmodule RescueCloud.Events.Payload do
         "prioritized" ->
           [
             {tier != nil, "priority_tier"},
+            {provisional == nil, "provisional_tier"},
             {dup == nil, "duplicate_of"},
             {reason == nil, "abstain_reason"}
           ]
@@ -164,6 +167,7 @@ defmodule RescueCloud.Events.Payload do
         "duplicate" ->
           [
             {tier != nil, "priority_tier"},
+            {provisional == nil, "provisional_tier"},
             {dup != nil, "duplicate_of"},
             {reason == nil, "abstain_reason"}
           ]
@@ -171,6 +175,7 @@ defmodule RescueCloud.Events.Payload do
         "abstain" ->
           [
             {tier == nil, "priority_tier"},
+            {provisional != nil or legacy?, "provisional_tier"},
             {dup == nil, "duplicate_of"},
             {reason != nil, "abstain_reason"},
             {q != nil, "follow_up_question"}
@@ -179,6 +184,7 @@ defmodule RescueCloud.Events.Payload do
         "not_a_request" ->
           [
             {tier == nil, "priority_tier"},
+            {provisional == nil, "provisional_tier"},
             {dup == nil, "duplicate_of"},
             {reason == nil, "abstain_reason"},
             {q == nil, "follow_up_question"}
@@ -191,16 +197,25 @@ defmodule RescueCloud.Events.Payload do
     for {false, field} <- checks, do: "#{path}.#{field} is inconsistent with outcome #{outcome}"
   end
 
-  defp outcome_rules(_, _), do: []
+  defp outcome_rules(_, _, _), do: []
 
   # --- checker -----------------------------------------------------------------------------
 
-  defp check(:engine_output, value, path) do
+  # Version skew: engines from before provisional_tier (2026-11-07) omit the key. Such an
+  # output is read as provisional_tier null, and its abstain is accepted without one, so
+  # events queued on an older field build are not rejected for good after the upgrade.
+  # A present key is checked as strictly as engine_output.schema.json (which stays strict).
+  defp check(:engine_output, value, path) when is_map(value) do
+    legacy? = not Map.has_key?(value, "provisional_tier")
+    value = Map.put_new(value, "provisional_tier", nil)
+
     case check(engine_output_spec(), value, path) do
-      [] -> outcome_rules(value, path)
+      [] -> outcome_rules(value, path, legacy?)
       errors -> errors
     end
   end
+
+  defp check(:engine_output, _value, path), do: ["#{path} has the wrong type"]
 
   defp check(:any, _value, _path), do: []
   defp check(:boolean, v, _path) when is_boolean(v), do: []

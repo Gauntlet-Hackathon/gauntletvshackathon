@@ -17,6 +17,7 @@ outputs =
     %{
       "outcome" => "prioritized",
       "priority_tier" => "P1",
+      "provisional_tier" => nil,
       "rule_id" => "R-P1-ALL",
       "duplicate_of" => nil,
       "abstain_reason" => nil,

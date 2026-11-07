@@ -5,6 +5,8 @@
 Writes ``<results-dir>/<system>__<set>.json`` (format in docs/DECISIONS.md: ``system``, ``set``,
 ``run_at``, ``n``, ``metrics`` name -> number) plus ``model_version``, ``rules_version``,
 ``failures`` (metric name -> failing case ids, for the C11 drill-down) and ``latency``.
+``metrics["calibration.ece"]`` is the pooled extracted-field calibration error the cloud promotion
+gate reads (DECISIONS A3); the follow-up-field rate derives the field from ``abstain_reason`` (A7).
 Only the ``test`` split is scored. Set E needs ``--open-sealed``.
 """
 
@@ -83,6 +85,24 @@ def default_context() -> dict[str, Any]:
         "hoax_marker_hits": 0,
         "thresholds": dict(DEFAULT_THRESHOLDS),
     }
+
+
+# The field a follow-up question asks for, by abstain_reason (DECISIONS A7; the EV5 labels).
+FOLLOW_UP_FIELD = {
+    "no_usable_location": "location",
+    "conflicting_counts": "people_count",
+    "low_confidence_request": "is_request",
+    "possible_hoax": "is_request",
+    "low_confidence_hazard": "hazard",
+}
+
+
+def follow_up_field(engine_output: dict[str, Any]) -> str | None:
+    """The missing field an abstain's follow-up asks for, derived from its abstain_reason
+    (engine_output has no field of its own); None for any other outcome."""
+    if engine_output.get("outcome") != "abstain":
+        return None
+    return FOLLOW_UP_FIELD.get(engine_output.get("abstain_reason") or "")
 
 
 def _dump(extracted: Extracted | dict[str, Any]) -> dict[str, Any]:
@@ -211,6 +231,34 @@ def _score_decision(rows: list[dict[str, Any]]) -> tuple[dict[str, float], dict[
     return out, fails
 
 
+OVERCONFIDENT_MIN = 0.75  # a wrong prediction at or above this confidence is a calibration failure
+
+
+def _score_calibration(rows: list[dict[str, Any]]) -> tuple[dict[str, float], dict[str, list[str]]]:
+    """``ece``: the calibration error of the confidences the decision is made from, i.e. every
+    extracted-field confidence pooled (calibration.py's samples, one ECE over all fields; the
+    promotion gate reads it as ``calibration.ece``). Left out when no case has both a gold and a
+    predicted extraction, so the gate reports it missing. Failures: cases with a wrong
+    prediction stated with confidence >= 0.75."""
+    from rescue_evals.calibration import FIELDS, case_samples, pooled_ece  # imports this module
+
+    samples: dict[str, tuple[list[float], list[bool]]] = {f: ([], []) for f in FIELDS}
+    overconfident: list[str] = []
+    for r in rows:
+        if r["gold_ex"] is None or r["pred_ex"] is None:
+            continue
+        case = case_samples(r["gold_ex"], r["pred_ex"])
+        for field, conf, ok in case:
+            samples[field][0].append(conf)
+            samples[field][1].append(ok)
+        if any(not ok and conf >= OVERCONFIDENT_MIN for _, conf, ok in case):
+            overconfident.append(r["id"])
+    ece = pooled_ece(samples)
+    if ece is None:
+        return {}, {}
+    return {"ece": ece}, {"ece": overconfident}
+
+
 def _latency(rows: list[dict[str, Any]]) -> dict[str, float]:
     n = len(rows)
     ext = sum(r["t_extract"] for r in rows)
@@ -304,7 +352,7 @@ def run_set(
                 "pred_tier": out.get("priority_tier")
                 if out.get("outcome") == "prioritized"
                 else None,
-                "pred_field": out.get("follow_up_field"),
+                "pred_field": follow_up_field(out),
                 "duplicate_of": out.get("duplicate_of"),
                 "t_extract": t1 - t0,
                 "t_decide": t2 - t1,
@@ -312,10 +360,13 @@ def run_set(
         )
     ex_metrics, ex_fails = _score_extraction(rows)
     de_metrics, de_fails = _score_decision(rows)
+    ca_metrics, ca_fails = _score_calibration(rows)
     metrics = {f"extraction.{k}": v for k, v in ex_metrics.items()}
     metrics.update({f"decision.{k}": v for k, v in de_metrics.items()})
+    metrics.update({f"calibration.{k}": v for k, v in ca_metrics.items()})
     failures = {f"extraction.{k}": v for k, v in ex_fails.items()}
     failures.update({f"decision.{k}": v for k, v in de_fails.items()})
+    failures.update({f"calibration.{k}": v for k, v in ca_fails.items()})
     return {
         "system": system.name,
         "set": set_name,

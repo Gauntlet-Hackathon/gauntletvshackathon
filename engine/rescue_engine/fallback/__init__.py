@@ -1,4 +1,4 @@
-"""Deterministic Python fallback engine (steps 1-3)."""
+"""Deterministic Python fallback engine (contracts/engine_rules.md)."""
 
 from .engine import decide, decide_one
 

@@ -60,6 +60,7 @@ defmodule RescueCloud.RecordsFixtures do
           %{
             "outcome" => "abstain",
             "priority_tier" => nil,
+            "provisional_tier" => Keyword.get(opts, :provisional_tier, "P2"),
             "rule_id" => Keyword.get(opts, :rule_id, "R-ABS-LOC"),
             "duplicate_of" => nil,
             "abstain_reason" => "no_usable_location",
@@ -71,6 +72,7 @@ defmodule RescueCloud.RecordsFixtures do
           %{
             "outcome" => "prioritized",
             "priority_tier" => Keyword.get(opts, :tier, "P1"),
+            "provisional_tier" => nil,
             "rule_id" => Keyword.get(opts, :rule_id, "R-P1-01"),
             "duplicate_of" => nil,
             "abstain_reason" => nil,

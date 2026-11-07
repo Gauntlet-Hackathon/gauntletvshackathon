@@ -49,6 +49,7 @@ SEALED_SET = "E"
 LOWER_IS_BETTER = {
     "decision.p1_misses_per_1000",
     "decision.false_alarm_rate",
+    "calibration.ece",
     ROW_MS,
     ROW_S1000,
     ROW_COST,

@@ -61,3 +61,16 @@ def test_runs_through_runner(tmp_path):
          "--results-dir", str(tmp_path / "r")]
     ) == 0  # fmt: skip
     assert (tmp_path / "r" / "regex-baseline__B.json").exists()
+
+
+def test_abstain_carries_provisional_tier():
+    # DECISIONS R1: engine outputs the evals score are contract-valid, provisional_tier included
+    from rescue_shared.contracts_io import validator_for
+
+    s = RegexBaselineSystem()
+    ex = s.extract("please help, water is rising, 3 of us on the roof").model_dump(mode="json")
+    out = s.decide({"extracted": ex, "context": _ctx()})
+    assert not list(validator_for("engine_output.schema.json").iter_errors(out))
+    assert out["outcome"] == "abstain" and out["provisional_tier"] in ("P1", "P2", "P3")
+    ok = s.decide({"extracted": s.extract(TEXT).model_dump(mode="json"), "context": _ctx()})
+    assert "provisional_tier" in ok and ok["provisional_tier"] is None

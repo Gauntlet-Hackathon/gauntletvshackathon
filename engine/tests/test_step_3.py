@@ -41,7 +41,9 @@ def decided(**kw):
 
 def test_fixture_coverage():
     ids = {c["case_id"] for c in TIER_CASES}
-    assert ids == {"C01", "C02", "C03", "C04", "C05", "C06", "C07", "C08", "C09", "C16", "C17"}
+    assert ids == {
+        "C01", "C02", "C03", "C04", "C05", "C06", "C07", "C08", "C09", "C16", "C17", "C25",
+    }  # fmt: skip
 
 
 @pytest.mark.parametrize("case", TIER_CASES, ids=lambda c: c["case_id"])
@@ -159,9 +161,10 @@ def test_below_weak_min_is_ignored():
 
 
 def test_weak_signal_above_uncertain_raise():
-    # uncertain trapped -> P2; weak rising_water would make it P1 -> abstain.
-    out = decide_one(make(hazards=[("trapped", 0.6), ("rising_water", 0.3)]))
-    assert out["rule_id"] == "R-ABS-HAZ"
+    # uncertain trapped -> P2; weak rising_water would make it P1. Changed 2026-11-07 (R2):
+    # a P2 stays prioritized with the hazard question instead of abstaining.
+    out = decided(hazards=[("trapped", 0.6), ("rising_water", 0.3)])
+    assert out == ("prioritized", "P2", "R-P2-01", Q_HAZARD)
 
 
 def test_bands_follow_context_thresholds():

@@ -118,16 +118,88 @@ def test_partial_ack_keeps_the_rest(store):
     assert store2.outbox_count() == 4
 
 
-def test_rejected_stay_in_outbox_but_do_not_block_others(store):
+def test_rejected_are_stored_as_rejected_and_do_not_block_others(store):
     cloud = FakeCloud()
     cloud.reject = {"e0001"}
     fill(store, 5)
     w = make(store, cloud)
     r = w.sync_once()
-    assert r.rejected == 1
-    assert [e["event_id"] for e in store.pending_outbox()] == ["e0001"]
-    w.sync_once()  # rejected event is not resent unchanged
-    assert cloud.received.count("e0001") == 0 and len(cloud.received) == 4
+    assert r.rejected == 1 and r.acked == 4
+    assert store.pending_outbox() == [] and store.outbox_count() == 0
+    assert store.rejected_count() == 1
+    assert store.rejected()[0]["event_id"] == "e0001"
+    assert store.rejected()[0]["error"] == "invalid_payload"
+    posts = cloud.calls.count("/sync/events")
+    assert w.sync_once().rejected == 0  # rejected event is not resent unchanged
+    assert cloud.calls.count("/sync/events") == posts  # nothing left to send
+    assert len(cloud.received) == 4
+    assert w.status()["rejected"] == 1 and w.status()["outbox_backlog"] == 0
+
+
+def test_rejected_not_resent_after_restart(tmp_path):
+    path = tmp_path / "f.db"
+    cloud = FakeCloud()
+    cloud.reject = {"e0002"}
+    s1 = EventStore(path, check_same_thread=False)
+    fill(s1, 3)
+    make(s1, cloud).sync_once()
+    s1.close()
+    s2 = EventStore(path, check_same_thread=False)  # a new process: no in-memory state
+    s2.append_events([ev(9)])
+    cloud.reject = set()  # even if the cloud would now accept it, it is never resent
+    make(s2, cloud).sync_once()
+    assert cloud.received == ["e0000", "e0001", "e0009"]
+    assert s2.rejected_count() == 1 and s2.outbox_count() == 0
+    s2.close()
+
+
+def test_sync_status_reports_rejected_count(tmp_path, monkeypatch):
+    monkeypatch.setenv("CLOUD_URL", "http://cloud")
+    monkeypatch.setenv("FIELD_DATA_DIR", str(tmp_path))
+    cloud = FakeCloud()
+    cloud.reject = {"e0000"}
+    store = EventStore(tmp_path / "s.db", check_same_thread=False)
+    fill(store, 3)
+    app = create_app(
+        store=store, decide_batch=fake_engine(),
+        sync_worker_factory=lambda st, url: make(st, cloud, idle_interval=0.05),
+    )
+    with TestClient(app) as client:
+        import time
+
+        for _ in range(100):
+            body = client.get("/sync/status").json()
+            if body["outbox_backlog"] == 0:
+                break
+            time.sleep(0.05)
+    assert body["rejected"] == 1 and body["outbox_backlog"] == 0
+    # without a worker (no CLOUD_URL) the counts still come from the store
+    monkeypatch.delenv("CLOUD_URL")
+    with TestClient(create_app(store=store, decide_batch=fake_engine())) as client:
+        body = client.get("/sync/status").json()
+    assert body["running"] is False and body["rejected"] == 1 and body["outbox_backlog"] == 0
+    store.close()
+
+
+def test_one_default_device_id_for_pipeline_and_sync():
+    from rescue_field.pipeline import DEFAULT_DEVICE_ID, PipelineConfig
+
+    assert DEFAULT_DEVICE_ID == "laptop-dev-01"
+    assert PipelineConfig().device_id == DEFAULT_DEVICE_ID
+    assert PipelineConfig.from_env({}).device_id == DEFAULT_DEVICE_ID
+    s = EventStore()
+    w = sync.worker_from_env(s, "http://cloud", model_version="stub:x", env={})
+    try:
+        assert w.device_id == DEFAULT_DEVICE_ID
+        assert w.client.headers["authorization"] == "Bearer dev-token-laptop-dev-01"
+    finally:
+        w.client.close()
+        s.close()
+    env = {"DEVICE_ID": "laptop-dev-07"}
+    assert PipelineConfig.from_env(env).device_id == "laptop-dev-07"
+    w = sync.worker_from_env(EventStore(), "http://cloud", model_version="stub:x", env=env)
+    assert w.device_id == "laptop-dev-07"
+    w.client.close()
 
 
 def test_unacked_ids_not_in_request_are_ignored(store):
@@ -258,3 +330,60 @@ def test_status_without_worker(tmp_path, monkeypatch):
     monkeypatch.setenv("FIELD_DATA_DIR", str(tmp_path))
     with TestClient(create_app(decide_batch=fake_engine())) as client:
         assert client.get("/sync/status").json()["running"] is False
+
+
+def decided_ev(event_id, rules, device_id="laptop-dev-01"):
+    return {
+        "event_id": event_id,
+        "request_id": f"req-{event_id}",
+        "type": "decided",
+        "device_id": device_id,
+        "occurred_at": "2026-11-07T10:00:00Z",
+        "rules_version": rules,
+        "model_version": "stub:x",
+    }
+
+
+def heartbeat_rules(store, env):
+    cloud = FakeCloud()
+    w = sync.worker_from_env(
+        store, "http://cloud", model_version="stub:x",
+        env={"DEVICE_TOKEN": "tok", **env}, transport=httpx.MockTransport(cloud),
+    )
+    w.down_sync = False  # FakeCloud only speaks the up-sync routes
+    try:
+        w.sync_once()
+    finally:
+        w.client.close()
+    return cloud.heartbeats[-1]["rules_version"]
+
+
+def test_heartbeat_rules_version_falls_back_to_env_then_placeholder(store):
+    assert heartbeat_rules(store, {}) == sync.DEFAULT_RULES_VERSION
+    assert heartbeat_rules(store, {"RULES_VERSION": "rules@1111111+bin:11111111"}) == (
+        "rules@1111111+bin:11111111"
+    )
+
+
+def test_heartbeat_reports_rules_version_of_latest_decision(store):
+    # DECISIONS A2: the build stamp from the engine beats the env value
+    env = {"RULES_VERSION": "rules@1111111+bin:11111111"}
+    store.append_events([decided_ev("d1", "rules@aaaaaaa+bin:aaaaaaaa")])
+    assert heartbeat_rules(store, env) == "rules@aaaaaaa+bin:aaaaaaaa"
+    store.append_events([decided_ev("d2", "rules@bbbbbbb+bin:bbbbbbbb")])
+    assert heartbeat_rules(store, env) == "rules@bbbbbbb+bin:bbbbbbbb"
+    # a decision down-synced from another device does not count as ours
+    store.append_remote_events([decided_ev("d3", "rules@ccccccc+bin:cccccccc", "other-dev")])
+    assert heartbeat_rules(store, env) == "rules@bbbbbbb+bin:bbbbbbbb"
+
+
+def test_heartbeat_rules_version_follows_pipeline_decisions(tmp_path, monkeypatch):
+    for name in ("RULES_VERSION", "DEVICE_ID", "CLOUD_URL"):
+        monkeypatch.delenv(name, raising=False)
+    s = EventStore(tmp_path / "f.db", check_same_thread=False)
+    app = create_app(store=s, decide_batch=fake_engine())
+    with TestClient(app) as client:
+        assert client.post("/requests", json={"raw_text": "help, flooding"}).status_code == 200
+    decided = [e for e in s.all_events() if e["type"] == "decided"]
+    assert heartbeat_rules(s, {}) == decided[-1]["rules_version"]
+    s.close()

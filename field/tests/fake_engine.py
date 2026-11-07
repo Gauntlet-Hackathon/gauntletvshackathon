@@ -34,6 +34,7 @@ def answer(item):
         "rule_id": f"R-{tier}-01",
         "duplicate_of": None,
         "abstain_reason": None,
+        "provisional_tier": None,
         "follow_up_question": None,
         "rules_version": "rules@a1b2c3d+bin:9f8e7d6c5b4a3f21",
     }

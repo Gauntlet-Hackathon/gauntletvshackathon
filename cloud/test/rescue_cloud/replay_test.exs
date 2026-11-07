@@ -176,4 +176,37 @@ defmodule RescueCloud.ReplayTest do
     sync!(events)
     assert {:ok, %{"match" => 2}} = Replay.verify(engine_dist: dist)
   end
+
+  test "a stored abstain whose provisional_tier differs from the replay is a mismatch", %{
+    dist: dist
+  } do
+    abstain = fn tag, provisional ->
+      out = %{
+        "outcome" => "abstain",
+        "priority_tier" => nil,
+        "provisional_tier" => provisional,
+        "rule_id" => "R-ABS-CNT",
+        "duplicate_of" => nil,
+        "abstain_reason" => "conflicting_counts",
+        "follow_up_question" => "How many people are with you?",
+        "rules_version" => @v2
+      }
+
+      p =
+        payload("decided")
+        |> put_in(["engine_input", "extracted", "people_count", "value"], nil)
+        |> Map.put("engine_output", out)
+
+      event(tag, 1, "decided", "2026-11-07T14:00:00Z", payload: p)
+      |> Map.put("rules_version", @v2)
+    end
+
+    sync!([abstain.("PA", "P2"), abstain.("PB", "P1")])
+
+    assert {:ok, %{"match" => 1, "mismatch" => 1}} = Replay.verify(engine_dist: dist)
+    assert statuses() == %{rid("PA") => "match", rid("PB") => "mismatch"}
+    tampered = Repo.get_by!(Verification, request_id: rid("PB"))
+    assert tampered.detail == "differs in: provisional_tier"
+    assert tampered.replayed_output["provisional_tier"] == "P2"
+  end
 end

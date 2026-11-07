@@ -3,8 +3,9 @@
 Cycle: `GET /health`; on success `POST /sync/heartbeat` (backlog + versions), then
 `POST /sync/events` in batches of 200, oldest first, then (when `down_sync` is on)
 `GET /sync/down` via `rescue_field.downsync`. Only event ids the cloud *acked* leave
-the outbox. Rejected events stay (they are skipped for the rest of this process, so they do
-not block newer events); unacked events stay and are retried. Any failure (connection error,
+the outbox. Rejected events are marked rejected in the store (with the cloud's error) and are
+never sent again, across restarts too, so they do not block newer events; /sync/status shows
+their count. Unacked events stay and are retried. Any failure (connection error,
 non-2xx, bad body) backs off exponentially with jitter, 2 s, 4 s, ... capped at 300 s.
 """
 
@@ -27,6 +28,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
 from rescue_field import downsync
+from rescue_field.pipeline import DEFAULT_DEVICE_ID
 from rescue_field.store import EventStore
 
 BATCH_SIZE = 200
@@ -35,7 +37,7 @@ BACKOFF_CAP_S = 300.0
 JITTER = 0.2  # +/- fraction of the delay
 IDLE_INTERVAL_S = 10.0  # wait between cycles while online
 REQUEST_TIMEOUT_S = 10.0
-# placeholder until an engine artifact is loaded
+# placeholder until the first decision (or RULES_VERSION) names the engine build
 DEFAULT_RULES_VERSION = "rules@0000000+bin:00000000"
 
 
@@ -96,7 +98,6 @@ class SyncWorker:
         self.online = False
         self.last_sync_at: str | None = None
         self.last_error: str | None = None
-        self.rejected_ids: set[str] = set()
         self._paused = threading.Event()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -121,6 +122,10 @@ class SyncWorker:
     def backlog(self) -> int:
         with self.lock:
             return self.store.outbox_count()
+
+    def rejected_count(self) -> int:
+        with self.lock:
+            return self.store.rejected_count()
 
     def ping(self) -> None:
         try:
@@ -147,24 +152,25 @@ class SyncWorker:
         result = SyncResult()
         while not self._stop.is_set() and not self._paused.is_set():
             with self.lock:
-                pending = self.store.pending_outbox(self.batch_size + len(self.rejected_ids))
-            batch = [e for e in pending if e["event_id"] not in self.rejected_ids]
-            batch = batch[: self.batch_size]
+                batch = self.store.pending_outbox(self.batch_size)
             if not batch:
                 break
             data = self._post("/sync/events", {"device_id": self.device_id, "events": batch})
             sent_ids = {e["event_id"] for e in batch}
             acked = [i for i in data.get("acked") or [] if i in sent_ids]
-            for rej in data.get("rejected") or []:
-                if isinstance(rej, dict) and rej.get("event_id") in sent_ids:
-                    self.rejected_ids.add(rej["event_id"])
+            rejected = [
+                (rej["event_id"], str(rej.get("error") or "rejected"))
+                for rej in data.get("rejected") or []
+                if isinstance(rej, dict) and rej.get("event_id") in sent_ids
+            ]
             with self.lock:
                 self.store.ack(acked)
+                marked = self.store.mark_rejected(rejected, _utc_now())
             result.sent += len(batch)
             result.acked += len(acked)
-            if not acked and not any(i in self.rejected_ids for i in sent_ids):
+            result.rejected += marked
+            if not acked and not marked:
                 break  # no progress this round (partial failure): back off rather than spin
-        result.rejected = len(self.rejected_ids)
         if self.down_sync and not self._stop.is_set() and not self._paused.is_set():
             try:
                 result.pulled = len(
@@ -234,6 +240,7 @@ class SyncWorker:
             "paused": self.paused,
             "online": self.online,
             "outbox_backlog": self.backlog(),
+            "rejected": self.rejected_count(),
             "last_sync_at": self.last_sync_at,
             "last_error": self.last_error,
             "consecutive_failures": self.failures,
@@ -249,14 +256,25 @@ def worker_from_env(
     env: Mapping[str, str] | None = None,
     transport: httpx.BaseTransport | None = None,
 ) -> SyncWorker:
+    """Worker configured from the runtime env. The heartbeat reports the rules_version of the
+    engine that made this device's most recent decision (the real build stamp, DECISIONS A2),
+    falling back to `RULES_VERSION` (then a placeholder) before the first decision."""
     env = os.environ if env is None else env
-    rules = env.get("RULES_VERSION") or DEFAULT_RULES_VERSION
+    fallback_rules = env.get("RULES_VERSION") or DEFAULT_RULES_VERSION
+    device_id = env.get("DEVICE_ID") or DEFAULT_DEVICE_ID
+    store_lock = lock if lock is not None else nullcontext()
+
+    def versions() -> tuple[str, str]:
+        with store_lock:
+            rules = store.latest_rules_version(device_id)
+        return (rules or fallback_rules, model_version)
+
     return SyncWorker(
         store,
         cloud_url,
-        device_id=env.get("DEVICE_ID") or "laptop-dev-01",
+        device_id=device_id,
         token=env.get("DEVICE_TOKEN") or "dev-token-laptop-dev-01",
-        versions=lambda: (rules, model_version),
+        versions=versions,
         lock=lock,
         transport=transport,
         down_sync=True,
@@ -277,8 +295,18 @@ def _worker(request: Request) -> SyncWorker | None:
 async def sync_status(request: Request) -> Any:
     worker = _worker(request)
     if worker is None:
-        return {"running": False, "paused": False, "online": False}
-    return worker.status()
+        store = getattr(request.app.state, "store", None)
+        lock = getattr(request.app.state, "intake_lock", None) or nullcontext()
+
+        def counts() -> dict[str, int]:
+            if store is None:
+                return {}
+            with lock:
+                return {"outbox_backlog": store.outbox_count(), "rejected": store.rejected_count()}
+
+        counted = await run_in_threadpool(counts)
+        return {"running": False, "paused": False, "online": False, **counted}
+    return await run_in_threadpool(worker.status)
 
 
 def _badge_ctx(request: Request) -> dict[str, Any]:

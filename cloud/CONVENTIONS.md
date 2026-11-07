@@ -77,7 +77,8 @@ test/rescue_cloud_web/               controller + LiveView tests (mirrors lib/re
 
 ## Device-auth plug pattern
 Status: the plug itself is ticket C2; Wave 0 only fixes the pattern so C2, C3, C8 and C9 agree. Decision: one bearer token per device,
-read from `config/devices.exs` (see `docs/DECISIONS.md`).
+read from `config/devices.exs` in dev and test only, plus the `DEVICE_TOKENS` pairs (`config/runtime.exs`, `:extra_devices`), which are
+added in every env and are the only devices in prod (see `docs/DECISIONS.md`, A6).
 - `RescueCloudWeb.Plugs.DeviceAuth` (in `lib/rescue_cloud_web/plugs/device_auth.ex`) is a module plug. It reads
   `authorization: Bearer <token>`, compares it in constant time (`Plug.Crypto.secure_compare/2`) with the configured tokens, and on
   success calls `assign(conn, :device_id, device_id)`.

@@ -1,7 +1,17 @@
 import json
 
+import pytest
+
 from rescue_evals.loaders import load_cases
-from rescue_evals.runner import SYSTEMS, GoldExtractionSystem, main, register_system, run_set
+from rescue_evals.metrics import expected_calibration_error
+from rescue_evals.runner import (
+    SYSTEMS,
+    GoldExtractionSystem,
+    follow_up_field,
+    main,
+    register_system,
+    run_set,
+)
 from rescue_shared.models import Extracted
 
 EX = {
@@ -101,6 +111,78 @@ def test_cli_unknown_system_and_registry(tmp_path):
     args = ["--system", "wrong", "--sets", "B", "--sets-dir", str(sets)]
     assert main([*args, "--results-dir", str(tmp_path / "r")]) == 0
     SYSTEMS.pop("wrong")
+
+
+def test_follow_up_field_derived_from_abstain_reason():
+    def out(reason, outcome="abstain"):
+        return {"outcome": outcome, "abstain_reason": reason}
+
+    assert follow_up_field(out("no_usable_location")) == "location"
+    assert follow_up_field(out("conflicting_counts")) == "people_count"
+    assert follow_up_field(out("low_confidence_request")) == "is_request"
+    assert follow_up_field(out("possible_hoax")) == "is_request"
+    assert follow_up_field(out("low_confidence_hazard")) == "hazard"
+    assert follow_up_field(out(None, "prioritized")) is None
+    assert follow_up_field({}) is None
+    # a stray follow_up_field key is not read
+    assert follow_up_field({"outcome": "abstain", "follow_up_field": "location"}) is None
+
+
+def abstain_row(cid, text, gold_field):
+    ex = json.loads(json.dumps(EX))
+    ex["location"] = {"text": None, "type": "none", "confidence": 0.9}
+    r = row(cid, text, tier=None, ex=ex, outcome="abstain")
+    r["gold_decision"]["abstain_reason"] = "no_usable_location"
+    r["gold_decision"]["follow_up_field"] = gold_field
+    return r
+
+
+def test_follow_up_field_rate_scores_engine_abstains(tmp_path):
+    rows = [abstain_row("a", "t1", "location"), abstain_row("b", "t2", "people_count")]
+    cases = load_cases(write(tmp_path, rows) / "b.jsonl")
+    res = run_set(GoldExtractionSystem(cases), cases, "B")
+    assert res["metrics"]["decision.abstain_recall"] == 1.0
+    assert res["metrics"]["decision.follow_up_field_rate"] == 0.5  # engine asks for location
+    assert res["failures"]["decision.follow_up_field_rate"] == ["b"]
+
+
+def test_result_carries_calibration_ece(tmp_path):
+    # gold extraction: every prediction is right, so ECE = mean(1 - confidence)
+    sets = write(tmp_path, [row("a", "t1")])
+    cases = load_cases(sets / "b.jsonl")
+    res = run_set(GoldExtractionSystem(cases), cases, "B")
+    confs = [0.9, 0.9, 0.95, 0.8, 0.9]  # location, people, is_request, vulnerable, hazard
+    expected = expected_calibration_error(confs, [True] * 5)
+    assert res["metrics"]["calibration.ece"] == pytest.approx(expected)
+    assert res["failures"]["calibration.ece"] == []
+    # a wrong location at 0.9 is an overconfident failure and raises the error
+    wrong = run_set(Wrong(), cases, "B")
+    assert wrong["metrics"]["calibration.ece"] > res["metrics"]["calibration.ece"]
+    assert wrong["failures"]["calibration.ece"] == ["a"]
+
+
+def test_calibration_ece_omitted_without_extraction_gold(tmp_path):
+    sets = write(tmp_path, [row("a", "t1", ex=None)])
+    cases = load_cases(sets / "b.jsonl")
+    res = run_set(Wrong(), cases, "B")
+    assert "calibration.ece" not in res["metrics"]
+
+
+def test_summary_json_feeds_the_promotion_gate(tmp_path):
+    from rescue_evals.report import LOWER_IS_BETTER, publish
+
+    sets = write(tmp_path, [row("a", "t1")])
+    out = tmp_path / "results"
+    args = ["--system", "gold-extraction", "--sets", "B", "--sets-dir", str(sets)]
+    assert main([*args, "--results-dir", str(out)]) == 0
+    doc = json.loads((out / "gold-extraction__B.json").read_text())
+    assert isinstance(doc["metrics"]["calibration.ece"], float)
+    publish(out)
+    # models.ex reads summary["results"][*]["metrics"]["calibration.ece"] (a number)
+    [result] = json.loads((out / "summary.json").read_text())["results"]
+    assert result["metrics"]["calibration.ece"] == doc["metrics"]["calibration.ece"]
+    assert result["model_version"] == "stub:gold-extraction" and result["set"] == "B"
+    assert "calibration.ece" in LOWER_IS_BETTER  # TABLE.md bolds the lowest ECE
 
 
 def test_sealed_set_refused(tmp_path):

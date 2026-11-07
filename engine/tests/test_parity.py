@@ -15,12 +15,13 @@ import os
 import random
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 from rescue_engine import build as b
-from rescue_engine.fallback import decide, decide_one
+from rescue_engine.fallback import decide, decide_one, rules
 from rescue_shared.contracts_io import validator_for
 from rescue_shared.versions import parse_rules_version
 
@@ -58,10 +59,17 @@ def run(binary: Path, stdin: str) -> subprocess.CompletedProcess[str]:
 
 
 def mercury(binary: Path, payload):
+    """Run the built binary. It is stamped with its real rules_version (A2): check that, then
+    put back the source placeholder so outputs compare equal to the in-process Python engine."""
     proc = run(binary, json.dumps(payload))
     assert proc.returncode == 0, proc.stderr
     assert proc.stderr == ""
-    return json.loads(proc.stdout)
+    stamped = json.loads((binary.parent.parent / "manifest.json").read_text())["rules_version"]
+    out = json.loads(proc.stdout)
+    for item in out if isinstance(out, list) else [out]:
+        assert item["rules_version"] == stamped
+        item["rules_version"] = rules.RULES_VERSION
+    return out
 
 
 def engine_input(case: dict) -> dict:
@@ -81,7 +89,7 @@ def load_e4_grid() -> list[dict]:
 # --- build registration ---------------------------------------------------------------------
 
 
-def test_build_registers_mercury_artifact(dist_dir: Path, binary: Path):
+def test_build_registers_mercury_artifact(dist_dir: Path, binary: Path, tmp_path: Path):
     manifest = json.loads((dist_dir / "manifest.json").read_text())
     validator_for("engine_manifest.schema.json").validate(manifest)
     assert manifest["engine_kind"] == "mercury"
@@ -89,8 +97,26 @@ def test_build_registers_mercury_artifact(dist_dir: Path, binary: Path):
     assert dist_dir.name == manifest["rules_version"]
     sha, bin_hash = parse_rules_version(manifest["rules_version"])
     assert (sha, bin_hash) == (manifest["rules_sha"], manifest["bin_hash"])
-    assert b.hash_files([binary], binary.parent)[:16] == bin_hash
+    # bin_hash covers the binary as compiled, before the real version was stamped in (A2).
+    original = tmp_path / binary.name
+    original.write_bytes(b.unstamped(binary.read_bytes(), manifest["rules_version"], "mercury"))
+    assert b.hash_files([original], tmp_path)[:16] == bin_hash
     assert os.access(binary, os.X_OK)
+
+
+def test_built_binary_emits_its_real_rules_version(dist_dir: Path, binary: Path):
+    manifest = json.loads((dist_dir / "manifest.json").read_text())
+    proc = run(binary, json.dumps(engine_input(CASES[0])))
+    assert proc.returncode == 0, proc.stderr
+    version = json.loads(proc.stdout)["rules_version"]
+    assert version == manifest["rules_version"] != rules.RULES_VERSION
+    assert parse_rules_version(version)  # a well-formed version, no padding left
+
+
+def test_source_binary_emits_the_placeholder(binary: Path, tmp_path: Path):
+    compiled = b.compile_mercury(tmp_path / "out")
+    proc = run(compiled, json.dumps(engine_input(CASES[0])))
+    assert json.loads(proc.stdout)["rules_version"] == rules.RULES_VERSION
 
 
 def test_mercury_build_refuses_overwrite(dist_dir: Path, binary: Path):
@@ -158,7 +184,7 @@ def _random_input(rng: random.Random) -> dict:
     return {
         "extracted": {
             "location": {
-                "text": "x",
+                "text": rng.choice(["x", "x", "x", None, "", " \t"]),
                 "type": rng.choice(["landmark", "address", "coords", "none"]),
                 "confidence": conf(),
             },
@@ -198,6 +224,56 @@ def test_random_inputs_parity(binary: Path):
     mismatches = [(i, o, e) for i, o, e in zip(inputs, outs, expected, strict=True) if o != e]
     assert not mismatches, mismatches[:3]
     assert {o["outcome"] for o in outs} == {"prioritized", "abstain", "not_a_request", "duplicate"}
+    # The 2026-11-07 review paths are all reached (provisional tiers, R2/R3/R5/R9/R13).
+    abstains = [o for o in outs if o["outcome"] == "abstain"]
+    assert {o["provisional_tier"] for o in abstains} == {"P1", "P2", "P3"}
+    questions = {(o["outcome"], o["follow_up_question"]) for o in outs}
+    assert ("prioritized", rules.Q_HAZARD) in questions
+    assert ("prioritized", rules.Q_HOAX) in questions
+    assert ("duplicate", rules.Q_CONFIRM) in questions
+    assert any(q == rules.Q_HAZARD_VULNERABLE for _, q in questions)
+    assert any(o["rule_id"] == "R-ABS-REQ" and o["provisional_tier"] == "P1" for o in abstains)
+
+
+def load_review_inputs() -> list[dict]:
+    """Every engine_input built at module level in test_review_fixes.py (BAD_ENUMS excluded)."""
+    spec = importlib.util.spec_from_file_location(
+        "review_fixes", Path(__file__).with_name("test_review_fixes.py")
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    m = module
+    inputs = [m.inp(cid) for cid in m.CASES]
+    inputs += [
+        m.signals("C14", hazards=[("injury", 0.3)], kind="supply"),
+        m.signals("C05", hazards=[("trapped", 0.95), ("rising_water", 0.3)]),
+        m.signals("C05", hazards=[("rising_water", 0.95), ("fire", 0.4)]),
+        m.signals("C05", hazards=[("rising_water", 0.95)], vulnerable=[("child", 0.3)]),
+        m.signals("C08", hazards=[("fire", 0.3)]),
+        m.signals("C08", hazards=[("trapped", 0.6), ("rising_water", 0.3)]),
+        m.signals("C08", vulnerable=[("elderly", 0.3)]),
+        m.signals("C08", hazards=[("fire", 0.3)], vulnerable=[("elderly", 0.3)]),
+        m.signals("C11", hazards=[("rising_water", 0.8), ("on_roof", 0.3)]),
+        *(m._c04_with(t) for t in ("P1", "P2", "P3", None)),
+        *(m._weak_p1_dup(t) for t in ("P1", "P2", "P3", None)),
+    ]
+    for text in (None, "", "   ", "\t\n", " 4410 Bissonnet St "):
+        for loc_type in ("address", "coords", "landmark"):
+            item = m.inp("C02")
+            item["extracted"]["location"] = {"text": text, "type": loc_type, "confidence": 0.9}
+            inputs.append(item)
+    for conf, hits, cands in ((0.84, 1, []), (0.8, 1, [m.cand(tier="P3")]), (0.7, 2, [])):
+        item = m.inp("C01")
+        item["extracted"]["is_request"]["confidence"] = conf
+        item["context"]["hoax_marker_hits"] = hits
+        item["context"]["duplicate_candidates"] = cands
+        inputs.append(item)
+    return inputs
+
+
+def test_review_fix_inputs_parity(binary: Path):
+    inputs = load_review_inputs()
+    assert mercury(binary, inputs) == decide(inputs)
 
 
 def test_optional_fields_default_like_python(binary: Path):
@@ -244,6 +320,49 @@ def test_bad_input_exits_1_with_one_stderr_line(binary: Path, stdin: str):
     assert proc.stdout == ""
     lines = proc.stderr.splitlines()
     assert len(lines) == 1 and lines[0].startswith("rescue_engine.mercury: ")
+
+
+def _python_cli(stdin: str) -> subprocess.CompletedProcess[str]:
+    env = {**os.environ, "PYTHONPATH": os.pathsep.join(str(ROOT / d) for d in ("engine", "shared"))}
+    return subprocess.run(
+        [sys.executable, "-m", "rescue_engine.fallback"],
+        input=stdin, capture_output=True, text=True, env=env, timeout=60, check=False,
+    )
+
+
+def _contract_violations() -> dict[str, dict]:
+    """Inputs outside the contract that both engines must reject (A9 enums, R8 thresholds)."""
+    spec = importlib.util.spec_from_file_location(
+        "review_fixes", Path(__file__).with_name("test_review_fixes.py")
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    bad = dict(module.BAD_ENUMS)
+    for name, th in {
+        "firm_below_uncertain": {"hazard_firm_min": 0.4},
+        "weak_above_uncertain": {"hazard_weak_min": 0.6},
+    }.items():
+        item = copy.deepcopy(engine_input(CASES[0]))
+        item["context"]["thresholds"].update(th)
+        bad[name] = item
+    bad["batch_with_one_bad"] = [engine_input(CASES[0]), module.BAD_ENUMS["need_kind"]]
+    return bad
+
+
+CONTRACT_VIOLATIONS = _contract_violations()
+
+
+@pytest.mark.parametrize(
+    "payload", CONTRACT_VIOLATIONS.values(), ids=CONTRACT_VIOLATIONS.keys()
+)
+def test_contract_violations_exit_1_in_both_engines(binary: Path, payload):
+    stdin = json.dumps(payload)
+    for proc, prefix in ((run(binary, stdin), "rescue_engine.mercury: "),
+                         (_python_cli(stdin), "rescue_engine.fallback: ")):
+        assert proc.returncode == 1
+        assert proc.stdout == ""
+        lines = proc.stderr.splitlines()
+        assert len(lines) == 1 and lines[0].startswith(prefix), proc.stderr
 
 
 # --- compiler-checked exhaustiveness ------------------------------------------------------------

@@ -1,7 +1,11 @@
 defmodule RescueCloudWeb.Plugs.DeviceAuth do
   @moduledoc """
-  Authenticates a field laptop by bearer token (configured in `config/devices.exs`).
-  Assigns `:device_id` on success; halts with 401 `{"error": "unauthorized"}` otherwise.
+  Authenticates a field laptop by bearer token. Assigns `:device_id` on success; halts with 401
+  `{"error": "unauthorized"}` otherwise.
+
+  The accepted devices are `devices/0`: the `:devices` map (the committed tokens in
+  `config/devices.exs`, loaded only in dev and test; empty in prod) plus the `:extra_devices`
+  pairs parsed from `DEVICE_TOKENS` in `config/runtime.exs`.
   """
   import Plug.Conn
 
@@ -20,9 +24,17 @@ defmodule RescueCloudWeb.Plugs.DeviceAuth do
     end
   end
 
+  @doc "Device id => token: the configured `:devices` with the `DEVICE_TOKENS` pairs added."
+  @spec devices() :: %{String.t() => String.t()}
+  def devices do
+    Map.merge(
+      Application.get_env(:rescue_cloud, :devices, %{}),
+      Application.get_env(:rescue_cloud, :extra_devices, %{})
+    )
+  end
+
   defp find_device(token) do
-    :rescue_cloud
-    |> Application.get_env(:devices, %{})
+    devices()
     |> Enum.reduce(:error, fn {id, expected}, acc ->
       # compare against every token so timing does not reveal which matched
       if Plug.Crypto.secure_compare(token, expected), do: {:ok, id}, else: acc

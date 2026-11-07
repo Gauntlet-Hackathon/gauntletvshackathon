@@ -106,6 +106,7 @@ defmodule RescueCloud.ProjectionTest do
       req = Projection.get_request(r)
       assert req.status == "decided"
       assert req.priority_tier == "P1"
+      assert req.provisional_tier == nil
       assert req.rule_id == "R-P1-ROOF"
       assert req.outcome == payload("decided")["engine_output"]["outcome"]
       assert req.rules_version == @rules
@@ -132,6 +133,27 @@ defmodule RescueCloud.ProjectionTest do
       push([event(r, 5, "rescued", "2026-11-07T15:00:00Z")])
       push([event(r, 6, "escalated", "2026-11-07T15:05:00Z")])
       assert Projection.get_request(r).status == "rescued"
+    end
+
+    test "escalated follows assigned; a later assigned does not move escalated back" do
+      r = rid("0A")
+      push([received(r, 1, "2026-11-07T14:00:00Z")])
+      push([event(r, 2, "assigned", "2026-11-07T14:10:00Z")])
+      push([event(r, 3, "escalated", "2026-11-07T14:20:00Z")])
+      assert Projection.get_request(r).status == "escalated"
+
+      push([event(r, 4, "assigned", "2026-11-07T14:30:00Z")])
+      assert Projection.get_request(r).status == "escalated"
+
+      push([event(r, 5, "rescued", "2026-11-07T15:00:00Z")])
+      assert Projection.get_request(r).status == "rescued"
+    end
+
+    test "status ranks: assigned < escalated < rescued" do
+      assert Projection.status_rank("decided") < Projection.status_rank("assigned")
+      assert Projection.status_rank("assigned") < Projection.status_rank("escalated")
+      assert Projection.status_rank("escalated") < Projection.status_rank("rescued")
+      assert Projection.status_rank("corrected") == nil
     end
 
     test "a correction does not change status and later statuses still advance" do

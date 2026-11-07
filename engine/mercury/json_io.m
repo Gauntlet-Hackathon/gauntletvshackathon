@@ -69,6 +69,7 @@ parse_input(Obj) = engine_input(parse_extracted(Ex), parse_context(Ctx)) :-
 parse_extracted(Ex) = Extracted :-
     Location = req_object(Ex, "location"),
     LocType = location_type_from(req_string(Location, "type")),
+    LocText = opt_string(Location, "text"),
     LocConf = req_number(Location, "confidence"),
     PeopleCount = opt_number(opt_object(Ex, "people_count"), "value"),
     Vulnerable = list.map(conf_item(vulnerable_from), opt_objects(Ex, "vulnerable")),
@@ -85,7 +86,7 @@ parse_extracted(Ex) = Extracted :-
     else
         RequestKind = other
     ),
-    Extracted = extracted(LocType, LocConf, PeopleCount, Vulnerable, Hazards,
+    Extracted = extracted(LocType, LocText, LocConf, PeopleCount, Vulnerable, Hazards,
         IsStale, StaleConf, RequestValue, RequestConf, Needs, RequestKind).
 
 :- func conf_item(func(string) = T, json.object) = conf_item(T).
@@ -125,7 +126,18 @@ parse_candidate(C) = candidate(
 
 :- func parse_thresholds(json.object) = thresholds.
 
-parse_thresholds(T) = thresholds(
+parse_thresholds(T) = Th :-
+    Th0 = merge_thresholds(T),
+    ( if thresholds_ordered(Th0) then
+        Th = Th0
+    else
+        Th = fail_input("thresholds must satisfy hazard_weak_min <= " ++
+            "hazard_uncertain_min <= hazard_firm_min")
+    ).
+
+:- func merge_thresholds(json.object) = thresholds.
+
+merge_thresholds(T) = thresholds(
         th(T, "request_confidence_min", D ^ request_confidence_min),
         th(T, "stale_confidence_min", D ^ stale_confidence_min),
         th(T, "hoax_marker_min", D ^ hoax_marker_min),
@@ -333,6 +345,7 @@ payload_to_json(batch(Outs)) = array(list.map(output_to_json, Outs)).
 output_to_json(Out) = json.det_make_object([
         "outcome" - string(outcome_string(Out ^ outcome)),
         "priority_tier" - maybe_json(tier_string, Out ^ priority_tier),
+        "provisional_tier" - maybe_json(tier_string, Out ^ provisional_tier),
         "rule_id" - string(rule_id_string(Out ^ rule_id)),
         "duplicate_of" - maybe_json(id, Out ^ duplicate_of),
         "abstain_reason" - maybe_json(abstain_reason_string, Out ^ abstain_reason),

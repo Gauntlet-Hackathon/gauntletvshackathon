@@ -19,8 +19,13 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 field #129 F14: tests/test_sync_integration.py: contract-faithful in-process fake cloud (auth, schema validation, dedupe); offline queueing, full drain, 500 retry/lost-ack idempotency, 401 keeps rows, ordering
 2026-11-07 field #152 F15: field/Dockerfile (python:3.12-slim, constraints, PYTHONPATH, uvicorn on $PORT, fallback engine) + root .dockerignore; verified image builds, GET / 200, POST /requests returns fallback-engine decision
 2026-11-07 field #152 F15 re-verify: image rebuilt, GET / 200, POST /requests got fallback-engine decision; added tests/test_dockerfile.py static checks for the Dockerfile/.dockerignore contract
+2026-11-07 field step3-R1: board sorts the follow-up queue by provisional_tier (P1 first, missing last; group takes its highest) then logic.within_tier_sort_key; follow-up card shows the provisional tier; tests in test_board.py
+2026-11-07 field step3-A4: store persists rejected events (outbox rejected_at/reject_error, added to existing SQLite files on open), pending_outbox and backlog skip them, sync worker marks them and never resends, /sync/status shows "rejected"; tests in test_store.py, test_sync.py
+2026-11-07 field step3-A5: one DEFAULT_DEVICE_ID = "laptop-dev-01" in pipeline.py, used by PipelineConfig and sync.worker_from_env; test in test_sync.py
+2026-11-07 field step3-R1/A2: fake engine and test fixtures emit provisional_tier; heartbeat rules_version comes from the newest local decided event (EventStore.latest_rules_version), falling back to RULES_VERSION then the placeholder; tests in test_sync.py
 2026-11-07 field #173 F18: board intake panel (_intake.html: single, paste, CSV forms; fetch script with Processing/Added/alert states, board fragment refresh); tests/test_board_intake.py
 2026-11-07 field #174 F27: rescue_field/loadtest.py surge load test (real engine, optional sync drain, JSON timings); tests/test_loadtest.py
+2026-11-07 field PR181: test_follow_up_group_takes_highest_provisional_tier gives the duplicate row a null provisional_tier (contract)
 2026-11-07 field #154 F16: root docker-compose.yml (db+cloud+field), .env.example, RUNBOOK 'Run locally'; verified POST /requests syncs to the cloud db; cloud prod.exs force_ssl now excludes host 'cloud'
 2026-11-07 field #155 F17: scripts/smoke.sh (health, 3 synced, cloud stop, 5 queued in outbox, restart, 5 arrive <=90s no dupes; --no-docker); verified PASS on every step against the compose stack
 2026-11-07 field #175 F26: field/fly.toml (placeholder app rescue-field-demo, /data volume, /sync/status check), RUNBOOK 'Deploy hosted field demo to Fly', tests/test_fly_toml.py

@@ -63,6 +63,80 @@ defmodule RescueCloud.EventsTest do
       bad = put_in(decided, ["engine_output", "outcome"], "abstain")
       refute Event.changeset(event(%{"type" => "decided", "payload" => bad})).valid?
     end
+
+    test "provisional_tier is set exactly on abstain outcomes when present (DECISIONS R1)" do
+      decided = example("payload-decided.valid")
+      out = decided["engine_output"]
+
+      valid? = fn o ->
+        Event.changeset(
+          event(%{"type" => "decided", "payload" => %{decided | "engine_output" => o}})
+        ).valid?
+      end
+
+      abstain = %{
+        out
+        | "outcome" => "abstain",
+          "priority_tier" => nil,
+          "provisional_tier" => "P1",
+          "rule_id" => "R-ABS-LOC",
+          "duplicate_of" => nil,
+          "abstain_reason" => "no_usable_location",
+          "follow_up_question" => "Where exactly are you?"
+      }
+
+      assert valid?.(abstain)
+      refute valid?.(%{abstain | "provisional_tier" => nil})
+      refute valid?.(%{abstain | "provisional_tier" => "P4"})
+      refute valid?.(%{abstain | "provisional_tier" => 1})
+
+      prioritized = %{
+        out
+        | "outcome" => "prioritized",
+          "priority_tier" => "P2",
+          "provisional_tier" => nil,
+          "duplicate_of" => nil,
+          "abstain_reason" => nil
+      }
+
+      assert valid?.(prioritized)
+      refute valid?.(%{prioritized | "provisional_tier" => "P2"})
+      refute valid?.(%{prioritized | "provisional_tier" => "P4"})
+    end
+
+    test "an engine_output from a pre-provisional_tier engine is accepted as null (version skew)" do
+      decided = example("payload-decided.valid")
+      out = Map.delete(decided["engine_output"], "provisional_tier")
+
+      valid? = fn o ->
+        Event.changeset(
+          event(%{"type" => "decided", "payload" => %{decided | "engine_output" => o}})
+        ).valid?
+      end
+
+      for {outcome, tier, dup, reason, q} <- [
+            {"prioritized", "P2", nil, nil, nil},
+            {"duplicate", "P2", "01JCB00000000000000000X001", nil, nil},
+            {"not_a_request", nil, nil, nil, nil},
+            {"abstain", nil, nil, "no_usable_location", "Where exactly are you?"}
+          ] do
+        o = %{
+          out
+          | "outcome" => outcome,
+            "priority_tier" => tier,
+            "duplicate_of" => dup,
+            "abstain_reason" => reason,
+            "follow_up_question" => q
+        }
+
+        assert valid?.(o), outcome
+      end
+
+      # The other outcome rules still hold without the key.
+      refute valid?.(%{out | "outcome" => "abstain", "priority_tier" => "P1"})
+      # Unknown keys are still rejected.
+      refute valid?.(Map.put(out, "provisional", "P1"))
+    end
   end
 
   describe "append_batch/1" do

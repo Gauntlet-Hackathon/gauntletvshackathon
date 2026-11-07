@@ -1,14 +1,14 @@
-# Shared fixtures: 24 rubric cases
+# Shared fixtures: 25 rubric cases
 
 Unit-test fixtures every lane uses (not an eval set; the eval sets live in `evals/`). Each line of `cases.jsonl` is one case:
 
 | key | meaning |
 |---|---|
-| `case_id`, `description` | `C01`…`C24` and what the case exercises |
+| `case_id`, `description` | `C01`…`C25` and what the case exercises |
 | `raw_text`, `request_id`, `received_at`, `contact` | the incoming message and its metadata (what the field pipeline sees) |
 | `extracted` | the `extracted` payload a correct extractor produces from `raw_text` (field/engine/evals tests feed this to their code) |
 | `context` | the engine context: `duplicate_candidates`, `street_list_hits`, `hoax_marker_hits`, `thresholds` (the defaults from `contracts/engine_rules.md`) |
-| `expected` | the `engine_output` for `{extracted, context}` |
+| `expected` | the `engine_output` for `{extracted, context}`; every abstain carries its `provisional_tier` (added 2026-11-07, see `docs/DECISIONS.md` R1) |
 
 `{"extracted": …, "context": …}` is a valid `engine_input`. Span offsets are Unicode code points (Python string indices).
 
@@ -19,7 +19,7 @@ Do not regenerate them from code. If an engine disagrees with a case, decide by 
 ## Coverage
 | What | Cases |
 |---|---|
-| P1 | C01 (R-P1-01), C02 (R-P1-02), C03 (R-P1-03, Spanish), C04 (raised from P2 by an uncertain signal, with a confirm question) |
+| P1 | C01 (R-P1-01), C02 (R-P1-02), C03 (R-P1-03, Spanish), C04 (raised from P2 by an uncertain signal, with a confirm question), C25 (R-P1-02: "not breathing" extracted as `injury`, the acute-medical-emergency convention, R6) |
 | P2 | C05 (R-P2-01), C06 (R-P2-02), C07 (R-P2-03, location confidence exactly 0.6) |
 | P3 | C08 (R-P3-01), C09 (R-P3-03, also the prompt-injection case) |
 | not_a_request | C10 (offer of help), C11 (old post resurfacing) |

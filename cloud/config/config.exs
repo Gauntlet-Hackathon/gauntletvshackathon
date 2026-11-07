@@ -59,5 +59,8 @@ config :phoenix, :json_library, Jason
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
-import_config "devices.exs"
+# Device tokens: the committed dev/demo tokens (devices.exs) load only in dev and test. Prod starts
+# with no devices and accepts only the pairs in DEVICE_TOKENS (config/runtime.exs, :extra_devices).
+config :rescue_cloud, :devices, %{}
+if config_env() in [:dev, :test], do: import_config("devices.exs")
 import_config "#{config_env()}.exs"

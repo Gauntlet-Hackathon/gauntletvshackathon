@@ -56,18 +56,18 @@
       "name": "window edge is inclusive; groups are transitive, candidates are direct",
       "window_hours": 2,
       "requests": [
-        {"request_id": "01JCB00000000000000000D001", "received_at": "2026-11-07T08:00:00Z", "location_text": "9 Elm Dr", "people_count": 1, "contact": null, "priority_tier": "P3"},
-        {"request_id": "01JCB00000000000000000D002", "received_at": "2026-11-07T10:00:00Z", "location_text": "9 Elm Drive", "people_count": 1, "contact": null, "priority_tier": "P3"},
-        {"request_id": "01JCB00000000000000000D003", "received_at": "2026-11-07T10:00:01Z", "location_text": "9 Elm Dr", "people_count": 1, "contact": null, "priority_tier": null}
+        {"request_id": "01JCB00000000000000000D001", "received_at": "2026-11-07T08:00:00Z", "location_text": "9 Elm Dr", "people_count": 3, "contact": null, "priority_tier": "P3"},
+        {"request_id": "01JCB00000000000000000D002", "received_at": "2026-11-07T10:00:00Z", "location_text": "9 Elm Drive", "people_count": 3, "contact": null, "priority_tier": "P3"},
+        {"request_id": "01JCB00000000000000000D003", "received_at": "2026-11-07T10:00:01Z", "location_text": "9 Elm Dr", "people_count": 3, "contact": null, "priority_tier": null}
       ],
       "expected": {
         "candidates": {
           "01JCB00000000000000000D001": [],
           "01JCB00000000000000000D002": [
-            {"request_id": "01JCB00000000000000000D001", "received_at": "2026-11-07T08:00:00Z", "people_count": 1, "contact_match": false, "priority_tier": "P3"}
+            {"request_id": "01JCB00000000000000000D001", "received_at": "2026-11-07T08:00:00Z", "people_count": 3, "contact_match": false, "priority_tier": "P3"}
           ],
           "01JCB00000000000000000D003": [
-            {"request_id": "01JCB00000000000000000D002", "received_at": "2026-11-07T10:00:00Z", "people_count": 1, "contact_match": false, "priority_tier": "P3"}
+            {"request_id": "01JCB00000000000000000D002", "received_at": "2026-11-07T10:00:00Z", "people_count": 3, "contact_match": false, "priority_tier": "P3"}
           ]
         },
         "groups": [["01JCB00000000000000000D001", "01JCB00000000000000000D002", "01JCB00000000000000000D003"]]
@@ -77,16 +77,16 @@
       "name": "equal timestamps are ordered by request_id; empty locations never match",
       "window_hours": 12,
       "requests": [
-        {"request_id": "01JCB00000000000000000E001", "received_at": "2026-11-07T12:00:00Z", "location_text": "7 Oak Ln", "people_count": 2, "contact": null, "priority_tier": "P2"},
-        {"request_id": "01JCB00000000000000000E002", "received_at": "2026-11-07T12:00:00Z", "location_text": "7 oak lane", "people_count": 2, "contact": null, "priority_tier": "P2"},
-        {"request_id": "01JCB00000000000000000E003", "received_at": "2026-11-07T12:05:00Z", "location_text": null, "people_count": 2, "contact": null, "priority_tier": "P2"},
-        {"request_id": "01JCB00000000000000000E004", "received_at": "2026-11-07T12:06:00Z", "location_text": "the", "people_count": 2, "contact": null, "priority_tier": "P2"}
+        {"request_id": "01JCB00000000000000000E001", "received_at": "2026-11-07T12:00:00Z", "location_text": "7 Oak Ln", "people_count": 3, "contact": null, "priority_tier": "P2"},
+        {"request_id": "01JCB00000000000000000E002", "received_at": "2026-11-07T12:00:00Z", "location_text": "7 oak lane", "people_count": 3, "contact": null, "priority_tier": "P2"},
+        {"request_id": "01JCB00000000000000000E003", "received_at": "2026-11-07T12:05:00Z", "location_text": null, "people_count": 3, "contact": null, "priority_tier": "P2"},
+        {"request_id": "01JCB00000000000000000E004", "received_at": "2026-11-07T12:06:00Z", "location_text": "the", "people_count": 3, "contact": null, "priority_tier": "P2"}
       ],
       "expected": {
         "candidates": {
           "01JCB00000000000000000E001": [],
           "01JCB00000000000000000E002": [
-            {"request_id": "01JCB00000000000000000E001", "received_at": "2026-11-07T12:00:00Z", "people_count": 2, "contact_match": false, "priority_tier": "P2"}
+            {"request_id": "01JCB00000000000000000E001", "received_at": "2026-11-07T12:00:00Z", "people_count": 3, "contact_match": false, "priority_tier": "P2"}
           ],
           "01JCB00000000000000000E003": [],
           "01JCB00000000000000000E004": []
@@ -98,9 +98,9 @@
       "name": "two interleaved groups are listed by their oldest member",
       "window_hours": 12,
       "requests": [
-        {"request_id": "01JCB00000000000000000F001", "received_at": "2026-11-07T07:00:00Z", "location_text": "10 Pine Rd", "people_count": 2, "contact": null, "priority_tier": "P2"},
+        {"request_id": "01JCB00000000000000000F001", "received_at": "2026-11-07T07:00:00Z", "location_text": "10 Pine Rd", "people_count": 3, "contact": null, "priority_tier": "P2"},
         {"request_id": "01JCB00000000000000000F002", "received_at": "2026-11-07T07:05:00Z", "location_text": "22 Cedar Rd", "people_count": 4, "contact": null, "priority_tier": "P1"},
-        {"request_id": "01JCB00000000000000000F003", "received_at": "2026-11-07T07:10:00Z", "location_text": "10 Pine Road", "people_count": 2, "contact": null, "priority_tier": "P3"},
+        {"request_id": "01JCB00000000000000000F003", "received_at": "2026-11-07T07:10:00Z", "location_text": "10 Pine Road", "people_count": 3, "contact": null, "priority_tier": "P3"},
         {"request_id": "01JCB00000000000000000F004", "received_at": "2026-11-07T07:15:00Z", "location_text": "22 cedar road", "people_count": 4, "contact": null, "priority_tier": "P2"}
       ],
       "expected": {
@@ -108,7 +108,7 @@
           "01JCB00000000000000000F001": [],
           "01JCB00000000000000000F002": [],
           "01JCB00000000000000000F003": [
-            {"request_id": "01JCB00000000000000000F001", "received_at": "2026-11-07T07:00:00Z", "people_count": 2, "contact_match": false, "priority_tier": "P2"}
+            {"request_id": "01JCB00000000000000000F001", "received_at": "2026-11-07T07:00:00Z", "people_count": 3, "contact_match": false, "priority_tier": "P2"}
           ],
           "01JCB00000000000000000F004": [
             {"request_id": "01JCB00000000000000000F002", "received_at": "2026-11-07T07:05:00Z", "people_count": 4, "contact_match": false, "priority_tier": "P1"}
@@ -121,17 +121,74 @@
       "name": "coordinates with different precision are the same place",
       "window_hours": 12,
       "requests": [
-        {"request_id": "01JCB00000000000000000G001", "received_at": "2026-11-07T06:00:00Z", "location_text": "29.7604, -95.3698", "people_count": 2, "contact": null, "priority_tier": "P2"},
-        {"request_id": "01JCB00000000000000000G002", "received_at": "2026-11-07T06:30:00Z", "location_text": "29.760412,-95.369811", "people_count": 2, "contact": null, "priority_tier": "P2"}
+        {"request_id": "01JCB00000000000000000G001", "received_at": "2026-11-07T06:00:00Z", "location_text": "29.7604, -95.3698", "people_count": 3, "contact": null, "priority_tier": "P2"},
+        {"request_id": "01JCB00000000000000000G002", "received_at": "2026-11-07T06:30:00Z", "location_text": "29.760412,-95.369811", "people_count": 3, "contact": null, "priority_tier": "P2"}
       ],
       "expected": {
         "candidates": {
           "01JCB00000000000000000G001": [],
           "01JCB00000000000000000G002": [
-            {"request_id": "01JCB00000000000000000G001", "received_at": "2026-11-07T06:00:00Z", "people_count": 2, "contact_match": false, "priority_tier": "P2"}
+            {"request_id": "01JCB00000000000000000G001", "received_at": "2026-11-07T06:00:00Z", "people_count": 3, "contact_match": false, "priority_tier": "P2"}
           ]
         },
         "groups": [["01JCB00000000000000000G001", "01JCB00000000000000000G002"]]
+      }
+    },
+    {
+      "name": "count-only matching needs a count of at least 3: two households of 2 at one address stay separate",
+      "window_hours": 12,
+      "requests": [
+        {"request_id": "01JCB00000000000000000H001", "received_at": "2026-11-07T11:00:00Z", "location_text": "5200 Gessner Rd Apt 4", "people_count": 2, "contact": "+17135550201", "priority_tier": "P2"},
+        {"request_id": "01JCB00000000000000000H002", "received_at": "2026-11-07T11:20:00Z", "location_text": "5200 Gessner Road apt 4", "people_count": 2, "contact": "+17135550202", "priority_tier": "P2"},
+        {"request_id": "01JCB00000000000000000H003", "received_at": "2026-11-07T11:30:00Z", "location_text": "5200 gessner rd apt 4", "people_count": 2, "contact": null, "priority_tier": "P3"},
+        {"request_id": "01JCB00000000000000000H004", "received_at": "2026-11-07T11:40:00Z", "location_text": "18 Bayou Ln", "people_count": 1, "contact": null, "priority_tier": "P3"},
+        {"request_id": "01JCB00000000000000000H005", "received_at": "2026-11-07T11:45:00Z", "location_text": "18 bayou lane", "people_count": 1, "contact": null, "priority_tier": "P3"}
+      ],
+      "expected": {
+        "candidates": {
+          "01JCB00000000000000000H001": [],
+          "01JCB00000000000000000H002": [],
+          "01JCB00000000000000000H003": [],
+          "01JCB00000000000000000H004": [],
+          "01JCB00000000000000000H005": []
+        },
+        "groups": []
+      }
+    },
+    {
+      "name": "count-only matching at the threshold: two reports of 3 people at one address are merged; an unknown count never matches",
+      "window_hours": 12,
+      "requests": [
+        {"request_id": "01JCB00000000000000000J001", "received_at": "2026-11-07T11:00:00Z", "location_text": "5200 Gessner Rd Apt 4", "people_count": 3, "contact": "+17135550201", "priority_tier": "P2"},
+        {"request_id": "01JCB00000000000000000J002", "received_at": "2026-11-07T11:20:00Z", "location_text": "5200 Gessner Road apt 4", "people_count": 3, "contact": "+17135550202", "priority_tier": "P1"},
+        {"request_id": "01JCB00000000000000000J003", "received_at": "2026-11-07T11:30:00Z", "location_text": "5200 gessner rd apt 4", "people_count": null, "contact": null, "priority_tier": null}
+      ],
+      "expected": {
+        "candidates": {
+          "01JCB00000000000000000J001": [],
+          "01JCB00000000000000000J002": [
+            {"request_id": "01JCB00000000000000000J001", "received_at": "2026-11-07T11:00:00Z", "people_count": 3, "contact_match": false, "priority_tier": "P2"}
+          ],
+          "01JCB00000000000000000J003": []
+        },
+        "groups": [["01JCB00000000000000000J001", "01JCB00000000000000000J002"]]
+      }
+    },
+    {
+      "name": "same contact still matches with small counts",
+      "window_hours": 12,
+      "requests": [
+        {"request_id": "01JCB00000000000000000K001", "received_at": "2026-11-07T13:00:00Z", "location_text": "77 Wayside Dr", "people_count": 2, "contact": "713-555-0300", "priority_tier": "P2"},
+        {"request_id": "01JCB00000000000000000K002", "received_at": "2026-11-07T13:15:00Z", "location_text": "77 wayside drive", "people_count": 2, "contact": "+1 713 555 0300", "priority_tier": "P2"}
+      ],
+      "expected": {
+        "candidates": {
+          "01JCB00000000000000000K001": [],
+          "01JCB00000000000000000K002": [
+            {"request_id": "01JCB00000000000000000K001", "received_at": "2026-11-07T13:00:00Z", "people_count": 2, "contact_match": true, "priority_tier": "P2"}
+          ]
+        },
+        "groups": [["01JCB00000000000000000K001", "01JCB00000000000000000K002"]]
       }
     }
   ]

@@ -46,6 +46,44 @@ defmodule RescueCloudWeb.RecordsLiveTest do
     assert has_element?(view, "#record-#{rid("A1")} [data-role=status]", "escalated")
   end
 
+  test "abstain follow-ups rank at their provisional_tier, after ranked rows of it (R1)", %{
+    conn: conn
+  } do
+    sync!(
+      [
+        event("D4", 1, "received", "2026-11-07T14:07:00Z"),
+        event("D4", 2, "decided", "2026-11-07T14:07:05Z",
+          outcome: "abstain",
+          provisional_tier: "P1"
+        ),
+        event("E5", 1, "received", "2026-11-07T14:08:00Z"),
+        event("E5", 2, "decided", "2026-11-07T14:08:05Z",
+          outcome: "abstain",
+          provisional_tier: "P3"
+        )
+      ],
+      @t
+    )
+
+    {:ok, view, _} = live(conn, ~p"/records")
+
+    # P1 (A1), P1? (D4), P2? (C3, the fixture default), P3 (B2), P3? (E5): a "P1?" abstain
+    # ranks with the P1 rows, not after every P3; within a tier ranked rows come first, and the
+    # newest abstain (E5) does not jump ahead of an older but more urgent one
+    assert rows(view) ==
+             Enum.map(~w(A1 D4 C3 B2 E5), &("record-" <> rid(&1)))
+
+    assert has_element?(view, "#record-#{rid("D4")} [data-role=tier]", "P1?")
+    assert has_element?(view, "#record-#{rid("E5")} [data-role=tier]", "P3?")
+
+    # The tier filter matches the provisional tier too, so filtering P1 shows the "P1?" abstain.
+    {:ok, view, _} = live(conn, ~p"/records?tier=P1")
+    assert rows(view) == Enum.map(~w(A1 D4), &("record-" <> rid(&1)))
+
+    {:ok, view, _} = live(conn, ~p"/records?tier=P3")
+    assert rows(view) == Enum.map(~w(B2 E5), &("record-" <> rid(&1)))
+  end
+
   test "P1 badge shows its word and an alarm icon", %{conn: conn} do
     {:ok, view, _} = live(conn, ~p"/records")
 

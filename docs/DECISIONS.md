@@ -121,3 +121,33 @@ HumAID (required by ToU clause "cite the corresponding paper in derived publicat
 - Keep HumAID as an internal, research-only eval Set A: tweet IDs plus labels in git under `evals/sets/A/`; tweet text downloaded locally under the ToU and git-ignored; HumAID cited on the evals panel. Only aggregate scores and IDs are shown anywhere public.
 - Never use Set A for training or put it in the corrections export.
 - If nobody runs the local-text setup, drop Set A and note it here (`docs/plan/08-risks-and-open-questions.md` risk row).
+
+## Step 3 review fixes (2026-11-07)
+Findings R1–R13 (engine rules) and A1–A12 (agent assumptions) are in the step 3 review. Paawan approved fixing them; where a finding needed a product call, the option below was chosen. These supersede the conflicting Wave 0 lines above.
+
+**Engine rules**
+- R1: every `abstain` carries `provisional_tier` (P1/P2/P3): the step-4 tier computed with firm, uncertain and weak signals together (the most cautious reading), whatever the abstain cause. Other outcomes have `provisional_tier: null`. Boards sort follow-ups by `provisional_tier`, then by the within-tier key. Version skew: `engine_output.schema.json` stays strict (the key is required, so new engines must emit it), but the cloud accepts a decided `engine_output` that lacks the key as `provisional_tier: null`, for every outcome, so events queued on a pre-upgrade field build are not rejected for good; a present key is checked strictly. The cloud `/records` list ranks an abstain at its `provisional_tier` (a "P1?" with the P1 rows, after the ranked P1s) and its tier filter matches either column.
+- R2: a weak (0.25–0.5) signal that would raise the tier no longer abstains a request that is already P1 or P2: it stays `prioritized` at that tier with the `low_confidence_hazard` question as its follow-up. It still abstains `low_confidence_hazard` when the request would otherwise be P3. (Replaces the `low_confidence_hazard` line above.)
+- R3: the hoax check moves after tiering. A possible hoax whose tier is P1 stays `prioritized` with the `possible_hoax` question as follow-up; P2/P3 still abstain `possible_hoax`. Default thresholds and the marker list are unchanged. (Replaces "hoax comes second".)
+- R4: `conflicting_counts` stays an abstain, but now carries the tier via `provisional_tier` (R1), taken as the highest of the request and its candidates.
+- R5: a stale post whose tier would be P1 abstains `low_confidence_request` instead of being dropped as `not_a_request`.
+- R6: extraction convention: any acute medical emergency (unconscious, not breathing, chest pain, severe bleeding, someone drowning) is extracted as hazard `injury`. R-P1-04 stays as the plan states it (child, elderly, disabled).
+- R7: count-only duplicate matching needs the same known count **and** a count of at least 3; same-contact matching is unchanged.
+- R8: thresholds must satisfy `hazard_weak_min ≤ hazard_uncertain_min ≤ hazard_firm_min`; engines exit 1 otherwise.
+- R9: a duplicate whose own uncertain signal set the group tier keeps the confirm question. It also keeps its own question when its `weak_tier` is above the group tier, so a weak P1 hint on a P2 duplicate keeps the `low_confidence_hazard` question (PR #181 review, B1).
+- R10: `duplicate_of` is the oldest direct candidate and may be an intermediate member; consumers resolve groups with `duplicate_groups`.
+- R11: an `address` or `coords` location with null or blank text counts as no usable location.
+- R12: conflicting *locations* across duplicates are not detected (04:33 asks for it). Deferred: the candidate shape cannot express it. Recorded here as a known deviation.
+- R13: when the weak signal that triggers `low_confidence_hazard` is a vulnerable person, the follow-up asks whether a child, elderly or disabled person is present.
+
+**Cross-lane**
+- A1: status order is assigned < escalated < rescued (escalation follows an assignment), in field and cloud alike; written into `contracts/logic.md`.
+- A2: `build.py` stamps the real `rules_version` into the built engine, so emitted decisions carry it and replay can find the build.
+- A3: the evals runner writes `metrics["calibration.ece"]` (one ECE pooled over every extracted-field confidence the decision is made from; engine output has no confidence of its own) for the promotion gate.
+- A4: rejected events are stored as rejected and never re-sent unchanged; /sync/status shows their count.
+- A5: the field app has one default `DEVICE_ID`, `laptop-dev-01`.
+- A6: `DEVICE_TOKENS` adds pairs to the device map. The committed dev tokens are loaded only in dev and test; prod accepts only `DEVICE_TOKENS`, so deploys must list every device (including `demo-field-01` for the demo).
+- A7: the follow-up-field metric is derived from `abstain_reason` (no_usable_location→location, conflicting_counts→people_count, low_confidence_request/possible_hoax→is_request, low_confidence_hazard→hazard).
+- A8: env names in use beyond the CLAUDE.md runtime contract: cloud `ENGINE_DIST`; field `RULES_VERSION`, `HF_REPO`, `HF_REVISION`.
+- A9: the Python fallback rejects enum values outside the contract with exit 1, like Mercury.
+- A10 (EV5 draft labels) is for the H4 hand-check; A11 (`POST /corrections`) stays deferred; A12 resolves with H1b #104.
