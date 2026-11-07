@@ -54,7 +54,7 @@ def _people(row: dict[str, Any]) -> int | None:
 def draft_message(row: dict[str, Any]) -> str:
     """The message for the crew: only extracted fields and the callback number, never raw text."""
     e = row["extracted"]
-    lines = [f"Rescue {words.incident(row['request_id'])}: {words.headline(e)}."]
+    lines = [f"Rescue {words.incident(row)}: {words.headline(e)}."]
     address = (e.get("location") or {}).get("text")
     lines.append(f"Where: {address}" if address else "Where: no address yet, call first")
     lines += words.details(e)

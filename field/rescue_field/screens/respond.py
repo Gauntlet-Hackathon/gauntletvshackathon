@@ -74,7 +74,7 @@ def find_job(events: list[dict[str, Any]], boat: str) -> dict[str, Any] | None:
 def radio_lines(row: dict[str, Any], volunteer: str) -> dict[str, str]:
     """The line to read on the radio for each OSM step (design: "Jordan K. here. On my way to
     2210 Telephone Road, incident 0147.")."""
-    number = row["request_id"][-4:]
+    number = words.incident_number(row)
     address = ((row["extracted"].get("location") or {}).get("text") or "").strip()
     me = f"{volunteer} here."
     if address:
@@ -100,7 +100,7 @@ def job_card(row: dict[str, Any], volunteer: str) -> dict[str, Any]:
         "request_id": row["request_id"],
         "crew": row["crew"],
         "pill": words.tier_pill(row["tier"]),
-        "incident": words.incident(row["request_id"]),
+        "incident": words.incident(row),
         "headline": words.headline(e),
         "address": (e.get("location") or {}).get("text"),
         "details": words.details(e),

@@ -425,15 +425,16 @@ if (typeof module === 'object' && module.exports) module.exports = makeIntakeCor
     ['add-one', 'add-bulk', 'check'].forEach(function (id) { var b = $(id); if (b) b.disabled = on; });
     Array.prototype.forEach.call(document.querySelectorAll('#samples button'), function (b) { b.disabled = on; });
   }
-  function addedLine(ids) {
-    var inc = ids.map(function (id) { return id.slice(-4); });
+  /* results: API results ({request_id, incident}); the incident number is the handle people use. */
+  function addedLine(results) {
+    var inc = results.map(function (x) { return x.incident || x.request_id.slice(-4); });
     return inc.length === 1 ? 'Added ' + inc[0] + ' to the log.' : 'Added ' + inc.length + ' requests to the log, ' + inc[0] + ' to ' + inc[inc.length - 1] + '.';
   }
   async function addOne(item) {
     var r = await post('/requests', JSON.stringify(core.payload(item)), 'application/json');
     if (!r.ok) return r;
     await refresh([r.data.request_id]);
-    say(addedLine([r.data.request_id]));
+    say(addedLine([r.data]));
     return r;
   }
   /* rows: [{n, item}] so an API row number maps back to the row the user sees. */
@@ -445,7 +446,7 @@ if (typeof module === 'object' && module.exports) module.exports = makeIntakeCor
     }
     var ids = r.data.results.map(function (x) { return x.request_id; });
     await refresh(ids);
-    say(addedLine(ids));
+    say(addedLine(r.data.results));
     return r;
   }
   function apiError(r) { return (r.row ? 'Row ' + r.row + ': ' : '') + r.detail; }

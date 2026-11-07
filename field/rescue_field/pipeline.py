@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import math
 import os
+import re
 import secrets
 import threading
 import time
@@ -35,6 +36,9 @@ DEFAULT_HOAX_MARKERS_PATH = CONTRACTS / "fixtures" / "hoax_markers.txt"
 # The one default device id for the field app (DECISIONS A5): the pipeline stamps it on events
 # and the sync worker authenticates as it, so the two must agree (CLAUDE.md dev device).
 DEFAULT_DEVICE_ID = "laptop-dev-01"
+# Incident numbers (#308): PREFIX-0001, PREFIX-0002, ... from a per-laptop SQLite counter.
+INCIDENT_COUNTER = "incident"
+_PREFIX_RE = re.compile(r"^[A-Z0-9]{1,4}$")
 log = logging.getLogger(__name__)
 
 Decider = Callable[[dict[str, Any]], dict[str, Any]]
@@ -54,17 +58,50 @@ class PipelineConfig:
     hoax_markers: tuple[str, ...] = field(
         default_factory=lambda: read_list(DEFAULT_HOAX_MARKERS_PATH)
     )
+    # None: derived from device_id (derive_incident_prefix).
+    incident_prefix: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.incident_prefix is not None and not _PREFIX_RE.fullmatch(self.incident_prefix):
+            raise ValueError("INCIDENT_PREFIX must be 1-4 characters of A-Z and 0-9")
+
+    @property
+    def prefix(self) -> str:
+        """The incident number prefix this laptop uses."""
+        return self.incident_prefix or derive_incident_prefix(self.device_id)
+
+    def incident(self, number: int) -> str:
+        return f"{self.prefix}-{number:04d}"
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> PipelineConfig:
-        """DEVICE_ID (or FIELD_DEVICE_ID), FIELD_STREETS_PATH, FIELD_HOAX_MARKERS_PATH override
-        the defaults."""
+        """DEVICE_ID (or FIELD_DEVICE_ID), INCIDENT_PREFIX (upper-cased), FIELD_STREETS_PATH,
+        FIELD_HOAX_MARKERS_PATH override the defaults."""
         env = os.environ if env is None else env
+        prefix = (env.get("INCIDENT_PREFIX") or "").strip().upper() or None
         return cls(
+            incident_prefix=prefix,
             device_id=env.get("DEVICE_ID") or env.get("FIELD_DEVICE_ID") or DEFAULT_DEVICE_ID,
             streets=read_list(env.get("FIELD_STREETS_PATH", DEFAULT_STREETS_PATH)),
             hoax_markers=read_list(env.get("FIELD_HOAX_MARKERS_PATH", DEFAULT_HOAX_MARKERS_PATH)),
         )
+
+
+def derive_incident_prefix(device_id: str) -> str:
+    """The default incident prefix for a laptop, from its DEVICE_ID (stable, 1-4 of A-Z0-9).
+
+    Split the upper-cased id on anything that is not A-Z or 0-9. If the last part is all digits,
+    the prefix is the first letter of the part before it (if any) plus the last 3 digits
+    (`laptop-dev-01` -> `D01`, `laptop-7` -> `L7`); otherwise it is the first 4 characters of
+    the last part (`boat` -> `BOAT`). An id with no letters or digits gives `A`."""
+    parts = [p for p in re.split(r"[^A-Z0-9]+", device_id.upper()) if p]
+    if not parts:
+        return "A"
+    last = parts[-1]
+    if last.isdigit():
+        head = parts[-2][0] if len(parts) > 1 else ""
+        return head + last[-3:]
+    return last[:4]
 
 
 def _now() -> str:
@@ -183,6 +220,7 @@ class IntakeItem:
     channel: str
     contact: str | None = None
     lang_hint: str | None = None
+    sample: bool | None = None  # True for grader-mode samples (#301, #308)
 
 
 def _extract(extractor: Extractor, raw: str) -> Extraction:
@@ -350,20 +388,24 @@ def process_batch(
             engine_outputs[i] = output
             tiers[ids[i]] = output["priority_tier"]
 
+    # Numbers are reserved only once every engine call succeeded, under the caller's intake
+    # lock, so they increase in arrival order; they are never reused (a failed store leaves a gap).
+    first_number = store.reserve(INCIDENT_COUNTER, len(items))
     results = []
     for i, item in enumerate(items):
         engine_output = engine_outputs[i]
         assert engine_output is not None
+        received: dict[str, Any] = {
+            "channel": item.channel,
+            "raw_text": item.raw,
+            "lang_hint": item.lang_hint,
+            "contact": item.contact,
+            "incident": config.incident(first_number + i),
+        }
+        if item.sample is not None:
+            received["sample"] = item.sample
         payloads = [
-            (
-                "received",
-                {
-                    "channel": item.channel,
-                    "raw_text": item.raw,
-                    "lang_hint": item.lang_hint,
-                    "contact": item.contact,
-                },
-            ),
+            ("received", received),
             ("extracted", extractions[i].payload),
             ("decided", {"engine_input": engine_inputs[i], "engine_output": engine_output}),
         ]

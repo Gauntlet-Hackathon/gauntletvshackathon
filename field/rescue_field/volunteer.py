@@ -41,7 +41,7 @@ def _base(rec: dict[str, Any], kind: str) -> dict[str, Any]:
     return {
         "request_id": rec["request_id"],
         "kind": kind,
-        "incident": words.incident(rec["request_id"]),
+        "incident": words.incident(rec),
         "headline": words.headline(e),
         "address": (e.get("location") or {}).get("text"),
         "details": words.details(e),
