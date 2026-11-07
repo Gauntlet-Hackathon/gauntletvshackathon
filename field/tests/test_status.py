@@ -77,3 +77,44 @@ def test_board_reflects_status(client):
     post(client, "rescued")
     html = client.get("/board").text
     assert 'data-status="rescued"' in html and "[rescued]" in html
+
+
+def test_escalated_to_assigned_is_a_second_dispatch(client, store):
+    for name in ("assigned", "escalated", "assigned", "escalated", "assigned", "rescued"):
+        assert post(client, name).status_code == 200, name
+    for name in BODIES:
+        assert post(client, name).status_code == 409
+    types = [e["type"] for e in store.all_events()][3:]
+    assert types == ["assigned", "escalated", "assigned", "escalated", "assigned", "rescued"]
+
+
+def test_current_status_folds_in_order():
+    from rescue_field.status import current_status, moves
+
+    def evs(*types):
+        return [{"type": t} for t in types]
+
+    assert current_status(evs()) is None
+    assert current_status(evs("assigned", "escalated", "assigned")) == "assigned"
+    assert current_status(evs("rescued", "assigned")) == "rescued"
+    assert current_status(evs("closed_duplicate", "assigned")) == "closed_duplicate"
+    assert current_status(evs("assigned", "corrected", "responder_status")) == "assigned"
+    assert not moves("assigned", "assigned") and moves("escalated", "assigned")
+
+
+def test_rescued_outcome_and_destination(client, store):
+    r = post(client, "rescued", outcome="all", destination="  Shelter 1 ")
+    assert r.status_code == 200, r.text
+    assert store.all_events()[-1]["payload"] == {
+        "rescued_count": 2, "note": None, "outcome": "all", "destination": "Shelter 1"
+    }
+
+
+@pytest.mark.parametrize(
+    "extra", [{"outcome": "most"}, {"outcome": 3}, {"destination": "x" * 201}]
+)
+def test_rescued_rejects_bad_outcome_or_destination(client, store, extra):
+    n = len(store.all_events())
+    r = post(client, "rescued", **extra)
+    assert r.status_code == 422 and r.json()["error"] == "invalid_input"
+    assert len(store.all_events()) == n
