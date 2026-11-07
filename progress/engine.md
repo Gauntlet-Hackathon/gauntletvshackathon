@@ -39,3 +39,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 engine evals: sets C (101) and D (68) from Paawan's review of the drafts, calls aligned with the frozen engine -> evals/sets/c_hard.jsonl, d_abstain.jsonl; 8 changes from the drafts with reasons in evals/sets/REVIEW.md
 2026-11-07 engine evals: Opus-with-rubric baseline stored (evals/results/opus/, C+D test splits, scored with the engine); prompt now includes the full rubric; no temperature (Opus 5.5 rejects it)
 2026-11-07 engine evals: Set B golden (82 Claude-written Houston cases, full gold extraction + spans, engine decisions, Paawan-reviewed) -> evals/sets/b_golden.jsonl; changes in REVIEW.md
+- 2026-11-07 engine E9 (#275): engine/tests/test_committed_builds.py runs each committed mercury build on the fixtures (expected, schema, stamp, fallback parity); truncated/restamped copy must fail
