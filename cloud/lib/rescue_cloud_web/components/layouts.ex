@@ -52,10 +52,17 @@ defmodule RescueCloudWeb.Layouts do
     >
       Skip to content
     </a>
-    <header class="navbar px-4 sm:px-6 lg:px-8">
+    <header class="navbar border-b border-base-300 bg-base-100 px-4 sm:px-6 lg:px-8">
       <div class="flex-1">
         <a href="/" class="flex-1 flex w-fit items-center gap-2">
-          <span class="text-sm font-semibold">Rescue triage cloud</span>
+          <img
+            src={~p"/images/communityrescue-icon.svg"}
+            alt=""
+            width="36"
+            height="36"
+            class="size-9"
+          />
+          <span id="app-name" class="text-xl font-bold">CommunityRescue</span>
         </a>
       </div>
       <nav aria-label="Main" class="flex flex-wrap gap-4 text-sm px-4">
