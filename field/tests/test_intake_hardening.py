@@ -102,8 +102,10 @@ def test_form_nul_is_stripped(client, store):
             "headers": {"content-type": "text/csv"},
         },
         {"files": {"file": ("r.csv", f"raw_text\n{TEXT}\x00\n".encode(), "text/csv")}},
-        {"content": json.dumps({"text": f"{TEXT} {SURROGATE}\nsecond"}).encode(),
-         "headers": {"content-type": "application/json"}},
+        {
+            "content": json.dumps({"text": f"{TEXT} {SURROGATE}\nsecond"}).encode(),
+            "headers": {"content-type": "application/json"},
+        },
     ],
 )
 def test_bulk_paths_strip_nul_and_lone_surrogates(client, store, kwargs):
@@ -429,3 +431,52 @@ def test_cloud_answering_413_to_everything_rejects_nothing():
     assert w.run_cycle() > 0
     assert not w.online and "HTTP 413" in w.last_error
     assert store.outbox_count() == 500 and store.rejected() == []
+
+
+# ---- F41: each row's engine input is checked, and the bad row is named -------------------------
+
+
+class BadRowExtractor:
+    """KeywordExtractor, except the text containing BAD gets a broken extraction."""
+
+    model_version = KEYWORD_MODEL_VERSION
+
+    def __init__(self, mutate):
+        self.mutate = mutate
+
+    def extract(self, raw_text):
+        payload = KeywordExtractor.payload(raw_text)
+        if "BAD" in raw_text:
+            self.mutate(payload)
+        return Extraction(payload, self.model_version)
+
+
+def _nan_confidence(payload):
+    payload["people_count"]["confidence"] = float("nan")
+
+
+def _bad_hazard(payload):
+    payload["hazards"] = [{"kind": "not-a-hazard", "confidence": 0.5}]
+
+
+class NeverCalled:
+    def __call__(self, inputs):
+        raise AssertionError("the engine must not run for an invalid batch")
+
+
+@pytest.mark.parametrize("mutate", [_nan_confidence, _bad_hazard])
+def test_bulk_bad_engine_input_names_the_row(store, mutate):
+    app = create_app(store=store, extractor=BadRowExtractor(mutate), decide_batch=NeverCalled())
+    with TestClient(app) as client:
+        r = client.post(
+            "/requests/bulk",
+            content=f"{TEXT}\n{TEXT} again\n{TEXT} BAD",
+            headers={"content-type": "text/plain"},
+        )
+        assert r.status_code == 422, r.text
+        body = r.json()
+        assert body["error"] == "invalid_input" and body["row"] == 3
+        assert body["detail"]
+        single = client.post("/requests", json={"raw_text": f"{TEXT} BAD"})
+        assert single.status_code == 422 and single.json()["error"] == "invalid_input"
+    assert store.all_events() == [] and store.outbox_count() == 0

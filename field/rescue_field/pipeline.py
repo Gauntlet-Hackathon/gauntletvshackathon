@@ -7,6 +7,7 @@ Context is built with rescue_shared.logic so field, cloud and evals agree on it.
 from __future__ import annotations
 
 import logging
+import math
 import os
 import secrets
 import time
@@ -46,9 +47,7 @@ def read_list(path: str | Path) -> tuple[str, ...]:
 @dataclass(frozen=True)
 class PipelineConfig:
     device_id: str = DEFAULT_DEVICE_ID
-    thresholds: Mapping[str, float | int] = field(
-        default_factory=lambda: dict(DEFAULT_THRESHOLDS)
-    )
+    thresholds: Mapping[str, float | int] = field(default_factory=lambda: dict(DEFAULT_THRESHOLDS))
     streets: tuple[str, ...] = field(default_factory=lambda: read_list(DEFAULT_STREETS_PATH))
     hoax_markers: tuple[str, ...] = field(
         default_factory=lambda: read_list(DEFAULT_HOAX_MARKERS_PATH)
@@ -140,6 +139,40 @@ def _validate_event(event: dict[str, Any]) -> None:
         raise ValueError(f"{event['type']} event failed schema validation: {errors[0].message}")
 
 
+class EngineInputError(ValueError):
+    """An item's engine input is not valid; `row` is its 1-based position in the batch."""
+
+    def __init__(self, row: int, detail: str) -> None:
+        super().__init__(f"row {row}: {detail}")
+        self.row = row
+        self.detail = detail
+
+
+def _non_finite(value: Any, path: str = "") -> str | None:
+    """Path of the first NaN/Infinity float anywhere in `value` (jsonschema accepts them)."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return path or "(root)"
+    if isinstance(value, Mapping):
+        for k, v in value.items():
+            if (found := _non_finite(v, f"{path}/{k}")) is not None:
+                return found
+    elif isinstance(value, (list, tuple)):
+        for i, v in enumerate(value):
+            if (found := _non_finite(v, f"{path}/{i}")) is not None:
+                return found
+    return None
+
+
+def _check_engine_input(row: int, engine_input: dict[str, Any]) -> None:
+    bad = _non_finite(engine_input)
+    if bad is not None:
+        raise EngineInputError(row, f"engine input has a non-finite number at {bad}")
+    errors = list(validator_for("engine_input.schema.json").iter_errors(engine_input))
+    if errors:
+        where = "/".join(str(p) for p in errors[0].absolute_path)
+        raise EngineInputError(row, f"{errors[0].message}" + (f" (at {where})" if where else ""))
+
+
 @dataclass(frozen=True)
 class IntakeItem:
     """One raw request waiting to be processed."""
@@ -218,6 +251,17 @@ def process_batch(
             waves.append([])
         waves[w].append(i)
 
+    # Check every row before the engine runs, so a bad row is named and nothing is stored.
+    # In-batch candidates still have no tier here; the engine waves fill them in below.
+    for n, (rid, item, ex) in enumerate(zip(ids, items, extractions, strict=True), 1):
+        _check_engine_input(
+            n,
+            {
+                "extracted": ex.payload,
+                "context": _context(all_candidates[rid], item.raw, ex.payload, config),
+            },
+        )
+
     tiers: dict[str, str | None] = {}
     engine_inputs: list[dict[str, Any] | None] = [None] * len(items)
     engine_outputs: list[dict[str, Any] | None] = [None] * len(items)
@@ -225,9 +269,7 @@ def process_batch(
         batch = []
         for i in wave:
             candidates = [
-                {**c, "priority_tier": tiers[c["request_id"]]}
-                if c["request_id"] in tiers
-                else c
+                {**c, "priority_tier": tiers[c["request_id"]]} if c["request_id"] in tiers else c
                 for c in all_candidates[ids[i]]
             ]
             context = _context(candidates, items[i].raw, extractions[i].payload, config)

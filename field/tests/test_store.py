@@ -113,3 +113,42 @@ def test_opens_and_migrates_a_store_without_rejection_columns(tmp_path):
     s = EventStore(path)  # migrating again is a no-op
     assert s.rejected_count() == 1
     s.close()
+
+
+def test_shared_connection_is_safe_without_caller_lock(tmp_path):
+    """Regression (CI on main): a sync worker built without the app lock raced request threads
+    on the one connection and outbox_count() got a None row. The store serializes itself."""
+    import threading
+
+    s = EventStore(tmp_path / "t.db", check_same_thread=False)
+    errors: list[BaseException] = []
+
+    def writer(base):
+        try:
+            for i in range(150):
+                ids = s.append_events([ev(base + i)])
+                s.ack(ids)
+                s.append_events([ev(base + 1000 + i)])
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    def reader():
+        try:
+            for _ in range(600):
+                assert isinstance(s.outbox_count(), int)
+                assert isinstance(s.rejected_count(), int)
+                s.pending_outbox(5)
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    threads = [threading.Thread(target=writer, args=(b,)) for b in (0, 5000)]
+    threads += [threading.Thread(target=reader) for _ in range(3)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    try:
+        assert errors == []
+        assert s.outbox_count() == 300
+    finally:
+        s.close()
