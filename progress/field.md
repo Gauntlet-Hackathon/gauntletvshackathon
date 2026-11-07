@@ -20,3 +20,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 field #152 F15: field/Dockerfile (python:3.12-slim, constraints, PYTHONPATH, uvicorn on $PORT, fallback engine) + root .dockerignore; verified image builds, GET / 200, POST /requests returns fallback-engine decision
 2026-11-07 field #152 F15 re-verify: image rebuilt, GET / 200, POST /requests got fallback-engine decision; added tests/test_dockerfile.py static checks for the Dockerfile/.dockerignore contract
 2026-11-07 field #173 F18: board intake panel (_intake.html: single, paste, CSV forms; fetch script with Processing/Added/alert states, board fragment refresh); tests/test_board_intake.py
+2026-11-07 field #174 F27: rescue_field/loadtest.py surge load test (real engine, optional sync drain, JSON timings); tests/test_loadtest.py
