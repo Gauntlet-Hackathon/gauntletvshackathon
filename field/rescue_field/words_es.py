@@ -46,8 +46,8 @@ SPANISH_WORDS = frozenset(
     {
         "ayuda", "ayúdenos", "ayudenos", "auxilio", "socorro", "agua", "necesitamos",
         "necesito", "somos", "estamos", "calle", "atrapado", "atrapados", "atrapada",
-        "inundación", "inundacion", "personas", "niños", "ninos", "favor", "urgente",
-        "techo", "casa", "hay", "por", "nuestra", "abuela", "abuelo",
+        "inundación", "inundacion", "personas", "niños", "ninos", "urgente",
+        "techo", "casa", "por", "nuestra", "abuela", "abuelo",
     }
 )  # fmt: skip
 _WORD = re.compile(r"[a-záéíóúüñ]+")

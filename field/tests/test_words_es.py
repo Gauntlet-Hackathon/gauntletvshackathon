@@ -55,6 +55,7 @@ def test_unknown_question_has_no_spanish_line():
         (None, ES_TEXT, True),
         (None, EN_TEXT, False),
         (None, "Please help, our casa is on Main St", False),  # one stray word is not enough
+        (None, "Please do us a favor, hay is in the barn", False),
         (None, None, False),
     ],
 )
