@@ -7,6 +7,10 @@ default ``python -m rescue_engine.fallback`` with this repo's lane folders on PY
 the engine output.
 
     HF_REPO=... HF_REVISION=<sha> python -m rescue_evals.runner --system ours
+
+For scored runs, point ``ENGINE_CMD`` at the frozen build's entrypoint
+(``engine/dist/<rules_version>/bin/mercury_engine``, see its manifest.json) so results carry the
+frozen ``rules_version``; the default Python fallback stamps the placeholder version.
 """
 
 from __future__ import annotations
