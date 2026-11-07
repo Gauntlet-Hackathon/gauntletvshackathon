@@ -29,8 +29,9 @@ Run your lane's command before opening a PR. All of them run from the repo root.
 - Everything CI runs: `ruff check . && pytest`, plus the `cloud` and picker commands above.
 
 ## Agent coordination
-See AGENT_RULES.md. Summary: work only on issues in your lane, one issue = one branch = one PR, never push to main, append one line to progress/<lane>.md per change
-(one file per lane, so parallel PRs never conflict; never a shared progress.md).
+See AGENT_RULES.md. Summary: work only on issues in your lane, one issue = one branch = one PR, never push to main, write one line to a new file progress/<lane>/<YYYY-MM-DD>-issue-<n>.md per change
+(one file per change, so parallel PRs never conflict; never append to progress/<lane>.md or a shared progress.md).
+New field screens go in `field/rescue_field/screens/<name>.py` with a module-level `router`; they register themselves (no `api.py` edit).
 
 ## Ticket path mapping (read before every ticket)
 The tickets were written before the packages were named. Wherever a ticket says the left side, use the right side:

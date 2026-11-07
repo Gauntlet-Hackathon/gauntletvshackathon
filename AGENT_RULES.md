@@ -31,7 +31,7 @@ Python lanes list their own dependencies in `<lane>/requirements.txt`; the pins 
 
 ## Definition of done
 - Tests written or updated for the change, and the full suite passes locally.
-- One line appended to `progress/<lane>.md` (one file per lane, so parallel PRs never conflict): date, lane, issue, what changed.
+- One line in a new file `progress/<lane>/<YYYY-MM-DD>-issue-<n>.md` (one file per change, so parallel PRs never conflict): date, lane, issue, what changed. `progress/<lane>.md` holds the older history; don't append to it.
 - A failure seen twice becomes a new rule in this file. Agents propose the rule in their PR summary; a human adds it.
 
 ## Night shift

@@ -32,7 +32,7 @@ from starlette.datastructures import UploadFile
 from rescue_field import add_page as add_page_module
 from rescue_field import board as board_module
 from rescue_field import boats as boats_module
-from rescue_field import engine_client, freeze
+from rescue_field import engine_client, freeze, screens
 from rescue_field import recheck as recheck_module
 from rescue_field import shell as shell_module
 from rescue_field import status as status_module
@@ -502,6 +502,7 @@ def create_app(
     app.state.extract_lock = FairLock()  # one model call at a time, outside intake_lock
     app.state.sync_worker = None
     app.add_middleware(BodySizeLimit)
+    screens.include_all(app)  # self-registering screens: rescue_field/screens/*.py
     app.include_router(router)
     app.include_router(sync_module.router)
     app.include_router(board_module.router)
