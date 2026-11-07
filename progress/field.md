@@ -25,3 +25,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 field step3-R1/A2: fake engine and test fixtures emit provisional_tier; heartbeat rules_version comes from the newest local decided event (EventStore.latest_rules_version), falling back to RULES_VERSION then the placeholder; tests in test_sync.py
 2026-11-07 field #173 F18: board intake panel (_intake.html: single, paste, CSV forms; fetch script with Processing/Added/alert states, board fragment refresh); tests/test_board_intake.py
 2026-11-07 field #174 F27: rescue_field/loadtest.py surge load test (real engine, optional sync drain, JSON timings); tests/test_loadtest.py
+2026-11-07 field PR181: test_follow_up_group_takes_highest_provisional_tier gives the duplicate row a null provisional_tier (contract)

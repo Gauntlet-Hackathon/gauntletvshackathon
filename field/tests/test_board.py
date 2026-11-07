@@ -186,10 +186,14 @@ def test_follow_up_card_shows_provisional_tier(store):
 
 
 def test_follow_up_group_takes_highest_provisional_tier(store):
-    add(store, "ORIG", abstain("P3"), extracted(location="loc-orig"), at="2026-11-07T09:00:00Z")
-    dup = abstain("P1")
+    # A duplicate never carries a provisional_tier (contract), so a member without one must
+    # neither lower nor drop the group's tier: the group keeps the highest tier it has (the
+    # root's P1), and still jumps the older P2 follow-up.
+    add(store, "ORIG", abstain("P1"), extracted(location="loc-orig"), at="2026-11-07T09:00:00Z")
+    dup = abstain(None)
     dup["outcome"], dup["duplicate_of"] = "duplicate", "ORIG"
     dup["abstain_reason"] = None
+    assert dup["provisional_tier"] is None
     add(store, "DUP", dup, extracted(location="loc-dup"), at="2026-11-07T09:30:00Z")
     add(store, "OTHER", abstain("P2"), extracted(location="loc-other"), at="2026-11-07T08:00:00Z")
     follow = build_board(store)["follow_ups"]
@@ -197,3 +201,4 @@ def test_follow_up_group_takes_highest_provisional_tier(store):
         ("ORIG", "P1"),
         ("OTHER", "P2"),
     ]
+    assert [d["request_id"] for d in follow[0]["duplicates"]] == ["DUP"]
