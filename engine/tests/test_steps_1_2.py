@@ -1,15 +1,18 @@
 import copy
 import json
+import os
 import re
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
-from engine.fallback import decide, decide_one
-from engine.fallback.rules import Q_LOCATION, RULES_VERSION
+
+from rescue_engine.fallback import decide, decide_one
+from rescue_engine.fallback.rules import Q_LOCATION, RULES_VERSION
 
 ROOT = Path(__file__).resolve().parents[2]
+ENV = {**os.environ, "PYTHONPATH": os.pathsep.join(str(ROOT / d) for d in ("engine", "shared"))}
 CASES = [
     json.loads(line)
     for line in (ROOT / "contracts/fixtures/cases.jsonl").read_text().splitlines()
@@ -63,14 +66,14 @@ def test_location_boundary_and_question():
     out = decide_one(variant(location__confidence=0.59))
     assert out["abstain_reason"] == "no_usable_location"
     assert out["follow_up_question"] == Q_LOCATION
-    with pytest.raises(NotImplementedError):  # 0.6 passes steps 1-2
-        decide_one(variant(location__confidence=0.6))
+    # 0.6 passes steps 1-2
+    assert decide_one(variant(location__confidence=0.6))["outcome"] == "prioritized"
 
 
 def test_landmark_needs_street_list_hit():
     assert decide_one(variant(ctx_street_list_hits=[]))["rule_id"] == "R-ABS-LOC"
-    with pytest.raises(NotImplementedError):
-        decide_one(variant(location__type="address", ctx_street_list_hits=[]))
+    address = variant(location__type="address", ctx_street_list_hits=[])
+    assert decide_one(address)["outcome"] == "prioritized"
 
 
 def test_list_input_returns_list():
@@ -80,8 +83,8 @@ def test_list_input_returns_list():
 
 def run_cli(payload):
     return subprocess.run(
-        [sys.executable, "-m", "engine.fallback"],
-        input=json.dumps(payload), capture_output=True, text=True, cwd=ROOT,
+        [sys.executable, "-m", "rescue_engine.fallback"],
+        input=json.dumps(payload), capture_output=True, text=True, cwd=ROOT, env=ENV,
     )
 
 
@@ -95,6 +98,6 @@ def test_cli_object_and_list():
 
 
 def test_cli_bad_input_fails():
-    proc = subprocess.run([sys.executable, "-m", "engine.fallback"], input="nope",
-                          capture_output=True, text=True, cwd=ROOT)
+    proc = subprocess.run([sys.executable, "-m", "rescue_engine.fallback"], input="nope",
+                          capture_output=True, text=True, cwd=ROOT, env=ENV)
     assert proc.returncode == 1

@@ -13,7 +13,7 @@ def main() -> int:
         payload = json.load(sys.stdin)
         result = decide(payload)
     except (json.JSONDecodeError, KeyError, TypeError, NotImplementedError) as exc:
-        print(f"engine.fallback: {type(exc).__name__}: {exc}", file=sys.stderr)
+        print(f"rescue_engine.fallback: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1
     json.dump(result, sys.stdout)
     sys.stdout.write("\n")
