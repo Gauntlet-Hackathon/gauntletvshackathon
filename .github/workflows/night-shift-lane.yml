@@ -203,6 +203,10 @@ jobs:
           MIX_ENV: test
         run: mix deps.get && mix deps.compile
 
+      - name: Install Mercury
+        if: inputs.lane == 'engine'
+        uses: ./.github/actions/install-mercury
+
       - name: Install Claude Code
         run: npm install -g "@anthropic-ai/claude-code@${{ vars.CLAUDE_CODE_VERSION || 'latest' }}"
 
