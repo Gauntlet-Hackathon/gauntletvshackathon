@@ -26,6 +26,8 @@
   <details><summary>Extracted fields</summary>
     <p>{{ r.raw_text }}</p>
     {% set e = r.extracted %}{% include "_fields.html" %}
+    <div class="recheck"><button type="button" class="recheck-btn" data-request-id="{{ r.request_id }}">Check again</button>
+      <span class="recheck-result" role="status"></span></div>
   </details>
   {% if r.duplicates %}
   <details class="dups"><summary>{{ r.duplicates|length }} duplicate(s)</summary>

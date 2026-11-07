@@ -32,6 +32,7 @@ from starlette.datastructures import UploadFile
 from rescue_field import board as board_module
 from rescue_field import boats as boats_module
 from rescue_field import engine_client, freeze
+from rescue_field import recheck as recheck_module
 from rescue_field import shell as shell_module
 from rescue_field import status as status_module
 from rescue_field import sync as sync_module
@@ -505,6 +506,7 @@ def create_app(
     app.include_router(status_module.router)
     app.include_router(shell_module.router)
     app.include_router(boats_module.router)
+    app.include_router(recheck_module.router)
     app.mount("/static", StaticFiles(directory=str(shell_module.STATIC_DIR)), name="static")
     return app
 

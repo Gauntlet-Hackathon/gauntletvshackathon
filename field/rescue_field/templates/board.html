@@ -164,6 +164,32 @@ async function submitStatus(ev) {
   }
 }
 document.getElementById("board").addEventListener("submit", submitStatus);
+async function recheck(ev) {
+  const btn = ev.target.closest("button.recheck-btn");
+  if (!btn) return;
+  const out = btn.parentElement.querySelector(".recheck-result");
+  out.textContent = "Checking\u2026";
+  btn.disabled = true;
+  try {
+    const resp = await fetch("/requests/" + encodeURIComponent(btn.dataset.requestId) + "/recheck", {method: "POST"});
+    let data = null;
+    try { data = await resp.json(); } catch (e) {}
+    if (!resp.ok) {
+      out.textContent = (data && (data.detail || data.error)) || ("Check failed (HTTP " + resp.status + ")");
+    } else if (data.same === true) {
+      out.textContent = "Same result";
+    } else if (data.same === false) {
+      out.textContent = "Different result now: " + data.differences.join("; ");
+    } else {
+      out.textContent = data.detail;
+    }
+  } catch (e) {
+    out.textContent = "Error: " + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+document.getElementById("board").addEventListener("click", recheck);
 refreshBadge(); setInterval(refreshBadge, 2000);
 </script>
 </body>

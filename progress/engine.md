@@ -49,3 +49,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 engine evals/results README + DECISIONS: keyword, gold, v3, laya-s13 re-run on B/C/D with set C at 58 test cases (#290); pooled outcome v3 0.53 vs s13 0.66
 2026-11-07 field UI-10 (#303): Spanish line ("En español: …") under each engine follow-up question on the board for Spanish requests; field/rescue_field/words_es.py, English unchanged
 2026-11-07 engine field: boat roster kept on the laptop (UI-4, #295): boats table + /boats screen and JSON routes, seat_warning; never synced
+2026-11-07 field UI-9 (#302): "Check again" button and POST /requests/{id}/recheck re-run the engine on the stored engine_input and report same / differences / rules-version mismatch; writes no event
