@@ -1,14 +1,14 @@
 """Decision engine, steps 1-3: request check, location check, priority tier.
 
 Pure and deterministic: reads an engine_input dict, returns an engine_output dict.
-Later steps (hoax, duplicates, contradictions) are added by E3.
+Also the hoax check (step 2 in contracts/engine_rules.md) and duplicates/contradictions.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from . import rules
+from . import dedupe, rules
 
 
 def _output(
@@ -47,6 +47,33 @@ def check_request(extracted: dict[str, Any], th: dict[str, float]) -> dict[str, 
     return None
 
 
+def check_hoax(
+    extracted: dict[str, Any], context: dict[str, Any], th: dict[str, float]
+) -> dict[str, Any] | None:
+    """Hoax markers plus a shaky is_request: route to a human, never discard."""
+    if (
+        context.get("hoax_marker_hits", 0) >= th["hoax_marker_min"]
+        and extracted["is_request"]["confidence"] < th["hoax_request_confidence_max"]
+    ):
+        return _output("abstain", rules.R_ABS_HOAX, "possible_hoax", rules.Q_HOAX)
+    return None
+
+
+def check_duplicates(
+    extracted: dict[str, Any], candidates: list[dict[str, Any]], own: dict[str, Any]
+) -> dict[str, Any]:
+    """Steps 4-5 on a prioritized request that has duplicate candidates."""
+    if dedupe.conflicting_counts(extracted, candidates):
+        return _output("abstain", rules.R_ABS_CNT, "conflicting_counts", rules.Q_COUNTS)
+    out = _output(
+        "duplicate",
+        rules.R_DUP,
+        priority_tier=dedupe.group_tier(own["priority_tier"], candidates),
+    )
+    out["duplicate_of"] = dedupe.earliest(candidates)
+    return out
+
+
 def check_location(
     extracted: dict[str, Any], context: dict[str, Any], th: dict[str, float]
 ) -> dict[str, Any] | None:
@@ -71,16 +98,21 @@ def check_tier(extracted: dict[str, Any], th: dict[str, float]) -> dict[str, Any
 
 
 def decide_one(engine_input: dict[str, Any]) -> dict[str, Any]:
-    """Decide one engine_input. Raises NotImplementedError when duplicate candidates exist."""
+    """Decide one engine_input."""
     extracted = engine_input["extracted"]
     context = engine_input.get("context") or {}
     th = _thresholds(context)
-    result = check_request(extracted, th) or check_location(extracted, context, th)
+    result = (
+        check_request(extracted, th)
+        or check_hoax(extracted, context, th)
+        or check_location(extracted, context, th)
+    )
     if result is not None:
         return result
     result = check_tier(extracted, th)
-    if context.get("duplicate_candidates") and result["outcome"] == "prioritized":
-        raise NotImplementedError("duplicates and contradictions (E3) are not implemented yet")
+    candidates = context.get("duplicate_candidates")
+    if candidates and result["outcome"] == "prioritized":
+        return check_duplicates(extracted, candidates, result)
     return result
 
 
