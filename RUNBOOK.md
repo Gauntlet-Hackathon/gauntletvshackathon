@@ -115,6 +115,28 @@ fly logs --app <app>                   # if the release_command or the check fai
 Then point each field laptop at it: `CLOUD_URL=https://<app>.fly.dev`, `DEVICE_ID`/`DEVICE_TOKEN` matching a `DEVICE_TOKENS` pair.
 If the deploy fails at `release_command` with a connection error, check `fly secrets list --app <app>` shows `DATABASE_URL` (re-run `fly postgres attach`) and that `ECTO_IPV6` is still in `[env]`.
 
+## Deploy hosted field demo to Fly
+Config: `field/fly.toml`. Its app name `rescue-field-demo` is a **placeholder** (`<app>` below). Nothing here has been deployed and no credentials are in the repo. Run every command from the **repo root** (the image builds from the root), logged in with `fly auth login`. Deploy the cloud first: you need its URL.
+
+The cloud's device map must contain `demo-field-01` with the same token you give the field app: add `demo-field-01:<long-random-token>` to the cloud's `DEVICE_TOKENS` secret (the DEVICE_TOKENS handling is being fixed in the step-3 PR, finding A6; check it is merged first).
+
+```sh
+# 1. Create the app from the checked-in config, without deploying.
+fly launch --copy-config --no-deploy --config field/fly.toml --name <app>
+
+# 2. Volume for the SQLite file (mounted at /data; must be in the app's region).
+fly volumes create field_data --size 1 --region iad --app <app>
+
+# 3. Secrets (never in fly.toml).
+fly secrets set --app <app> DEVICE_TOKEN=<long-random-token> CLOUD_URL=https://<cloud-app>.fly.dev
+
+# 4. Deploy.
+fly deploy . --config field/fly.toml --dockerfile field/Dockerfile --app <app>
+
+# 5. Check it.
+curl https://<app>.fly.dev/sync/status
+```
+
 ## Run locally
 Whole stack (Postgres, cloud, field) with Docker:
 1. `cp .env.example .env` and set `SECRET_KEY_BASE` (`openssl rand -base64 48` or `mix phx.gen.secret`).
