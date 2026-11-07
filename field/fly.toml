@@ -21,6 +21,11 @@ kill_signal = "SIGTERM"
   DEVICE_ID = "demo-field-01"
   FIELD_DATA_DIR = "/data"
 
+[[vm]]
+  memory = "2gb"
+  cpus = 2
+  cpu_kind = "shared"
+
 [mounts]
   source = "field_data"
   destination = "/data"
@@ -34,7 +39,7 @@ kill_signal = "SIGTERM"
   min_machines_running = 1
 
   [[http_service.checks]]
-    grace_period = "20s"
+    grace_period = "60s"
     interval = "15s"
     timeout = "5s"
     method = "GET"
