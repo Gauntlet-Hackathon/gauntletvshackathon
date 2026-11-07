@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CommunityRescue</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0B57D0}a:hover{color:#0842A0}
+button:focus-visible{outline:3px solid #0B57D0;outline-offset:2px}
+</style>
+<style>
+html,body{height:100%;margin:0;background:#E9EBEF}
+.stage{height:100vh;height:100dvh;display:flex;justify-content:center}
+.phone{width:100%;max-width:560px;height:100%;background:#F6F7F9;border-left:1px solid #D0D5DD;border-right:1px solid #D0D5DD}
+@media (max-width: 560px){.phone{border:0}}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="phone" id="app"></div>
+</div>
+<script>
+/* Minimal runtime for this prototype: renders the template's {{holes}}, <sc-if> and <sc-for>, and re-renders on setState. */
+(function () {
+  var TEMPLATE = `<div style="width: 100%; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; background: #F6F7F9; color: #111418; font-family: 'Atkinson Hyperlegible', system-ui, sans-serif">
+
+<header style="flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px; padding: 10px 16px 10px; background: #FFFFFF; border-bottom: 1px solid #D0D5DD">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+<span style="display: inline-flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 700"><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%201024%201024%22%20width%3D%221024%22%20height%3D%221024%22%20role%3D%22img%22%20aria-label%3D%22CommunityRescue%22%3E%0A%20%20%3Crect%20width%3D%221024%22%20height%3D%221024%22%20rx%3D%22228%22%20fill%3D%22%230B57D0%22/%3E%0A%20%20%3Cpath%20d%3D%22M262%20404%20L512%20196%20L762%20404%22%20fill%3D%22none%22%20stroke%3D%22%23FFFFFF%22%20stroke-width%3D%2264%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%0A%20%20%3Ccircle%20cx%3D%22512%22%20cy%3D%22552%22%20r%3D%22168%22%20fill%3D%22none%22%20stroke%3D%22%23FFFFFF%22%20stroke-width%3D%2292%22/%3E%0A%20%20%3Ccircle%20cx%3D%22512%22%20cy%3D%22552%22%20r%3D%22168%22%20fill%3D%22none%22%20stroke%3D%22%23F59E0B%22%20stroke-width%3D%2292%22%20stroke-dasharray%3D%22104%20159.9%22%20stroke-dashoffset%3D%2252%22%20transform%3D%22rotate%28-45%20512%20552%29%22/%3E%0A%20%20%3Cpath%20d%3D%22M150%20790%20q90%20-62%20181%200%20t181%200%20t181%200%20t181%200%22%20fill%3D%22none%22%20stroke%3D%22%230B57D0%22%20stroke-width%3D%22120%22%20stroke-linecap%3D%22round%22/%3E%0A%20%20%3Cpath%20d%3D%22M150%20790%20q90%20-62%20181%200%20t181%200%20t181%200%20t181%200%22%20fill%3D%22none%22%20stroke%3D%22%23FFFFFF%22%20stroke-width%3D%2252%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E%0A" alt="" width="32" height="32" style="width: 32px; height: 32px; display: block">CommunityRescue</span>
+<button type="button" aria-label="Signed in as Jordan K., volunteer with the [ECC NAME] Emergency Control Center. Open account menu" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 2px 0 0; border: 0; background: transparent; color: #111418; font: 700 15px 'Atkinson Hyperlegible', system-ui, sans-serif; cursor: pointer; text-align: left"><span aria-hidden="true" style="flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 16px; background: #EEF3FD; color: #0A3A8C; font-size: 13px; font-weight: 700">JK</span><span style="display: flex; flex-direction: column; line-height: 1.2"><span>Jordan K.</span><span style="font-size: 12px; font-weight: 400; color: #4A5260">Volunteer</span><span style="font-size: 12px; font-weight: 400; color: #4A5260">[ECC NAME] ECC</span></span></button>
+</div>
+<div role="radiogroup" aria-label="Jordan is" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; background: #E9EBEF; border-radius: 12px; padding: 4px">
+<sc-for list="{{roles}}" as="r" hint-placeholder-count="2">
+<button type="button" role="radio" aria-checked="{{r.checked}}" onClick="{{r.pick}}" style="{{r.style}}">{{r.label}}</button>
+</sc-for>
+</div>
+<span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #4A5260"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="5" r="5" fill="#F59E0B"></circle></svg>No Internet: Local Store, Sync when online</span>
+</header>
+
+<div style="flex: 1 1 auto; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px">
+
+<sc-if value="{{isNext}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<sc-if value="{{toast}}" hint-placeholder-val="{{false}}">
+<div role="status" style="display: flex; gap: 10px; align-items: flex-start; background: #E7F3E8; color: #0F3D13; border-radius: 12px; padding: 12px 14px; font-size: 16px">
+<span style="flex: 1 1 auto">{{toast}}</span>
+<button type="button" onClick="{{clearToast}}" aria-label="Dismiss" style="min-width: 44px; min-height: 44px; border: 0; background: transparent; color: #0F3D13; font-size: 22px; cursor: pointer">×</button>
+</div>
+</sc-if>
+<p style="margin: 0; font-size: 16px; color: #4A5260">{{summary}}</p>
+
+<sc-if value="{{hasCur}}" hint-placeholder-val="{{true}}">
+<article style="background: #FFFFFF; border: 1px solid #D0D5DD; border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+<span style="{{cur.pillStyle}}">{{cur.levelLabel}}</span>
+<span aria-label="{{cur.incLabel}}" style="display: inline-block; padding: 3px 9px; border: 2px solid #111418; border-radius: 6px; background: #FFFFFF; color: #111418; font-size: 15px; font-weight: 700; letter-spacing: 0.04em">{{cur.inc}}</span>
+</div>
+<h1 style="margin: 0; font-size: 26px; line-height: 1.2; font-weight: 700">{{cur.headline}}</h1>
+<div style="display: flex; flex-direction: column; gap: 2px; background: #E7F3E8; border-radius: 10px; padding: 10px 12px">
+<span style="font-size: 19px; font-weight: 700">{{cur.place}}</span>
+<span style="font-size: 16px; color: #4A5260">{{cur.landmark}}</span>
+</div>
+<ul style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 17px; line-height: 1.35">
+<sc-for list="{{cur.details}}" as="d" hint-placeholder-count="3"><li>{{d.t}}</li></sc-for>
+</ul>
+<div style="background: #F6F7F9; border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; font-size: 15px">
+<span style="font-weight: 700">{{cur.contact}}</span>
+<span style="color: #4A5260">{{cur.heard}}</span>
+</div>
+<button type="button" onClick="{{toggleWhy}}" aria-expanded="{{whyOpen}}" style="align-self: flex-start; min-height: 44px; padding: 0; border: 0; background: transparent; color: #0B57D0; font: 700 16px 'Atkinson Hyperlegible', system-ui, sans-serif; text-decoration: underline; cursor: pointer">{{whyLabel}}</button>
+<sc-if value="{{showWhy}}" hint-placeholder-val="{{false}}">
+<p style="margin: 0; font-size: 16px; line-height: 1.4; background: #EEF3FD; border-radius: 10px; padding: 10px 12px">{{cur.why}}</p>
+</sc-if>
+<nav aria-label="Queue views" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; border-top: 1px solid #E4E7EC; padding-top: 12px">
+<sc-for list="{{nav}}" as="n" hint-placeholder-count="3">
+<button type="button" onClick="{{n.go}}" aria-current="{{n.current}}" style="{{n.style}}">{{n.label}}</button>
+</sc-for>
+</nav>
+</article>
+<button type="button" onClick="{{primary}}" style="min-height: 60px; border: 0; border-radius: 14px; background: #0B57D0; color: #FFFFFF; font: 700 20px 'Atkinson Hyperlegible', system-ui, sans-serif; cursor: pointer">{{cur.primaryLabel}}</button>
+<button type="button" onClick="{{secondary}}" style="min-height: 56px; border: 2px solid #0B57D0; border-radius: 14px; background: #FFFFFF; color: #0B57D0; font: 700 18px 'Atkinson Hyperlegible', system-ui, sans-serif; cursor: pointer">{{cur.secondaryLabel}}</button>
+<button type="button" onClick="{{skip}}" style="min-height: 44px; border: 0; background: transparent; color: #4A5260; font: 400 16px 'Atkinson Hyperlegible', system-ui, sans-serif; text-decoration: underline; cursor: pointer">Skip for now, show the next person</button>
+</sc-if>
+<sc-if value="{{noCur}}" hint-placeholder-val="{{false}}">
+<div style="background: #FFFFFF; border-radius: 16px; padding: 24px; font-size: 19px; text-align: center">Nobody is waiting right now.</div>
+<nav aria-label="Queue views" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px">
+<sc-for list="{{nav}}" as="n" hint-placeholder-count="3">
+<button type="button" onClick="{{n.go}}" aria-current="{{n.current}}" style="{{n.style}}">{{n.label}}</button>
+</sc-for>
+</nav>
+</sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{isSend}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<button type="button" onClick="{{goNext}}" style="align-self: flex-start; min-height: 44px; border: 0; background: transparent; color: #0B57D0; font: 700 16px 'Atkinson Hyperlegible', system-ui, sans-serif; cursor: pointer; padding: 0">‹ Back</button>
+<h1 style="margin: 0; font-size: 24px; font-weight: 700">Who can go to {{cur.place}}?</h1>
+<p style="margin: 0; font-size: 16px; color: #4A5260">They need room for {{cur.people}} people.</p>
+<sc-for list="{{helpers}}" as="h" hint-placeholder-count="3">
+<button type="button" onClick="{{h.pick}}" aria-pressed="{{h.pressed}}" style="{{h.style}}">
+<span style="font-size: 19px; font-weight: 700">{{h.name}}</span>
+<span style="font-size: 15px; color: #4A5260">{{h.status}}</span>
+<span style="{{h.fitStyle}}">{{h.fit}}</span>
+</button>
+</sc-for>
+<sc-if value="{{hasHelper}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 4px 0 0; font-size: 18px; font-weight: 700">Tell {{helperShort}} (radio or text)</h2>
+<p style="margin: 0; font-size: 18px; line-height: 1.45; background: #111418; color: #FFFFFF; border-radius: 12px; padding: 14px">{{message}}</p>
+<button type="button" style="min-height: 52px; border: 2px solid #111418; border-radius: 14px; background: #FFFFFF; color: #111418; font: 700 17px 'Atkinson Hyperlegible', system-ui, sans-serif; cursor: pointer">Copy message</button>
+<button type="button" onClick="{{confirmSend}}" style="min-height: 60px; border: 0; border-radius: 14px; background: #0B57D0; color: #FFFFFF; font: 700 20px 'Atkinson Hyperlegible', system-ui, sans-serif; cursor: pointer">{{helperShort}} is on the way</button>
+</div>
+</sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{isSent}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 14px; padding-top: 24px">
+<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#1B5E20" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M7.5 12.5l3 3 6-6.5"></path></svg>
+<h1 style="margin: 0; font-size: 26px; font-weight: 700">{{lastSent.helper}} is on the way to {{lastSent.place}}</h1>
+<p style="margin: 0; font-size: 17px; line-height: 1.4">If {{lastSent.helper}} hasn’t checked in within 20 minutes, this screen will remind you to call.</p>
+<p style="margin: 0; font-size: 17px; line-height: 1.4; color: #4A5260">When they’re back, open <strong>Out now</strong> and tell us how it went.</p>
+<button type="button" onClick="{{goNext}}" style="min-height: 60px; border: 0; border-radius: 14px; background: #0B57D0; color: #FFFFFF; font: 700 20px 'Atkinson Hyperlegible', system-ui, sans-serif; cursor: pointer">Next person</button>
+</div>
+</sc-if>
+
+<sc-if value="{{isAsk}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<button type="button" onClick="{{goNext}}" style="align-self: flex-start; min-height: 44px; border: 0; background: transparent; color: #0B57D0; font: 700 16px 'Atkinson Hyperlegible', system-ui, sans-serif; cursor: pointer; padding: 0">‹ Back</button>
+<h1 style="margin: 0; font-size: 24px; font-weight: 700">Ask before anyone goes</h1>
+<p style="margin: 0; font-size: 17px; line-height: 1.4">{{cur.askWhy}}</p>
+<span style="font-size: 15px; font-weight: 700; color: #4A5260">Call or text {{cur.contact}}</span>
+<p style="margin: 0; font-size: 18px; line-height: 1.45; background: #111418; color: #FFFFFF; border-radius: 12px; padding: 14px">{{cur.ask}}</p>
+<button type="button" style="min-height: 52px; border: 2px solid #111418; border-radius: 14px; background: #FFFFFF; color: #111418; font: 700 17px 'Atkinson Hyperlegible', system-ui, sans-serif; cursor: pointer">Copy message</button>
+<button type="button" onClick="{{markAsked}}" style="min-height: 60px; border: 0; border-radius: 14px; background: #0B57D0; color: #FFFFFF; font: 700 19px 'Atkinson Hyperlegible', system-ui, sans-serif; cursor: pointer">I asked, show me the next person</button>
+</div>
+</sc-if>
+
+<sc-if value="{{isList}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<nav aria-label="Queue views" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px">
+<sc-for list="{{nav}}" as="n" hint-placeholder-count="3">
+<button type="button" onClick="{{n.go}}" aria-current="{{n.current}}" style="{{n.style}}">{{n.label}}</button>
+</sc-for>
+</nav>
+<h1 style="margin: 0; font-size: 24px; font-weight: 700">Waiting for help</h1>
+<p style="margin: 0; font-size: 15px; color: #4A5260">Most urgent first. Tap one to open it.</p>
+<sc-for list="{{waitingRows}}" as="w" hint-placeholder-count="3">
+<button type="button" onClick="{{w.open}}" style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; width: 100%; min-height: 84px; padding: 14px; border: 1px solid #D0D5DD; border-radius: 14px; background: #FFFFFF; color: #111418; font-family: 'Atkinson Hyperlegible', system-ui, sans-serif; cursor: pointer">
+<span style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap"><span style="{{w.pillStyle}}">{{w.levelLabel}}</span><span aria-label="{{w.incLabel}}" style="display: inline-block; padding: 2px 8px; border: 2px solid #111418; border-radius: 6px; background: #FFFFFF; color: #111418; font-size: 14px; font-weight: 700; letter-spacing: 0.04em">{{w.inc}}</span></span>
+<span style="font-size: 18px; font-weight: 700">{{w.headline}}</span>
+<span style="font-size: 15px; color: #4A5260">{{w.place}} · {{w.people}} people</span>
+</button>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{isOut}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<nav aria-label="Queue views" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px">
+<sc-for list="{{nav}}" as="n" hint-placeholder-count="3">
+<button type="button" onClick="{{n.go}}" aria-current="{{n.current}}" style="{{n.style}}">{{n.label}}</button>
+</sc-for>
+</nav>
+<h1 style="margin: 0; font-size: 24px; font-weight: 700">Out now</h1>
+<p style="margin: 0; font-size: 15px; color: #4A5260">When a team calls in, tap Update.</p>
+<sc-for list="{{outRows}}" as="o" hint-placeholder-count="2">
+<div style="background: #FFFFFF; border: 1px solid #D0D5DD; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px">
+<span style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap"><span aria-label="{{o.incLabel}}" style="display: inline-block; padding: 2px 8px; border: 2px solid #111418; border-radius: 6px; background: #FFFFFF; color: #111418; font-size: 14px; font-weight: 700; letter-spacing: 0.04em">{{o.inc}}</span><span style="font-size: 18px; font-weight: 700">{{o.helper}} → {{o.place}}</span></span>
+<span style="font-size: 15px; color: #4A5260">{{o.since}} · {{o.people}} people</span>
+<button type="button" onClick="{{o.update}}" style="min-height: 52px; border: 0; border-radius: 12px; background: #0B57D0; color: #FFFFFF; font: 700 17px 'Atkinson Hyperlegible', system-ui, sans-serif; cursor: pointer">Update: how did it go?</button>
+</div>
+</sc-for>
+<sc-if value="{{noOut}}" hint-placeholder-val="{{false}}">
+<p style="margin: 0; font-size: 17px">No teams out right now.</p>
+</sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{isDone}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<button type="button" onClick="{{goOut}}" style="align-self: flex-start; min-height: 44px; border: 0; background: transparent; color: #0B57D0; font: 700 16px 'Atkinson Hyperlegible', system-ui, sans-serif; cursor: pointer; padding: 0">‹ Back</button>
+<h1 style="margin: 0; font-size: 24px; font-weight: 700">How did it go at {{done.place}}?</h1>
+<sc-for list="{{outcomes}}" as="c" hint-placeholder-count="4">
+<button type="button" onClick="{{c.pick}}" aria-pressed="{{c.pressed}}" style="{{c.style}}">{{c.label}}</button>
+</sc-for>
+<sc-if value="{{showCount}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 10px; background: #FFFFFF; border-radius: 14px; padding: 14px">
+<span style="font-size: 17px; font-weight: 700">How many people are safe?</span>
+<div style="display: flex; align-items: center; gap: 16px">
+<button type="button" onClick="{{minus}}" aria-label="One fewer" style="width: 56px; height: 56px; border: 2px solid #111418; border-radius: 12px; background: #FFFFFF; font-size: 26px; cursor: pointer">−</button>
+<span style="font-size: 32px; font-weight: 700; min-width: 40px; text-align: center">{{count}}</span>
+<button type="button" onClick="{{plus}}" aria-label="One more" style="width: 56px; height: 56px; border: 2px solid #111418; border-radius: 12px; background: #FFFFFF; font-size: 26px; cursor: pointer">+</button>
+</div>
+<span style="font-size: 17px; font-weight: 700">Where did they go?</span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{dests}}" as="d" hint-placeholder-count="3">
+<button type="button" onClick="{{d.pick}}" aria-pressed="{{d.pressed}}" style="{{d.style}}">{{d.label}}</button>
+</sc-for>
+</div>
+</div>
+</sc-if>
+<button type="button" onClick="{{saveDone}}" style="min-height: 60px; border: 0; border-radius: 14px; background: #0B57D0; color: #FFFFFF; font: 700 20px 'Atkinson Hyperlegible', system-ui, sans-serif; cursor: pointer">Save</button>
+</div>
+</sc-if>
+<sc-if value="{{rv.isRespond}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<h1 style="margin: 0; font-size: 24px; font-weight: 700">{{rv.headline}}</h1>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span id="osm-label" style="font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #4A5260">Operational Status Messages (OSM)</span>
+<span style="font-size: 13px; color: #4A5260">Tap a status to send it to the ECC.</span>
+<div role="group" aria-labelledby="osm-label" style="display: flex; gap: 4px">
+<sc-for list="{{rv.steps}}" as="st" hint-placeholder-count="4"><button type="button" onClick="{{st.go}}" aria-pressed="{{st.pressed}}" style="{{st.style}}">{{st.label}}</button></sc-for>
+</div>
+</div>
+<sc-if value="{{rv.showJob}}" hint-placeholder-val="{{true}}">
+<article style="background: #FFFFFF; border: 1px solid #D0D5DD; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+<span style="display: inline-block; padding: 5px 12px; border-radius: 999px; font-size: 15px; font-weight: 700; background: #B00020; color: #FFFFFF">Needs help now</span>
+<span aria-label="Incident 0147" style="display: inline-block; padding: 3px 9px; border: 2px solid #111418; border-radius: 6px; background: #FFFFFF; color: #111418; font-size: 15px; font-weight: 700; letter-spacing: 0.04em">#0147</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 2px; background: #E7F3E8; border-radius: 10px; padding: 10px 12px">
+<span style="font-size: 22px; font-weight: 700">{{rv.job.place}}</span>
+<span style="font-size: 16px; color: #4A5260">{{rv.job.landmark}}</span>
+</div>
+<ul style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; font-size: 16px; line-height: 1.35">
+<sc-for list="{{rv.job.details}}" as="d" hint-placeholder-count="3"><li>{{d.t}}</li></sc-for>
+</ul>
+<div style="background: #F6F7F9; border-radius: 10px; padding: 10px 12px; font-size: 15px; font-weight: 700">Call when close: {{rv.job.contact}}</div>
+</article>
+</sc-if>
+<sc-if value="{{rv.idle}}" hint-placeholder-val="{{false}}">
+<p style="margin: 0; font-size: 17px; line-height: 1.4; background: #FFFFFF; border-radius: 14px; padding: 16px">Dispatch will send your next job here. Stay near the launch and keep your radio on.</p>
+</sc-if>
+<sc-if value="{{rv.showCheck}}" hint-placeholder-val="{{false}}">
+<span style="font-size: 15px; color: #4A5260">{{rv.check}}</span>
+</sc-if>
+<sc-if value="{{rv.showDests}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{rv.dests}}" as="dd" hint-placeholder-count="3"><button type="button" onClick="{{dd.pick}}" aria-pressed="{{dd.pressed}}" style="{{dd.style}}">{{dd.label}}</button></sc-for>
+</div>
+</sc-if>
+<sc-for list="{{rv.actions}}" as="a" hint-placeholder-count="2">
+<button type="button" onClick="{{a.go}}" style="{{a.style}}">{{a.label}}</button>
+</sc-for>
+<sc-if value="{{rv.tell}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 15px; font-weight: 700; color: #4A5260">Tell dispatch (radio or text)</span>
+<p style="margin: 0; font-size: 17px; line-height: 1.45; background: #111418; color: #FFFFFF; border-radius: 12px; padding: 14px">{{rv.tell}}</p>
+<span style="font-size: 13px; color: #4A5260">No signal? Read it on the radio. It is also saved on this phone.</span>
+</div>
+</sc-if>
+</div>
+</sc-if>
+</div>
+
+<div style="flex: 0 0 auto; background: #FFFFFF; border-top: 1px solid #D0D5DD; padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 6px">
+<sc-if value="{{ecc}}" hint-placeholder-val="{{false}}">
+<span role="status" style="font-size: 13px; font-weight: 700; color: #0A3A8C; text-align: center">{{ecc}}</span>
+</sc-if>
+<div aria-label="Emergency Control Center" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+<button type="button" onClick="{{pttTap}}" aria-pressed="{{pttPressed}}" style="{{pttStyle}}"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="7" width="10" height="15" rx="2"></rect><path d="M14 7V2"></path><path d="M10 11h4"></path><path d="M10 14h4"></path><circle cx="12" cy="18" r="1"></circle></svg>{{pttLabel}}</button>
+<button type="button" onClick="{{msgTap}}" style="{{eccBtn}}"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>Message ECC</button>
+<button type="button" onClick="{{locTap}}" style="{{eccBtn}}"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>Send location</button>
+</div>
+</div>
+</div>
+`;
+  var root = document.getElementById('app');
+  var inst = null, queued = false;
+  window.DCLogic = class { constructor(props) { this.props = props || {}; this.state = {}; } setState(p) { Object.assign(this.state, typeof p === 'function' ? p(this.state) : p); if (!queued) { queued = true; requestAnimationFrame(render); } } };
+  var HOLE = /\{\{\s*([^}]+?)\s*\}\}/g, WHOLE = /^\s*\{\{\s*([^}]+?)\s*\}\}\s*$/;
+  function lookup(path, scopes) {
+    var parts = path.split('.');
+    for (var i = scopes.length - 1; i >= 0; i--) {
+      if (scopes[i] && Object.prototype.hasOwnProperty.call(scopes[i], parts[0])) {
+        var v = scopes[i][parts[0]];
+        for (var k = 1; k < parts.length; k++) v = v == null ? undefined : v[parts[k]];
+        return v;
+      }
+    }
+    return undefined;
+  }
+  function value(str, scopes) { var m = WHOLE.exec(str); return m ? lookup(m[1], scopes) : str.replace(HOLE, function (_, p) { var v = lookup(p, scopes); return v == null ? '' : String(v); }); }
+  function walk(node, scopes) {
+    Array.prototype.slice.call(node.childNodes).forEach(function (el) {
+      if (el.nodeType === 3) { if (el.nodeValue.indexOf('{{') > -1) { var t = value(el.nodeValue, scopes); el.nodeValue = t == null ? '' : String(t); } return; }
+      if (el.nodeType !== 1) return;
+      var tag = el.tagName.toLowerCase();
+      if (tag === 'sc-for') {
+        var list = value(el.getAttribute('list') || '', scopes) || [], as = el.getAttribute('as') || 'item', frag = document.createDocumentFragment();
+        list.forEach(function (item) {
+          var box = document.createElement('div');
+          Array.prototype.forEach.call(el.childNodes, function (c) { box.appendChild(c.cloneNode(true)); });
+          var sc = {}; sc[as] = item; walk(box, scopes.concat([sc]));
+          while (box.firstChild) frag.appendChild(box.firstChild);
+        });
+        el.replaceWith(frag); return;
+      }
+      if (tag === 'sc-if') {
+        if (value(el.getAttribute('value') || '', scopes)) { walk(el, scopes); var f = document.createDocumentFragment(); while (el.firstChild) f.appendChild(el.firstChild); el.replaceWith(f); }
+        else el.remove();
+        return;
+      }
+      Array.prototype.slice.call(el.attributes).forEach(function (a) {
+        if (a.name.indexOf('hint-') === 0) { el.removeAttribute(a.name); return; }
+        if (a.value.indexOf('{{') < 0) return;
+        var v = value(a.value, scopes);
+        if (a.name.indexOf('on') === 0) { el.removeAttribute(a.name); if (typeof v === 'function') el.addEventListener(a.name.slice(2), v); return; }
+        if (v === false || v == null) el.removeAttribute(a.name); else el.setAttribute(a.name, String(v));
+      });
+      walk(el, scopes);
+    });
+  }
+  var lastKey = '';
+  function render() {
+    queued = false;
+    var scroller = root.querySelector('div[style*="overflow-y: auto"]'), top = scroller ? scroller.scrollTop : 0;
+    var s = inst.state, key = [s.role, s.screen, s.rStep, s.curId].join('|');
+    var t = document.createElement('template'); t.innerHTML = TEMPLATE; walk(t.content, [inst.renderVals()]);
+    root.replaceChildren(t.content);
+    var next = root.querySelector('div[style*="overflow-y: auto"]'); if (next && key === lastKey) next.scrollTop = top;
+    lastKey = key;
+  }
+  window.__start = function (C) { inst = new C({}); render(); };
+})();
+
+</script>
+<script>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      screen: 'next', waiting: ['147', '151', '155'], curId: '147', asked: {}, helper: null, why: false,
+      out: [
+        { id: '142', helper: 'Ana', place: '1408 Airline Drive', since: 'Left 13:24', people: 2 },
+        { id: '139', helper: 'Truck team', place: 'Gessner Road at Westview', since: 'Left 13:10', people: 1 }
+      ],
+      doneId: null, outcome: null, count: 2, dest: null, toast: null, lastSent: { helper: '', place: '' },
+      role: 'send', rStep: 'assigned', rTell: '', rCheck: '6 min ago', rDest: null, ptt: false, ecc: ''
+    };
+  }
+  respondVals(s) {
+    const btn = (kind) => 'width:100%;min-height:' + (kind === 'primary' ? '60px' : '54px') + ';border-radius:14px;cursor:pointer;font:700 ' + (kind === 'primary' ? '20px' : '18px') + ' Atkinson Hyperlegible,system-ui,sans-serif;' + (kind === 'primary' ? 'border:0;background:#0B57D0;color:#FFFFFF' : 'border:2px solid #0B57D0;background:#FFFFFF;color:#0B57D0');
+    const A = (label, kind, o) => ({ label, style: btn(kind), go: () => this.setState(o) });
+    const P = '2210 Telephone Road';
+    const acts = {
+      assigned: [A('I can’t take this one', 'secondary', { rTell: 'Jordan here. I can’t take incident 0147. Please send someone else.' })],
+      enroute: [A('I’m there', 'primary', { rStep: 'onscene', rTell: 'Jordan here. At ' + P + ' now.', rCheck: 'just now' }), A('Check in: all OK', 'secondary', { rTell: 'Jordan here. Check-in: all OK, still heading to ' + P + '.', rCheck: 'just now' }), A('Can’t get there', 'secondary', { rStep: 'blocked', rTell: 'Jordan here. Can’t reach ' + P + ': water too fast. Need a bigger boat.' })],
+      onscene: [A('Got everyone out', 'primary', { rStep: 'done', rTell: 'Jordan here. Got all 3 from ' + P + '. Heading to [SHELTER NAME].' }), A('Got some of them', 'secondary', { rStep: 'done', rTell: 'Jordan here. Got some from ' + P + '. People still there: please send another boat.' }), A('Nobody there', 'secondary', { rStep: 'done', rTell: 'Jordan here. Nobody at ' + P + '. Closing incident 0147.' }), A('Need more help here', 'secondary', { rTell: 'Jordan here. At ' + P + ', need more help: oxygen patient needs EMS at the drop-off.', rCheck: 'just now' })],
+      done: [A('Ready for the next job', 'primary', { rStep: 'idle', rTell: 'Jordan here. Dropped off. Ready for the next job.', rDest: null })],
+      blocked: [A('Head back to the launch', 'primary', { rStep: 'idle', rTell: 'Jordan here. Heading back to the launch.' }), A('Try another way', 'secondary', { rStep: 'enroute', rTell: 'Jordan here. Trying another way to ' + P + '.' })],
+      idle: [A('Restart the demo job', 'secondary', { rStep: 'assigned', rTell: '', rDest: null, rCheck: '6 min ago' })]
+    };
+    const step = s.rStep;
+    const idx = ['assigned', 'enroute', 'onscene', 'done'].indexOf(step === 'blocked' ? 'enroute' : step === 'idle' ? 'done' : step);
+    const osm = [['Sent to you', { rStep: 'assigned', rTell: 'Jordan here. Got incident 0147, ' + P + '.' }], ['On the way', { rStep: 'enroute', rTell: 'Jordan here. On my way to ' + P + ', incident 0147.', rCheck: 'just now' }], ['There', { rStep: 'onscene', rTell: 'Jordan here. At ' + P + ' now, incident 0147.', rCheck: 'just now' }], ['Done', { rStep: 'done', rTell: 'Jordan here. Incident 0147 done.' }]];
+    const steps = osm.map(([label, o], i) => ({ label, pressed: i === idx ? 'true' : 'false', go: () => this.setState(o),
+      style: 'flex:1 1 0;min-height:44px;text-align:center;padding:8px 2px;border-radius:8px;border:0;cursor:pointer;font:700 13px Atkinson Hyperlegible,system-ui,sans-serif;' + (i < idx ? 'background:#E7F3E8;color:#0F3D13' : i === idx ? 'background:#0B57D0;color:#FFFFFF' : 'background:#E9EBEF;color:#4A5260') }));
+    const chip = (sel) => 'min-height:48px;padding:0 16px;border-radius:999px;cursor:pointer;font:700 16px Atkinson Hyperlegible,system-ui,sans-serif;' + (sel ? 'background:#111418;color:#FFFFFF;border:2px solid #111418' : 'background:#FFFFFF;color:#111418;border:2px solid #98A2B3');
+    return {
+      isRespond: s.role === 'respond',
+      headline: { assigned: 'Dispatch sent you a rescue', enroute: 'Heading there', onscene: 'You’re there. How’s it going?', done: 'Nice work. Where did they go?', blocked: 'Couldn’t get there', idle: 'No job right now' }[step],
+      steps, actions: acts[step], tell: s.rTell,
+      showJob: step !== 'idle', idle: step === 'idle',
+      showCheck: step === 'enroute' || step === 'onscene', check: 'Dispatch last heard from you ' + s.rCheck,
+      showDests: step === 'done',
+      dests: ['Shelter', 'Hospital', 'Family or friends'].map((label) => ({ label, pressed: s.rDest === label ? 'true' : 'false', style: chip(s.rDest === label), pick: () => this.setState({ rDest: label }) })),
+      job: { place: P, landmark: 'Gray two-story, past the gas station',
+        details: [{ t: '3 people: Maria, her husband, grandmother (82)' }, { t: 'Grandmother on oxygen, tank running low' }, { t: 'Water at the front steps' }],
+        contact: 'Maria · 713-555-0142' }
+    };
+  }
+  renderVals() {
+    const s = this.state;
+    const sendRole = s.role === 'send';
+    const pills = {
+      now: 'align-self:flex-start;display:inline-block;padding:5px 12px;border-radius:999px;font-size:15px;font-weight:700;background:#B00020;color:#FFFFFF',
+      check: 'align-self:flex-start;display:inline-block;padding:4px 12px;border-radius:999px;font-size:15px;font-weight:700;background:#FFF4E5;color:#5C3300;border:1px solid #E8B562',
+      soon: 'align-self:flex-start;display:inline-block;padding:5px 12px;border-radius:999px;font-size:15px;font-weight:700;background:#EEF3FD;color:#0A3A8C'
+    };
+    const R = {
+      '147': { level: 'now', levelLabel: 'Needs help now', headline: 'Grandma on oxygen, power is out', place: '2210 Telephone Road', landmark: 'Gray two-story, past the gas station', people: 3,
+        details: [{ t: '3 people: Maria, her husband, her grandmother (82)' }, { t: 'Oxygen tank is running low' }, { t: 'Water at the front steps and rising' }],
+        contact: 'Maria · 713-555-0142', heard: 'Texted 6 min ago. We called back: still there.', check: false,
+        why: 'Oxygen without power can turn life-threatening within hours. That puts her first.',
+        ask: 'Hi Maria, this is the volunteer rescue team. A boat is being arranged. Is anyone hurt, and do you have pets with you?', askWhy: 'Find out what the team should bring.' },
+      '151': { level: 'check', levelLabel: 'Check first', headline: 'Family on a roof behind the Kroger', place: 'Kroger, Westheimer Road', landmark: 'Posted 5 hours ago, shared 40 times', people: 2,
+        details: [{ t: '2 people, 1 child' }, { t: 'On the roof when posted' }, { t: 'Nobody has confirmed since' }],
+        contact: '713-555-0188 (from the post)', heard: 'Social post 5 hours ago. Not checked yet.', check: true,
+        why: 'Old posts that keep getting shared are often about people who were already rescued. A quick call can save a boat trip.',
+        ask: 'This is the volunteer rescue team. Are you still behind the Kroger on Westheimer, and do you still need a boat? How many people are with you?', askWhy: 'This post is 5 hours old. Make sure they still need help before a boat goes.' },
+      '155': { level: 'soon', levelLabel: 'Needs help soon', headline: '4 people trapped upstairs with a dog', place: '800 Bissonnet Street', landmark: 'Apartment 2B, stairs under water', people: 4,
+        details: [{ t: '4 adults and 1 dog' }, { t: 'Upstairs and safe for now' }, { t: 'Water covering the stairs' }],
+        contact: 'Dev · 713-555-0171', heard: 'Called 22 min ago.', check: false,
+        why: 'They are trapped but safe upstairs for now, so they come after anyone in immediate danger.',
+        ask: 'Hi Dev, this is the volunteer rescue team. A boat is coming. Is anyone hurt, and is the water still rising?', askWhy: 'Check nothing has changed.' }
+    };
+    const waitingIds = s.waiting;
+    const curId = waitingIds.indexOf(s.curId) > -1 ? s.curId : waitingIds[0];
+    const base = curId ? R[curId] : null;
+    const cur = base ? Object.assign({}, base, {
+      pillStyle: pills[base.level], inc: '#0' + curId, incLabel: 'Incident 0' + curId,
+      heard: s.asked[curId] ? 'You asked just now. Waiting for their answer.' : base.heard,
+      primaryLabel: base.check && !s.asked[curId] ? 'Call or text to check' : 'Send someone',
+      secondaryLabel: base.check && !s.asked[curId] ? 'Send someone anyway' : 'Ask them a question'
+    }) : { place: '', people: 0, details: [] };
+    const useAskFirst = base && base.check && !s.asked[curId];
+    const H = [
+      { id: 'mike', name: 'Mike’s boat', short: 'Mike', status: 'At the launch, ready to go', free: 6 },
+      { id: 'sara', name: 'Sara’s boat', short: 'Sara', status: 'Out on a job, 2 seats left', free: 2 },
+      { id: 'truck', name: 'High-water truck', short: 'Truck team', status: 'Back at the shelter in 15 min', free: 8 }
+    ];
+    const helpers = H.map((h) => {
+      const sel = s.helper === h.id; const fits = h.free >= (cur.people || 0);
+      return { name: h.name, status: h.status, fit: fits ? 'Room for everyone' : 'Not enough room for ' + cur.people,
+        fitStyle: 'font-size:15px;font-weight:700;' + (fits ? 'color:#1B5E20' : 'color:#8A2B00'),
+        pressed: sel ? 'true' : 'false', pick: () => this.setState({ helper: h.id }),
+        style: 'display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:100%;text-align:left;min-height:84px;padding:14px;border-radius:14px;cursor:pointer;font-family:Atkinson Hyperlegible,system-ui,sans-serif;color:#111418;' + (sel ? 'background:#EEF3FD;border:3px solid #0B57D0' : 'background:#FFFFFF;border:1px solid #D0D5DD') };
+    });
+    const helper = H.find((h) => h.id === s.helper);
+    const message = helper && base ? helper.short + ', incident 0' + curId + ', rescue at ' + base.place + '. ' + base.landmark + '. ' + base.people + ' people. ' + base.details[1].t + '. Call ' + base.contact.replace(' · ', ' at ') + ' when close. Bring them to [SHELTER NAME].' : '';
+    const go = (screen) => () => this.setState({ screen, helper: null, why: false });
+    const removeCur = (extra) => {
+      const w = s.waiting.filter((id) => id !== curId);
+      this.setState(Object.assign({ waiting: w, curId: w[0] || null, helper: null, why: false }, extra));
+    };
+    const nowCount = waitingIds.filter((id) => R[id].level === 'now').length;
+    const ppl = waitingIds.reduce((a, id) => a + R[id].people, 0);
+    const done = s.out.find((o) => o.id === s.doneId) || { place: '', people: 0 };
+    const OC = [['all', 'Got everyone out'], ['some', 'Got some of them out'], ['gone', 'Nobody there, already gone'], ['noreach', 'Couldn’t get there']];
+    const choice = (sel) => 'width:100%;min-height:56px;padding:0 16px;text-align:left;border-radius:14px;cursor:pointer;font:700 18px Atkinson Hyperlegible,system-ui,sans-serif;color:#111418;' + (sel ? 'background:#EEF3FD;border:3px solid #0B57D0' : 'background:#FFFFFF;border:1px solid #D0D5DD');
+    const chip = (sel) => 'min-height:48px;padding:0 16px;border-radius:999px;cursor:pointer;font:700 16px Atkinson Hyperlegible,system-ui,sans-serif;' + (sel ? 'background:#111418;color:#FFFFFF;border:2px solid #111418' : 'background:#FFFFFF;color:#111418;border:2px solid #98A2B3');
+    const toastFor = (o, d, c) => ({
+      all: 'Marked safe: ' + c + ' people from ' + d.place + '. Other posts about this house were closed too, so nobody else gets sent.',
+      some: 'Saved. ' + c + ' people safe. The people still at ' + d.place + ' are back at the top of the list.',
+      gone: 'Closed. If anyone shares that post again, it will say Check first.',
+      noreach: d.place + ' is back at the top of the list so another team can try.'
+    })[o];
+    const navDefs = [['next', 'Next'], ['list', 'Waiting (' + waitingIds.length + ')'], ['out', 'Out now (' + s.out.length + ')']];
+    const active = s.screen === 'list' ? 'list' : (s.screen === 'out' || s.screen === 'done') ? 'out' : 'next';
+    return {
+      isNext: sendRole && s.screen === 'next', isSend: sendRole && s.screen === 'send', isSent: sendRole && s.screen === 'sent', isAsk: sendRole && s.screen === 'ask',
+      isList: sendRole && s.screen === 'list', isOut: sendRole && s.screen === 'out', isDone: sendRole && s.screen === 'done',
+      isSendRole: sendRole, rv: this.respondVals(s),
+      ecc: s.ecc,
+      pttPressed: s.ptt ? 'true' : 'false', pttLabel: s.ptt ? 'Talking… tap to end' : 'Push to talk',
+      pttTap: () => this.setState({ ptt: !s.ptt, ecc: s.ptt ? 'Call ended.' : 'Live: talking to [ECC NAME] ECC' }),
+      msgTap: () => this.setState({ ecc: 'Message to ECC saved. Sends when online.' }),
+      locTap: () => this.setState({ ecc: 'Your location is saved for ECC. Sends when online.' }),
+      eccBtn: 'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:68px;border-radius:12px;border:1px solid #D0D5DD;background:#F6F7F9;color:#111418;cursor:pointer;font:700 13px Atkinson Hyperlegible,system-ui,sans-serif',
+      pttStyle: 'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:68px;border-radius:12px;cursor:pointer;font:700 13px Atkinson Hyperlegible,system-ui,sans-serif;' + (s.ptt ? 'border:2px solid #B00020;background:#B00020;color:#FFFFFF' : 'border:2px solid #0B57D0;background:#EEF3FD;color:#0A3A8C'),
+      roles: [['send', 'Queue'], ['respond', 'Respond']].map(([id, label]) => ({ label, checked: s.role === id ? 'true' : 'false', pick: () => this.setState({ role: id }),
+        style: 'min-height:44px;border-radius:9px;cursor:pointer;font:700 16px Atkinson Hyperlegible,system-ui,sans-serif;' + (s.role === id ? 'background:#FFFFFF;color:#0A3A8C;border:2px solid #0B57D0' : 'background:transparent;color:#4A5260;border:2px solid transparent') })),
+      toast: s.toast, clearToast: () => this.setState({ toast: null }),
+      summary: ppl + ' people waiting · ' + nowCount + ' need help now',
+      hasCur: !!base, noCur: !base, cur,
+      whyOpen: s.why ? 'true' : 'false', showWhy: s.why, whyLabel: s.why ? 'Hide why' : 'Why is this one first?',
+      toggleWhy: () => this.setState({ why: !s.why }),
+      primary: useAskFirst ? go('ask') : go('send'),
+      secondary: useAskFirst ? go('send') : go('ask'),
+      skip: () => { const w = s.waiting.filter((id) => id !== curId).concat(curId ? [curId] : []); this.setState({ waiting: w, curId: w[0], why: false }); },
+      goNext: go('next'), goOut: go('out'),
+      helpers, hasHelper: !!helper, helperShort: helper ? helper.short : '', message,
+      confirmSend: () => removeCur({ screen: 'sent', lastSent: { helper: helper.short, place: base.place },
+        out: s.out.concat([{ id: curId, helper: helper.short, place: base.place, since: 'Left just now', people: base.people }]) }),
+      lastSent: s.lastSent,
+      markAsked: () => { const a = Object.assign({}, s.asked); a[curId] = true; const w = s.waiting.filter((id) => id !== curId).concat([curId]); this.setState({ asked: a, waiting: w, curId: w[0], screen: 'next', why: false }); },
+      waitingRows: waitingIds.map((id) => Object.assign({}, R[id], { pillStyle: pills[R[id].level], inc: '#0' + id, incLabel: 'Incident 0' + id, open: () => this.setState({ curId: id, screen: 'next', why: false }) })),
+      outRows: s.out.map((o) => Object.assign({}, o, { inc: '#0' + o.id, incLabel: 'Incident 0' + o.id, update: () => this.setState({ screen: 'done', doneId: o.id, outcome: null, count: o.people, dest: null }) })),
+      noOut: s.out.length === 0,
+      done,
+      outcomes: OC.map(([id, label]) => ({ label, pressed: s.outcome === id ? 'true' : 'false', style: choice(s.outcome === id), pick: () => this.setState({ outcome: id }) })),
+      showCount: s.outcome === 'all' || s.outcome === 'some',
+      count: s.count, minus: () => this.setState({ count: Math.max(0, s.count - 1) }), plus: () => this.setState({ count: s.count + 1 }),
+      dests: ['Shelter', 'Hospital', 'Family or friends'].map((label) => ({ label, pressed: s.dest === label ? 'true' : 'false', style: chip(s.dest === label), pick: () => this.setState({ dest: label }) })),
+      saveDone: () => { if (!s.outcome) return; this.setState({ out: s.out.filter((o) => o.id !== s.doneId), screen: 'next', toast: toastFor(s.outcome, done, s.count) }); },
+      nav: navDefs.map(([id, label]) => ({ label, current: active === id ? 'page' : 'false', go: go(id),
+        style: 'min-height:48px;border-radius:10px;cursor:pointer;font:700 15px Atkinson Hyperlegible,system-ui,sans-serif;' + (active === id ? 'background:#111418;color:#FFFFFF;border:2px solid #111418' : 'background:#FFFFFF;color:#111418;border:2px solid #98A2B3') }))
+    };
+  }
+}
+
+window.__start(Component);
+</script>
+</body>
+</html>
