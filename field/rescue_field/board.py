@@ -177,6 +177,12 @@ async def board(request: Request) -> HTMLResponse:
 
     ctx = await run_in_threadpool(read)
     ctx["model_version"] = getattr(request.app.state.extractor, "model_version", None) or "unknown"
+    info = getattr(request.app.state, "extractor_info", None) or {}
+    ctx["model_banner"] = (
+        info.get("fallback_reason") or "unknown"
+        if info.get("expected_model") and info.get("extractor") != "hf"
+        else None
+    )
     ctx["demo_mode"] = os.environ.get("DEMO_MODE") == "1"
     # The state /sync/offline-toggle flips, so the button label survives a reload.
     worker = getattr(request.app.state, "sync_worker", None)

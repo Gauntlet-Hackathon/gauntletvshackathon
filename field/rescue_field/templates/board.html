@@ -9,7 +9,7 @@
    #1a1a1a on #ffffff 17.4:1 (body), #4a4a4a on #ffffff 8.86:1 (meta),
    #b00020 on #ffffff 7.33:1 (P1 heading, errors), #8a4b00 on #ffffff 6.8:1 (P2 heading),
    #1b5e20 on #ffffff 7.87:1 (P3 heading), #ffffff on #b00020 / #8a4b00 / #1b5e20 (tier labels) 7.33 / 6.8 / 7.87:1,
-   #1a1a1a on #c8e6c9 12.94:1 (online badge), #1a1a1a on #ffcdd2 12.36:1 (offline badge),
+   #ffffff on #b00020 7.33:1 (model fallback banner), #1a1a1a on #c8e6c9 12.94:1 (online badge), #1a1a1a on #ffcdd2 12.36:1 (offline badge),
    #1a1a1a on #eeeeee 15.0:1 (no-sync badge), #0b57d0 focus outline on #ffffff 6.39:1. */
 html { font-size: 18px; }
 body { font-family: system-ui, sans-serif; margin: 1rem auto; max-width: 90rem; padding: 0 1rem;
@@ -25,6 +25,7 @@ body { font-family: system-ui, sans-serif; margin: 1rem auto; max-width: 90rem; 
 .dups { margin: .3rem 0 0 1rem; font-size: 1rem; }
 table { border-collapse: collapse; } td, th { padding: .1rem .6rem .1rem 0; text-align: left; }
 .badge { display: inline-block; padding: .15rem .6rem; border-radius: 1rem; font-size: 1rem; color: #1a1a1a; }
+#model-banner { background: #b00020; color: #ffffff; padding: .6rem 1rem; font-size: 1.2rem; border-radius: 4px; }
 #intake-error, #status-error { color: #b00020; } #intake form { margin: .6rem 0; }
 .badge-online { background: #c8e6c9; } .badge-offline { background: #ffcdd2; } .badge-nosync { background: #eeeeee; }
 button, input, select, textarea { font-size: 1rem; }
@@ -44,6 +45,8 @@ textarea:focus-visible, [tabindex]:focus-visible { outline: 3px solid #0b57d0; o
 {% endif %}
 </header>
 <main>
+{% if model_banner %}<p id="model-banner" role="alert"><strong>Real model not loaded, using keyword fallback: {{ model_banner }}</strong></p>
+{% endif %}
 {% include "_intake.html" %}
 <p id="status-error" role="alert"></p>
 <div id="board" tabindex="-1">{% include "_board.html" %}</div>

@@ -291,8 +291,25 @@ def _worker(request: Request) -> SyncWorker | None:
     return getattr(request.app.state, "sync_worker", None)
 
 
+def extractor_status(request: Request) -> dict[str, Any]:
+    """The `extractor` object of /sync/status: what the app chose, what it expected, and why."""
+    app_state = request.app.state
+    info = dict(getattr(app_state, "extractor_info", None) or {})
+    for key in ("extractor", "model_version", "expected_model", "fallback_reason"):
+        info.setdefault(key, None)
+    calibrated = getattr(getattr(app_state, "extractor", None), "calibrated", None)
+    info["calibrated"] = calibrated if isinstance(calibrated, bool) else None
+    return info
+
+
 @router.get("/sync/status")
 async def sync_status(request: Request) -> Any:
+    status = await _sync_status(request)
+    status["extractor"] = extractor_status(request)
+    return status
+
+
+async def _sync_status(request: Request) -> dict[str, Any]:
     worker = _worker(request)
     if worker is None:
         store = getattr(request.app.state, "store", None)

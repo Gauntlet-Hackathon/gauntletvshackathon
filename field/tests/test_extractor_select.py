@@ -134,3 +134,78 @@ def test_import_with_hf_env_touches_no_files(tmp_path):
     )
     assert out.returncode == 0, out.stderr
     assert list(tmp_path.iterdir()) == []
+
+
+# ---- F37: the fallback is loud --------------------------------------------------------------
+
+BANNER = "Real model not loaded, using keyword fallback"
+
+
+def test_fallback_is_visible_in_status_and_board(env, monkeypatch, caplog):
+    hf_env(monkeypatch)
+    Boom.exc = RuntimeError("no weights")
+    monkeypatch.setattr(slm_hf, "HFExtractor", Boom)
+    app = api.create_app(decide_batch=fake_engine())
+    with caplog.at_level(logging.ERROR, logger="rescue_field.api"):
+        with TestClient(app) as client:
+            ex = client.get("/sync/status").json()["extractor"]
+            html = client.get("/").text
+    assert ex["extractor"] == "fixture"
+    assert ex["expected_model"] == HF_VERSION
+    assert ex["fallback_reason"] == "RuntimeError: no weights"
+    assert ex["calibrated"] is None
+    assert f"{BANNER}: RuntimeError: no weights" in html and 'role="alert"' in html
+    assert any(r.levelno == logging.ERROR for r in caplog.records)
+
+
+def test_no_env_no_banner(env):
+    app = api.create_app(decide_batch=fake_engine())
+    with TestClient(app) as client:
+        ex = client.get("/sync/status").json()["extractor"]
+        assert BANNER not in client.get("/").text
+    assert ex["extractor"] == "fixture" and ex["expected_model"] is None
+    assert ex["fallback_reason"] is None
+
+
+def test_load_success_no_banner(env, monkeypatch):
+    hf_env(monkeypatch)
+    monkeypatch.setattr(slm_hf, "HFExtractor", FakeHF)
+    app = api.create_app(decide_batch=fake_engine())
+    with TestClient(app) as client:
+        ex = client.get("/sync/status").json()["extractor"]
+        assert BANNER not in client.get("/").text
+    assert ex == {
+        "extractor": "hf",
+        "model_version": HF_VERSION,
+        "expected_model": HF_VERSION,
+        "fallback_reason": None,
+        "calibrated": None,
+    }
+
+
+def test_calibrated_flag_reported(env, monkeypatch):
+    hf_env(monkeypatch)
+
+    class Uncal(FakeHF):
+        calibrated = False
+
+    monkeypatch.setattr(slm_hf, "HFExtractor", Uncal)
+    app = api.create_app(decide_batch=fake_engine())
+    with TestClient(app) as client:
+        assert client.get("/sync/status").json()["extractor"]["calibrated"] is False
+
+
+def test_hfextractor_exposes_calibrated(tmp_path):
+    class Inner:
+        calibrated = False
+
+        def extract(self, t):
+            return {}
+
+    hf = slm_hf.HFExtractor(
+        repo="org/model",
+        revision=SHA,
+        local_path=str(tmp_path),
+        extractor_factory=lambda f: Inner(),
+    )
+    assert hf.calibrated is False
