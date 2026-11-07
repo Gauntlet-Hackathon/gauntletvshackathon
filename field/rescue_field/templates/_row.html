@@ -1,0 +1,22 @@
+{% set s = r.tier_source %}
+<div class="row" data-request-id="{{ r.request_id }}" data-tier="{{ r.tier }}">
+  <strong>{{ r.extracted.location.text }}</strong>
+  · {{ r.extracted.people_count.value if r.extracted.people_count.value is not none else "?" }} people
+  <div class="meta">
+    <span class="rule">{{ s.decision.rule_id }}</span> ·
+    rules <span class="rules-version">{{ s.rules_version }}</span> ·
+    model <span class="model-version">{{ s.model_version }}</span> · {{ r.received_at }}
+  </div>
+  <details><summary>Extracted fields</summary>
+    <p>{{ r.raw_text }}</p>
+    {% set e = r.extracted %}{% include "_fields.html" %}
+  </details>
+  {% if r.duplicates %}
+  <details class="dups"><summary>{{ r.duplicates|length }} duplicate(s)</summary>
+    {% for d in r.duplicates %}
+    <div>{{ d.request_id }} · {{ d.received_at }} · {{ d.decision.rule_id }}
+      · {{ d.decision.priority_tier or "-" }}</div>
+    {% endfor %}
+  </details>
+  {% endif %}
+</div>
