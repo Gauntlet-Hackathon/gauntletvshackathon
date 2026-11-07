@@ -46,6 +46,12 @@ CREATE TABLE IF NOT EXISTS outbox (
     rejected_at TEXT,
     reject_error TEXT
 );
+CREATE TABLE IF NOT EXISTS boats (
+    name TEXT PRIMARY KEY,
+    seats INTEGER NOT NULL CHECK (seats BETWEEN 1 AND 100),
+    status TEXT NOT NULL CHECK (status IN ('ready', 'out', 'returning')),
+    last_check_in TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
