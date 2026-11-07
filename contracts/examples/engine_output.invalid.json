@@ -1,6 +1,7 @@
 {
   "outcome": "prioritized",
   "priority_tier": null,
+  "provisional_tier": null,
   "rule_id": "R-P1-01",
   "duplicate_of": null,
   "abstain_reason": null,

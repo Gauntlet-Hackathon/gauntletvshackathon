@@ -81,6 +81,7 @@
   "engine_output": {
     "outcome": "duplicate",
     "priority_tier": "P1",
+    "provisional_tier": null,
     "rule_id": "R-DUP-01",
     "duplicate_of": "01JCB00000000000000000RQ01",
     "abstain_reason": null,

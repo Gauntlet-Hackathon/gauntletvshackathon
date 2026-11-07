@@ -150,6 +150,7 @@ class EngineInput(Contract):
 class EngineOutput(Contract):
     outcome: Literal["prioritized", "abstain", "not_a_request", "duplicate"]
     priority_tier: Tier | None
+    provisional_tier: Tier | None
     rule_id: RuleId
     duplicate_of: ULID | None
     abstain_reason: AbstainReason | None
@@ -163,6 +164,8 @@ class EngineOutput(Contract):
             raise ValueError(f"{o} needs a priority_tier")
         if o in ("abstain", "not_a_request") and self.priority_tier is not None:
             raise ValueError(f"{o} must not have a priority_tier")
+        if (o == "abstain") != (self.provisional_tier is not None):
+            raise ValueError("provisional_tier is set exactly when outcome is abstain")
         if (o == "duplicate") != (self.duplicate_of is not None):
             raise ValueError("duplicate_of is set exactly when outcome is duplicate")
         if (o == "abstain") != (self.abstain_reason is not None):

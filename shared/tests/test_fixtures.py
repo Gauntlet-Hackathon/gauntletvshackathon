@@ -1,4 +1,4 @@
-"""The 24 hand-written rubric cases validate against the contracts and are internally consistent.
+"""The 25 hand-written rubric cases validate against the contracts and are internally consistent.
 `expected` is never checked here: it was written by hand from the rubric, and only an engine
 (engine lane tests) is compared against it."""
 
@@ -20,9 +20,9 @@ MARKERS = [s for s in (FIXTURES / "hoax_markers.txt").read_text().splitlines() i
 IDS = [c["case_id"] for c in CASES]
 
 
-def test_24_unique_cases():
-    assert IDS == [f"C{n:02d}" for n in range(1, 25)]
-    assert len({c["request_id"] for c in CASES}) == 24
+def test_25_unique_cases():
+    assert IDS == [f"C{n:02d}" for n in range(1, 26)]
+    assert len({c["request_id"] for c in CASES}) == 25
 
 
 def test_coverage_required_by_the_ticket():

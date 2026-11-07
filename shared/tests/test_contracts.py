@@ -126,6 +126,14 @@ BAD_OUTPUTS = {
         outcome="abstain", priority_tier=None, duplicate_of=None, abstain_reason="possible_hoax"
     ),
     "not_a_request with tier": _output(outcome="not_a_request", duplicate_of=None),
+    "abstain without provisional_tier": _output(
+        outcome="abstain", priority_tier=None, duplicate_of=None, abstain_reason="possible_hoax",
+        follow_up_question="Real?",
+    ),  # fmt: skip
+    "duplicate with provisional_tier": _output(provisional_tier="P1"),
+    "missing provisional_tier": {
+        k: v for k, v in example("engine_output", "valid").items() if k != "provisional_tier"
+    },
     "unknown abstain reason": _output(
         outcome="abstain", priority_tier=None, duplicate_of=None,
         abstain_reason="vibes", follow_up_question="Real?",

@@ -22,6 +22,17 @@
         }
       ]
     },
+    "provisional_tier": {
+      "anyOf": [
+        {
+          "$ref": "common.schema.json#/$defs/tier"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Set exactly on abstain: the step-4 tier read with firm, uncertain and weak signals together (the most cautious reading), so follow-ups can be ranked. Null for every other outcome."
+    },
     "rule_id": {
       "$ref": "common.schema.json#/$defs/rule_id"
     },
@@ -63,6 +74,7 @@
   "required": [
     "outcome",
     "priority_tier",
+    "provisional_tier",
     "rule_id",
     "duplicate_of",
     "abstain_reason",
@@ -70,7 +82,7 @@
     "rules_version"
   ],
   "title": "engine output",
-  "description": "Exactly one outcome per input. priority_tier is kept on duplicate outcomes.",
+  "description": "Exactly one outcome per input. priority_tier is kept on duplicate outcomes; provisional_tier is non-null exactly on abstain outcomes.",
   "allOf": [
     {
       "if": {
@@ -84,6 +96,9 @@
         "properties": {
           "priority_tier": {
             "$ref": "common.schema.json#/$defs/tier"
+          },
+          "provisional_tier": {
+            "type": "null"
           },
           "duplicate_of": {
             "type": "null"
@@ -107,6 +122,9 @@
           "priority_tier": {
             "$ref": "common.schema.json#/$defs/tier"
           },
+          "provisional_tier": {
+            "type": "null"
+          },
           "duplicate_of": {
             "$ref": "common.schema.json#/$defs/ulid"
           },
@@ -128,6 +146,9 @@
         "properties": {
           "priority_tier": {
             "type": "null"
+          },
+          "provisional_tier": {
+            "$ref": "common.schema.json#/$defs/tier"
           },
           "duplicate_of": {
             "type": "null"
@@ -152,6 +173,9 @@
       "then": {
         "properties": {
           "priority_tier": {
+            "type": "null"
+          },
+          "provisional_tier": {
             "type": "null"
           },
           "duplicate_of": {

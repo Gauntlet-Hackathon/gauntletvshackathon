@@ -6,7 +6,14 @@ python (default): copies the fallback engine sources into the version directory.
 mercury: builds engine/mercury with make (needs mmc and MERCURY_JSON_SRC) and copies the binary
 to bin/mercury_engine in the version directory.
 Both write manifest.json (contracts/engine_manifest.schema.json). rules_sha is the git SHA of the
-last commit touching the rule sources; bin_hash is the sha256 (first 16 hex) over the copied files.
+last commit touching the rule sources; bin_hash is the sha256 (first 16 hex) over the copied files
+as they are before stamping, i.e. with the placeholder version in them.
+
+Stamping (A2, docs/DECISIONS.md): the published copy then carries the real rules_version, so every
+decision it emits names the build that made it. For python, the `RULES_VERSION = "<placeholder>"`
+line of rules.py is rewritten. For mercury, the binary holds the placeholder in a fixed-width,
+space-padded slot (rules.m `version_slot`), which is overwritten in place with the real version
+padded the same way. Undoing the stamp (see `unstamped`) gives back the bytes bin_hash covers.
 An existing version directory is never overwritten.
 """
 
@@ -33,6 +40,10 @@ ENTRYPOINT = "python -m rescue_engine.fallback"
 MERCURY_DIR = ENGINE_DIR.parent / "mercury"
 MERCURY_BINARY = "mercury_engine"
 MERCURY_ENTRYPOINT = f"bin/{MERCURY_BINARY}"
+
+PLACEHOLDER_VERSION = "rules@0000000+bin:00000000"
+VERSION_SLOT_WIDTH = 120  # rules.m version_slot; a rules_version is at most 115 characters
+RULES_PY = "rules.py"
 
 
 class VersionExists(Exception):
@@ -64,10 +75,66 @@ def git_sha(path: Path, repo: Path = REPO_ROOT) -> str:
     raise RuntimeError("cannot determine git SHA of the rule sources")
 
 
+# --- version stamping -------------------------------------------------------------------------
+
+
+def python_version_line(version: str) -> str:
+    return f'RULES_VERSION = "{version}"'
+
+
+def version_slot(version: str) -> bytes:
+    """The bytes of the Mercury binary's version slot holding version."""
+    if len(version) > VERSION_SLOT_WIDTH:
+        raise RuntimeError(f"rules_version longer than {VERSION_SLOT_WIDTH} characters")
+    return version.ljust(VERSION_SLOT_WIDTH).encode("ascii")
+
+
+def _replace_once(data: bytes, old: bytes, new: bytes, what: str) -> bytes:
+    count = data.count(old)
+    if count != 1:
+        raise RuntimeError(f"expected exactly one {what} to stamp, found {count}")
+    return data.replace(old, new)
+
+
+def stamp_python(rules_py: Path, version: str) -> None:
+    """Rewrite the RULES_VERSION placeholder line of a copied rules.py."""
+    old = python_version_line(PLACEHOLDER_VERSION).encode()
+    new = python_version_line(version).encode()
+    rules_py.write_bytes(_replace_once(rules_py.read_bytes(), old, new, "RULES_VERSION line"))
+
+
+def stamp_binary(binary: Path, version: str) -> None:
+    """Overwrite the placeholder version slot of a copied Mercury binary (same length)."""
+    data = _replace_once(
+        binary.read_bytes(), version_slot(PLACEHOLDER_VERSION), version_slot(version),
+        "version slot",
+    )  # fmt: skip
+    binary.write_bytes(data)
+
+
+def unstamped(data: bytes, version: str, kind: str) -> bytes:
+    """Undo a stamp: the bytes the manifest's bin_hash was computed over."""
+    if kind == "mercury":
+        return _replace_once(data, version_slot(version), version_slot(PLACEHOLDER_VERSION),
+                             "version slot")  # fmt: skip
+    return _replace_once(
+        data, python_version_line(version).encode(),
+        python_version_line(PLACEHOLDER_VERSION).encode(), "RULES_VERSION line",
+    )  # fmt: skip
+
+
+# --- publishing -------------------------------------------------------------------------------
+
+
 def _publish(
-    dist: Path, sha: str, bin_hash: str, kind: str, entrypoint: str, stage: Callable[[Path], None]
+    dist: Path,
+    sha: str,
+    bin_hash: str,
+    kind: str,
+    entrypoint: str,
+    stage: Callable[[Path, str], None],
 ) -> Path:
-    """Fill a temp dir with stage(tmp), add manifest.json, rename it to dist/<rules_version>."""
+    """Fill a temp dir with stage(tmp, version), add manifest.json, rename it to dist/<version>."""
     version = rules_version(sha, bin_hash)
     target = dist / version
     if target.exists():
@@ -78,7 +145,7 @@ def _publish(
         shutil.rmtree(tmp)
     try:
         tmp.mkdir()
-        stage(tmp)
+        stage(tmp, version)
         manifest = {
             "rules_version": version,
             "rules_sha": sha,
@@ -102,12 +169,15 @@ def build(
     bin_hash = hash_files(files, source)[:16]
     sha = rules_sha or git_sha(source)
 
-    def stage(tmp: Path) -> None:
+    def stage(tmp: Path, version: str) -> None:
+        package = tmp / "rescue_engine" / "fallback"
         for f in files:
-            dest = tmp / "rescue_engine" / "fallback" / f.relative_to(source)
+            dest = package / f.relative_to(source)
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(f, dest)
         (tmp / "rescue_engine" / "__init__.py").write_text((ENGINE_DIR / "__init__.py").read_text())
+        if (package / RULES_PY).exists():
+            stamp_python(package / RULES_PY, version)
 
     return _publish(dist, sha, bin_hash, "python", ENTRYPOINT, stage)
 
@@ -133,9 +203,10 @@ def build_mercury(
         binary = compile_mercury(Path(work), source)
         bin_hash = hash_files([binary], binary.parent)[:16]
 
-        def stage(tmp: Path) -> None:
+        def stage(tmp: Path, version: str) -> None:
             (tmp / "bin").mkdir()
             shutil.copy2(binary, tmp / MERCURY_ENTRYPOINT)
+            stamp_binary(tmp / MERCURY_ENTRYPOINT, version)
 
         return _publish(dist, sha, bin_hash, "mercury", MERCURY_ENTRYPOINT, stage)
 

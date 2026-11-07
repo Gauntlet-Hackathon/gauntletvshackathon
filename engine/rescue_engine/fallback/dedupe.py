@@ -24,12 +24,15 @@ def conflicting_counts(extracted: dict[str, Any], candidates: list[dict[str, Any
 
 def group_tier(own_tier: str, candidates: list[dict[str, Any]]) -> str:
     """Highest tier of the request and every candidate that has one."""
-    best = own_tier
-    for c in candidates:
-        tier = c.get("priority_tier")
-        if tier is not None and rules.higher(tier, best):
-            best = tier
-    return best
+    return rules.highest(own_tier, [c.get("priority_tier") for c in candidates])
+
+
+def sets_group_tier(own_tier: str, candidates: list[dict[str, Any]]) -> bool:
+    """True when own_tier is more urgent than every candidate's (non-null) tier."""
+    return all(
+        c.get("priority_tier") is None or rules.higher(own_tier, c["priority_tier"])
+        for c in candidates
+    )
 
 
 def earliest(candidates: list[dict[str, Any]]) -> str:

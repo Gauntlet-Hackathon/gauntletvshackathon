@@ -100,6 +100,7 @@
     --->    q_location
     ;       q_request
     ;       q_hazard
+    ;       q_hazard_vulnerable
     ;       q_confirm
     ;       q_hoax
     ;       q_counts.
@@ -117,6 +118,7 @@
 :- type extracted
     --->    extracted(
                 location_type       :: location_type,
+                location_text       :: maybe(string),
                 location_conf       :: float,
                 people_count        :: maybe(float),
                 vulnerable          :: list(conf_item(vulnerable)),
@@ -170,6 +172,7 @@
     --->    engine_output(
                 outcome             :: outcome,
                 priority_tier       :: maybe(tier),
+                provisional_tier    :: maybe(tier),
                 rule_id             :: rule_id,
                 duplicate_of        :: maybe(string),
                 abstain_reason      :: maybe(abstain_reason),
@@ -180,7 +183,14 @@
 
 :- func default_thresholds = thresholds.
 
-    % Same placeholder the Python fallback emits (rules.RULES_VERSION).
+    % True when hazard_weak_min =< hazard_uncertain_min =< hazard_firm_min (R8).
+    % json_io.m rejects thresholds that fail it.
+    %
+:- pred thresholds_ordered(thresholds::in) is semidet.
+
+    % The placeholder the Python fallback emits (rules.RULES_VERSION) in the source tree;
+    % rescue_engine.build writes the real version into the built binary (see version_slot).
+    %
 :- func rules_version = string.
 
 :- func decide(engine_input) = engine_output.
@@ -202,70 +212,88 @@
 
 default_thresholds = thresholds(0.6, 0.6, 1.0, 0.85, 0.6, 0.75, 0.5, 0.25, 24.0, 12.0).
 
-rules_version = "rules@0000000+bin:00000000".
+thresholds_ordered(Th) :-
+    Th ^ hazard_weak_min =< Th ^ hazard_uncertain_min,
+    Th ^ hazard_uncertain_min =< Th ^ hazard_firm_min.
+
+rules_version = string.strip(version_slot).
+
+    % A fixed-width slot (the placeholder padded with spaces to 120 characters) that
+    % rescue_engine.build overwrites in the compiled binary with the real rules_version,
+    % padded the same way (A2). Keep it one literal of exactly this width.
+    %
+:- func version_slot = string.
+
+version_slot = "rules@0000000+bin:00000000                                                                                              ".
 
 %---------------------------------------------------------------------------%
 
 decide(engine_input(Ex, Ctx)) = Out :-
     Th = Ctx ^ thresholds,
-    ( if check_request(Ex, Th, RequestOut) then
+    A = assess(Ex, Th),
+    ( if check_request(Ex, Th, A, RequestOut) then
         Out = RequestOut
-    else if check_hoax(Ex, Ctx, Th) then
-        Out = abstain_output(r_abs_hoax, possible_hoax, q_hoax)
     else if not usable_location(Ex, Ctx, Th) then
-        Out = abstain_output(r_abs_loc, no_usable_location, q_location)
+        Out = abstain_output(r_abs_loc, no_usable_location, q_location, A ^ a_weak)
     else
-        TierOut = check_tier(Ex, Th),
+        TierOut = check_hoax(Ex, Ctx, Th, A, check_tier(A)),
         Candidates = Ctx ^ duplicate_candidates,
         ( if
             TierOut ^ outcome = prioritized,
             TierOut ^ priority_tier = yes(OwnTier),
             Candidates = [First | Rest]
         then
-            Out = check_duplicates(Ex, OwnTier, First, Rest)
+            Out = check_duplicates(Ex, A, OwnTier, TierOut ^ follow_up_question,
+                First, Rest)
         else
             Out = TierOut
         )
     ).
 
-:- func abstain_output(rule_id, abstain_reason, question) = engine_output.
+    % Every abstain carries the provisional tier (R1).
+    %
+:- func abstain_output(rule_id, abstain_reason, question, tier) = engine_output.
 
-abstain_output(Rule, Reason, Question) =
-    engine_output(abstain, no, Rule, no, yes(Reason), yes(Question)).
+abstain_output(Rule, Reason, Question, Provisional) =
+    engine_output(abstain, no, yes(Provisional), Rule, no, yes(Reason), yes(Question)).
+
+:- func plain_output(outcome, maybe(tier), rule_id, maybe(question)) = engine_output.
+
+plain_output(Outcome, Tier, Rule, Question) =
+    engine_output(Outcome, Tier, no, Rule, no, no, Question).
 
 %---------------------------------------------------------------------------%
-% Step 1: request check.
+% Step 1: request check. A stale post whose tier would be P1 goes to a human
+% instead of being dropped (R5).
 
-:- pred check_request(extracted::in, thresholds::in, engine_output::out) is semidet.
+:- pred check_request(extracted::in, thresholds::in, assessment::in,
+    engine_output::out) is semidet.
 
-check_request(Ex, Th, Out) :-
+check_request(Ex, Th, A, Out) :-
     ( if Ex ^ request_conf < Th ^ request_confidence_min then
-        Out = abstain_output(r_abs_req, low_confidence_request, q_request)
+        Out = abstain_output(r_abs_req, low_confidence_request, q_request, A ^ a_weak)
     else if Ex ^ is_request = no then
-        Out = engine_output(not_a_request, no, r_nar_01, no, no, no)
+        Out = plain_output(not_a_request, no, r_nar_01, no)
     else
         Ex ^ is_stale_post = yes,
         Ex ^ stale_conf >= Th ^ stale_confidence_min,
-        Out = engine_output(not_a_request, no, r_nar_02, no, no, no)
+        ( if A ^ a_weak = p1 then
+            Out = abstain_output(r_abs_req, low_confidence_request, q_request, p1)
+        else
+            Out = plain_output(not_a_request, no, r_nar_02, no)
+        )
     ).
 
 %---------------------------------------------------------------------------%
-% Hoax: markers plus a shaky is_request route to a human, never discard.
-
-:- pred check_hoax(extracted::in, context::in, thresholds::in) is semidet.
-
-check_hoax(Ex, Ctx, Th) :-
-    Ctx ^ hoax_marker_hits >= Th ^ hoax_marker_min,
-    Ex ^ request_conf < Th ^ hoax_request_confidence_max.
-
-%---------------------------------------------------------------------------%
-% Step 2: location check.
+% Step 2: location check. Null or blank text is never usable (R11).
 
 :- pred usable_location(extracted::in, context::in, thresholds::in) is semidet.
 
 usable_location(Ex, Ctx, Th) :-
     Type = Ex ^ location_type,
     Ex ^ location_conf >= Th ^ location_confidence_min,
+    Ex ^ location_text = yes(Text),
+    string.strip(Text) \= "",
     (
         Type = landmark,
         Ctx ^ has_street_list_hits = yes
@@ -278,7 +306,7 @@ usable_location(Ex, Ctx, Th) :-
 
 %---------------------------------------------------------------------------%
 % Step 3: tier, with uncertainty escalation. A signal is never dropped to
-% lower a tier: a weak signal that would raise it means abstain.
+% lower a tier: a weak signal that would raise it asks a human (R2).
 
 :- type signals
     --->    signals(
@@ -289,27 +317,93 @@ usable_location(Ex, Ctx, Th) :-
                 sig_need_hours_over :: float
             ).
 
-:- func check_tier(extracted, thresholds) = engine_output.
+    % The tiers at the three confidence bands (rules.assess_tier in Python).
+    % a_weak is the most cautious reading, the provisional tier of an abstain.
+    % a_hazard_q is set when a weak signal would raise the tier.
+    %
+:- type assessment
+    --->    assessment(
+                a_firm              :: tier,
+                a_uncertain         :: tier,
+                a_rule              :: tier_rule,
+                a_weak              :: tier,
+                a_hazard_q          :: maybe(question)
+            ).
 
-check_tier(Ex, Th) = Out :-
-    match_tier(signals_at(Ex, Th ^ hazard_firm_min, Th), Firm, _),
-    match_tier(signals_at(Ex, Th ^ hazard_uncertain_min, Th), Uncertain, Rule),
-    match_tier(signals_at(Ex, Th ^ hazard_weak_min, Th), Weak, _),
+:- func assess(extracted, thresholds) = assessment.
+
+assess(Ex, Th) = assessment(Firm, Uncertain, Rule, Weak, HazardQ) :-
+    F = Th ^ hazard_firm_min,
+    U = Th ^ hazard_uncertain_min,
+    W = Th ^ hazard_weak_min,
+    match_tier(signals_at(Ex, F, F, Th), Firm, _),
+    match_tier(signals_at(Ex, U, U, Th), Uncertain, Rule),
+    match_tier(signals_at(Ex, W, W, Th), Weak, _),
     ( if higher(Weak, Uncertain) then
-        Out = abstain_output(r_abs_haz, low_confidence_hazard, q_hazard)
+        % Does the raise need a weak vulnerable entry? Then ask about it (R13).
+        match_tier(signals_at(Ex, W, U, Th), HazardsOnly, _),
+        ( if higher(Weak, HazardsOnly) then
+            HazardQ = yes(q_hazard_vulnerable)
+        else
+            HazardQ = yes(q_hazard)
+        )
     else
-        ( if higher(Uncertain, Firm) then
+        HazardQ = no
+    ).
+
+:- func check_tier(assessment) = engine_output.
+
+check_tier(A) = Out :-
+    Uncertain = A ^ a_uncertain,
+    Rule = tier_rule(A ^ a_rule),
+    HazardQ = A ^ a_hazard_q,
+    (
+        HazardQ = yes(Q),
+        ( if Uncertain = p3 then
+            Out = abstain_output(r_abs_haz, low_confidence_hazard, Q, A ^ a_weak)
+        else
+            Out = plain_output(prioritized, yes(Uncertain), Rule, yes(Q))
+        )
+    ;
+        HazardQ = no,
+        ( if higher(Uncertain, A ^ a_firm) then
             Question = yes(q_confirm)
         else
             Question = no
         ),
-        Out = engine_output(prioritized, yes(Uncertain), tier_rule(Rule), no, no, Question)
+        Out = plain_output(prioritized, yes(Uncertain), Rule, Question)
     ).
 
-:- func signals_at(extracted, float, thresholds) = signals.
+%---------------------------------------------------------------------------%
+% Step 4: hoax markers plus a shaky is_request. A P1 stays prioritized with the
+% hoax question (R3); anything else is routed to a human, never discarded.
 
-signals_at(Ex, MinConf, Th) =
-    signals(kinds_at(Ex ^ hazards, MinConf), kinds_at(Ex ^ vulnerable, MinConf),
+:- func check_hoax(extracted, context, thresholds, assessment, engine_output)
+    = engine_output.
+
+check_hoax(Ex, Ctx, Th, A, Out0) = Out :-
+    ( if
+        Ctx ^ hoax_marker_hits >= Th ^ hoax_marker_min,
+        Ex ^ request_conf < Th ^ hoax_request_confidence_max
+    then
+        ( if
+            Out0 ^ outcome = prioritized,
+            Out0 ^ priority_tier = yes(p1)
+        then
+            Out = Out0 ^ follow_up_question := yes(q_hoax)
+        else
+            Out = abstain_output(r_abs_hoax, possible_hoax, q_hoax, A ^ a_weak)
+        )
+    else
+        Out = Out0
+    ).
+
+    % Hazards kept at HazardMin, vulnerable entries at VulnMin.
+    %
+:- func signals_at(extracted, float, float, thresholds) = signals.
+
+signals_at(Ex, HazardMin, VulnMin, Th) =
+    signals(kinds_at(Ex ^ hazards, HazardMin), kinds_at(Ex ^ vulnerable, VulnMin),
         Ex ^ needs, Ex ^ request_kind, Th ^ need_hours_over).
 
 :- func kinds_at(list(conf_item(T)), float) = set(T).
@@ -427,19 +521,32 @@ higher(A, B) :-
     tier_rank(A) < tier_rank(B).
 
 %---------------------------------------------------------------------------%
-% Steps 4-5: duplicates and contradictions (candidates arrive oldest first).
+% Step 5: duplicates and contradictions (candidates arrive oldest first).
 
-:- func check_duplicates(extracted, tier, candidate, list(candidate)) = engine_output.
+:- func check_duplicates(extracted, assessment, tier, maybe(question), candidate,
+    list(candidate)) = engine_output.
 
-check_duplicates(Ex, OwnTier, First, Rest) = Out :-
+check_duplicates(Ex, A, OwnTier, OwnQuestion, First, Rest) = Out :-
     Candidates = [First | Rest],
     ( if conflicting_counts(Ex, Candidates) then
-        Out = abstain_output(r_abs_cnt, conflicting_counts, q_counts)
+        % R4: the abstain keeps the group's tier as its provisional tier.
+        Provisional = list.foldl(group_tier, Candidates, A ^ a_weak),
+        Out = abstain_output(r_abs_cnt, conflicting_counts, q_counts, Provisional)
     else
         GroupTier = list.foldl(group_tier, Candidates, OwnTier),
         Earliest = list.foldl(earlier, Rest, First),
-        Out = engine_output(duplicate, yes(GroupTier), r_dup_01,
-            yes(Earliest ^ cand_request_id), no, no)
+        % R9: keep the request's own question when its own signals set the group tier.
+        ( if
+            list.member(C, Candidates),
+            C ^ cand_tier = yes(T),
+            not higher(OwnTier, T)
+        then
+            Question = no
+        else
+            Question = OwnQuestion
+        ),
+        Out = engine_output(duplicate, yes(GroupTier), no, r_dup_01,
+            yes(Earliest ^ cand_request_id), no, Question)
     ).
 
 :- pred conflicting_counts(extracted::in, list(candidate)::in) is semidet.
@@ -514,6 +621,10 @@ question_string(q_request) =
 question_string(q_hazard) =
     "Can you confirm what is happening right now: is water rising, " ++
     "is anyone injured, trapped or in danger?".
+question_string(q_hazard_vulnerable) =
+    "Can you confirm what is happening right now: is water rising, " ++
+    "is anyone injured, trapped or in danger, and is a child, elderly or " ++
+    "disabled person with you?".
 question_string(q_confirm) =
     "Please confirm: is anyone in immediate danger (rising water, injury, " ++
     "fire, trapped), and is a child, elderly or disabled person with you?".
