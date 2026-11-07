@@ -52,3 +52,29 @@ def test_copies_frozen_build_and_checks_manifest():
 
 def test_dockerignore_keeps_engine_dist():
     assert not any(e.rstrip("/").startswith("engine") for e in DOCKERIGNORE)
+
+
+def test_model_build_args_and_secret():
+    assert 'ARG HF_REPO=""' in DOCKERFILE
+    assert 'ARG HF_REVISION=""' in DOCKERFILE
+    assert "--mount=type=secret,id=HF_TOKEN" in DOCKERFILE
+    assert "/run/secrets/HF_TOKEN" in DOCKERFILE
+    assert "COPY field/requirements-model.txt" in DOCKERFILE
+
+
+def test_model_cpu_index_only_for_torch_and_sha_check():
+    assert DOCKERFILE.count("download.pytorch.org/whl/cpu") == 1
+    line = next(x for x in DOCKERFILE.splitlines() if "download.pytorch.org/whl/cpu" in x)
+    assert line.rstrip(" \\").endswith("torch")
+    assert "[0-9a-f]{40}" in DOCKERFILE
+
+
+def test_offline_env_is_unconditional():
+    env = next(x for x in DOCKERFILE.splitlines() if x.startswith("ENV HF_REPO="))
+    for name in ("HF_HUB_OFFLINE=1", "TRANSFORMERS_OFFLINE=1", "HF_MODEL_DIR=/models/current"):
+        assert name in env
+
+
+def test_base_requirements_have_no_torch():
+    reqs = (ROOT / "field" / "requirements.txt").read_text().lower()
+    assert "torch" not in reqs

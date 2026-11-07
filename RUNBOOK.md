@@ -136,6 +136,17 @@ fly deploy . --config field/fly.toml --dockerfile field/Dockerfile --app <app>
 curl https://<app>.fly.dev/sync/status
 ```
 
+### Bake the trained model into the field image (optional)
+Without build args the image has no torch and uses the keyword extractor. With both `HF_REPO` and `HF_REVISION` (a 40-hex commit SHA) the build installs CPU torch, downloads the weights into `/models/current`, and the app runs fully offline (`HF_HUB_OFFLINE=1`).
+The HF repo is **gated** (CC BY-NC-SA, research-only, #213). Pass the token as a build secret only, never as an arg or env:
+```bash
+fly deploy . --config field/fly.toml --dockerfile field/Dockerfile --app <app> \
+  --build-arg HF_REPO=<org>/<model> --build-arg HF_REVISION=<40-hex-sha> --build-secret HF_TOKEN=<hf-token>
+# local / compose-style build:
+HF_TOKEN=<hf-token> docker build -f field/Dockerfile --secret id=HF_TOKEN,env=HF_TOKEN \
+  --build-arg HF_REPO=<org>/<model> --build-arg HF_REVISION=<40-hex-sha> .
+```
+
 ## Run locally
 Whole stack (Postgres, cloud, field) with Docker:
 1. `cp .env.example .env` and set `SECRET_KEY_BASE` (`openssl rand -base64 48` or `mix phx.gen.secret`).
