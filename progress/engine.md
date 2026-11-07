@@ -14,3 +14,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 engine #57 EV6: evals/rescue_evals/baselines/stored.py replays stored JSONL outputs through the runner (system 'stored', env STORED_OUTPUTS), counts missing/malformed rows; tests in evals/tests/test_stored.py
 2026-11-07 engine #63 EV7: evals/rescue_evals/report.py builds results table (regex/Opus/generic SLM/ours, sealed E separate) and writes summary.json + TABLE.md; tests in evals/tests/test_report.py
 2026-11-07 engine #59 E4: engine/tests/test_properties.py grid (3.6k inputs) exhaustiveness, 10x determinism, CLI batch parity, prompt-injection invariance
+2026-11-07 engine #60 EV8: evals/rescue_evals/calibration.py (reliability PNG + ECE per field, numpy/zlib PNG) and consistency.py (N reruns, % cases changed); tests in evals/tests/test_calibration.py
