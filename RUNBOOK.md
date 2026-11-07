@@ -137,7 +137,7 @@ curl https://<app>.fly.dev/sync/status
 ```
 
 ### Bake the trained model into the field image
-`field/fly.toml` `[build.args]` pins the model (currently the interim laya-s13 pin, #104), so every Fly deploy from the checked-in config installs CPU torch, downloads the gated weights (slower build) and needs `--build-secret HF_TOKEN=...`. `--build-arg HF_REPO=... --build-arg HF_REVISION=...` on the command line overrides that pin. The keyword-only image is now a local `docker build` / `docker compose build` without build args.
+`field/fly.toml` `[build.args]` pins the model (currently the v3 checkpoint, #104), so every Fly deploy from the checked-in config installs CPU torch, downloads the gated weights (slower build) and needs `--build-secret HF_TOKEN=...`. `--build-arg HF_REPO=... --build-arg HF_REVISION=...` on the command line overrides that pin. The keyword-only image is now a local `docker build` / `docker compose build` without build args.
 Without build args the image has no torch and uses the keyword extractor. With both `HF_REPO` and `HF_REVISION` (a 40-hex commit SHA) the build installs CPU torch, downloads the weights into `/models/current`, and the app runs fully offline (`HF_HUB_OFFLINE=1`).
 The HF repo is **gated** (CC BY-NC-SA, research-only, #213). Pass the token as a build secret only, never as an arg or env:
 ```bash
