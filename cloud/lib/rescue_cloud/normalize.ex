@@ -8,6 +8,9 @@ defmodule RescueCloud.Normalize do
   @coords ~r/^\s*(-?\d{1,3}\.\d+)\s*[,;\s]\s*(-?\d{1,3}\.\d+)\s*$/u
   @non_alnum ~r/[^a-z0-9]+/
 
+  # Smallest people count that matches on its own, without a shared contact (contracts/logic.md).
+  @count_match_min 3
+
   @token_map %{
     "st" => "street",
     "ave" => "avenue",
@@ -68,6 +71,7 @@ defmodule RescueCloud.Normalize do
   For every request (string-keyed maps with `request_id`, `received_at`, `location_text`,
   `people_count`, `contact`, `priority_tier`), the earlier requests that are direct duplicate
   candidates of it, oldest first, in the `engine_input.context.duplicate_candidates` shape.
+  A count-only match needs equal known counts of at least #{@count_match_min}.
   """
   @spec duplicate_candidates([map()], number()) :: %{String.t() => [map()]}
   def duplicate_candidates(requests, window_hours) do
@@ -140,8 +144,10 @@ defmodule RescueCloud.Normalize do
 
   # Returned as a tuple so the binding in the comprehension above is always truthy.
   defp match_kind(a, b, a_contact, b_contact) do
+    count = a["people_count"]
+
     {a_contact != "" and a_contact == b_contact,
-     a["people_count"] != nil and a["people_count"] == b["people_count"]}
+     is_integer(count) and count >= @count_match_min and count == b["people_count"]}
   end
 
   defp component(_adjacency, [], seen), do: seen

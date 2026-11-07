@@ -103,6 +103,10 @@ def _order(event: Mapping[str, Any]) -> tuple[str, str]:
     return (event["received_at"], event["request_id"])
 
 
+# Smallest people count that matches on its own (without a shared contact); contracts/logic.md.
+COUNT_MATCH_MIN = 3
+
+
 def duplicate_candidates(
     events: Sequence[Mapping[str, Any]], window_hours: float
 ) -> dict[str, list[dict[str, Any]]]:
@@ -112,7 +116,8 @@ def duplicate_candidates(
     contact (str|None), priority_tier (P1|P2|P3|None). B is a candidate for A when B is earlier
     than A (by received_at, then request_id), at most window_hours before it, both normalized
     locations are equal and non-empty, and either the normalized contacts are equal and non-empty
-    (contact_match) or both people counts are known and equal. Candidates are sorted oldest
+    (contact_match) or both people counts are known, equal and at least COUNT_MATCH_MIN.
+    Candidates are sorted oldest
     first. Every event id is a key (maybe with []).
     """
     keyed = [
@@ -130,7 +135,11 @@ def duplicate_candidates(
                 continue
             contact_match = bool(a_contact) and a_contact == b_contact
             a_count = a.get("people_count")
-            same_count = a_count is not None and a_count == b.get("people_count")
+            same_count = (
+                a_count is not None
+                and a_count >= COUNT_MATCH_MIN
+                and a_count == b.get("people_count")
+            )
             if contact_match or same_count:
                 found.append((b, contact_match))
         found.sort(key=lambda pair: _order(pair[0]))

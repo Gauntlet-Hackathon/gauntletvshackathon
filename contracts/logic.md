@@ -40,7 +40,8 @@ B is a **candidate** of A when all hold:
 - B is earlier than A, ordering by `(received_at, request_id)`;
 - `A.received_at − B.received_at ≤ window_hours × 3600` seconds (inclusive);
 - `normalize_location` of both is equal and not `""`;
-- **contact_match** (normalized contacts equal and not `""`) **or** both `people_count` are non-null and equal.
+- **contact_match** (normalized contacts equal and not `""`) **or** both `people_count` are non-null, equal and at least 3 (a count-only
+  match; two households of 1–2 people at one address are common, so small equal counts alone never match).
 
 Each candidate is `{request_id, received_at, people_count, contact_match, priority_tier}` of B (the `engine_input.context.duplicate_candidates` shape), sorted oldest first.
 Every input request is a key in the result, with `[]` when it has no candidate. Candidates are **direct** matches only (no transitive closure).
