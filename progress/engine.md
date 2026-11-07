@@ -25,3 +25,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 engine #66 Mercury install added to the python CI job so pytest engine can use mmc
 2026-11-07 engine #66 E7: Mercury port (engine/mercury rules.m det + exhaustive switches, json_io.m, mercury_engine.m CLI, Makefile with --halt-at-warn); build.py --kind mercury publishes bin/mercury_engine; engine/tests/test_parity.py (fixtures, E4 grid, 3k random inputs, error shape, missing-arm compile error)
 2026-11-07 engine #156 EV12: python -m rescue_evals.baselines --system opus|slm --split dev|test [--mock] [--limit N]; writes evals/results/<system>/<model-id>.jsonl, scores via stored harness; tests in evals/tests/test_baselines_llm.py
+2026-11-07 engine #171 EV13: report.py columns accept system aliases (opus/slm), main block gains running.mean_ms_per_request, running.seconds_per_1000_requests, running.works_offline, consistency.pct_cases_changed; tests in evals/tests/test_report.py
