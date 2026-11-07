@@ -632,7 +632,7 @@ def run_set(
 ) -> dict[str, Any]:
     """Score ``system`` on the test-split cases. Returns the result document (not yet written).
 
-    Cases are decided in arrival order (``received_at``, then case id, as the field orders
+    Cases are decided in arrival order (``received_at``, then request id, as the field orders
     requests), each with duplicate candidates from the earlier cases of this set; the result
     lists them in the given order."""
     refuse_sealed(cases, set_name, open_sealed)
@@ -641,7 +641,8 @@ def run_set(
     by_id: dict[str, dict[str, Any]] = {}
     errors: dict[str, str] = {}
     rules_version = None
-    for c in sorted(cases, key=lambda c: (times[c.id], c.id)):
+    # ties on received_at go in stand-in request id order, as logic._order breaks them
+    for c in sorted(cases, key=lambda c: (times[c.id], DuplicateIndex.request_id(c.id))):
         t0 = time.perf_counter()
         pred_ex: dict[str, Any] | None = None
         try:
