@@ -1,0 +1,77 @@
+{% extends "app/_shell.html" %}
+{# Respond mode (UI-5). `job` comes from screens/respond.job_card. No rule IDs, versions or confidences here. #}
+{% block title %}Respond · CommunityRescue{% endblock %}
+{% block content %}
+<section id="respond" data-crew="{{ crew or '' }}">
+<details id="pick-boat" class="card"{% if not crew %} open{% endif %}>
+<summary>{% if crew %}Your boat: <strong>{{ crew }}</strong> (change){% else %}Pick your boat{% endif %}</summary>
+{% if boats %}
+<form id="boat-list" method="get" action="/respond">
+<p class="muted">Boats on this laptop</p>
+<p class="card-top">{% for b in boats %}<button type="submit" class="chip{% if crew == b.name %} selected{% endif %}" name="crew" value="{{ b.name }}">{{ b.name }}</button>{% endfor %}</p>
+</form>
+{% endif %}
+<form id="boat-form" method="get" action="/respond">
+<label for="crew-input">Or type your crew name</label>
+<input id="crew-input" name="crew" maxlength="60" value="{{ crew or '' }}" autocomplete="off">
+<button type="submit" class="btn">Use this name</button>
+</form>
+</details>
+
+{% if crew %}
+{% if job %}
+<h1>Dispatch sent you a rescue</h1>
+<p id="osm-label" class="muted"><strong>Operational Status Messages (OSM)</strong><br>Tap a status to get the line to read to dispatch.</p>
+<div role="group" aria-labelledby="osm-label" class="card-top" id="osm">
+{% for s in job.steps %}<button type="button" class="chip osm" aria-pressed="false" data-step="{{ s.key }}" data-line="{{ s.line }}">{{ s.label }}</button>{% endfor %}
+</div>
+<div id="tell" hidden>
+<p class="muted"><strong>Tell dispatch (radio or text)</strong></p>
+<p id="tell-line" class="question-block"></p>
+<button type="button" class="btn-small" id="copy-line">Copy</button>
+</div>
+
+<article class="card job-card" data-request-id="{{ job.request_id }}" aria-label="Incident {{ job.incident }}">
+<p class="card-top">
+{% if job.pill %}<span class="pill {{ job.pill.cls }}">{{ job.pill.text }}</span>{% endif %}
+<span class="incident" aria-label="Incident {{ job.incident }}">{{ job.incident }}</span>
+</p>
+<h2 class="headline">{{ job.headline }}</h2>
+{% if job.address %}<p class="address">{{ job.address }}</p>{% else %}<p class="address address-missing">No address yet</p>{% endif %}
+{% if job.details %}<ul class="details">{% for d in job.details %}<li>{{ d }}</li>{% endfor %}</ul>{% endif %}
+{% if job.contact %}<p class="contact"><strong>Call when close: {{ job.contact }}</strong></p>{% endif %}
+</article>
+
+<div id="outcomes" hidden>
+<h2>How did it go?</h2>
+<div class="card">
+<label for="all-count">How many people did you get out?</label>
+<input id="all-count" type="number" min="0" inputmode="numeric" value="{{ job.people if job.people is not none else '' }}">
+<label for="shelter">Taking them to</label>
+<select id="shelter">{% for s in shelters %}<option>{{ s }}</option>{% endfor %}</select>
+<button type="button" class="btn btn-primary outcome" data-action="all">Got everyone out</button>
+</div>
+<div class="card">
+<label for="some-count">How many did you get out?</label>
+<input id="some-count" type="number" min="0" inputmode="numeric">
+<button type="button" class="btn outcome" data-action="some">Got some out</button>
+</div>
+<div class="card">
+<button type="button" class="btn outcome" data-action="nobody">Nobody there</button>
+</div>
+<div class="card">
+<label for="noreach-reason">What stopped you?</label>
+<input id="noreach-reason" maxlength="200" value="Couldn't get there">
+<button type="button" class="btn outcome" data-action="noreach">Couldn't get there</button>
+</div>
+</div>
+<button type="button" class="btn outcome" data-action="decline" data-reason="{{ crew }} can't take this one">I can't take this one</button>
+<p id="respond-msg" role="alert"></p>
+{% else %}
+<h1>{{ no_job }}</h1>
+<p class="card">Dispatch will send your next job here. Stay near the launch and keep your radio on.</p>
+{% endif %}
+{% endif %}
+</section>
+<script src="/static/respond.js"></script>
+{% endblock %}

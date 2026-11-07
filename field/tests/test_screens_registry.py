@@ -25,7 +25,9 @@ def test_include_all_registers_each_module_router(monkeypatch, tmp_path):
     assert TestClient(app).get("/alpha").json() == {"ok": "alpha"}
 
 
-def test_empty_package_registers_nothing():
+def test_empty_package_registers_nothing(monkeypatch, tmp_path):
+    # An empty package (the real one holds screens now, e.g. respond.py).
+    monkeypatch.setattr(screens, "__path__", [str(tmp_path)])
     app = FastAPI()
     before = len(app.routes)
     screens.include_all(app)
