@@ -275,8 +275,10 @@ defmodule RescueCloud.ModelsTest do
     end
   end
 
-  describe "gate pooling (review H-03, PR-3b)" do
-    test "P1 misses pool by urgent requests: 0+3 vs 2+1 misses is a tie, not a win", %{
+  # Review H-03 / PR-3b. Test names stay short: @moduletag :tmp_dir puts the test name in
+  # local_dir, a varchar(255) column, and CI checkouts have long paths.
+  describe "gate pooling" do
+    test "P1 pools by urgent: tie", %{
       summary: s
     } do
       {cur, cand} = approved_and_candidate!()
@@ -294,7 +296,7 @@ defmodule RescueCloud.ModelsTest do
       assert {:pass, _} = Models.evaluate(cand.model_version)
     end
 
-    test "a candidate worse per urgent request fails even when n-weighting made it look better",
+    test "P1 worse per urgent fails",
          %{summary: s} do
       {cur, cand} = approved_and_candidate!()
       # B: 100 requests, 10 urgent; C: 100 requests, 40 urgent.
@@ -308,7 +310,7 @@ defmodule RescueCloud.ModelsTest do
       assert reason =~ "p1_misses_per_1000: candidate 60.0 must be <= current 20.0"
     end
 
-    test "abstain recall is taken from set D only", %{summary: s} do
+    test "abstain recall from D", %{summary: s} do
       {cur, cand} = approved_and_candidate!()
       cur_docs = p1_docs(cur.model_version, {0, 10, 50}, {0, 10, 50})
       approve!(cur, s, cur_docs)
@@ -337,7 +339,7 @@ defmodule RescueCloud.ModelsTest do
       assert "decision.abstain_recall missing for candidate" in rep["reasons"]
     end
 
-    test "a gated metric the approved model has and the candidate lacks fails", %{summary: s} do
+    test "missing gated metric fails", %{summary: s} do
       {cur, cand} = approved_and_candidate!()
       hazard = doc(cur.model_version, "C", 50, %{"extraction.hazard_f1" => {0.8, 40}})
       cur_docs = [hazard | p1_docs(cur.model_version, {0, 10, 50}, {0, 10, 50})]
@@ -349,7 +351,7 @@ defmodule RescueCloud.ModelsTest do
       assert reason =~ "extraction.hazard_f1 missing for candidate"
     end
 
-    test "F1s are recomputed from summed metric_counts; old docs pool by n without the P1 row" do
+    test "F1 from counts; old docs" do
       v = "hf:org/slm@#{@sha}"
 
       docs = [
