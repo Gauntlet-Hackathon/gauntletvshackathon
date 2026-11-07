@@ -23,3 +23,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 engine #24 W0-5: Mercury spike GO; engine/mercury/hello.m and mercury-spike CI job (pinned 22.01.8 .debs, mercury_json), decision in docs/DECISIONS.md
 2026-11-07 engine #66 Mercury install moved to .github/actions/install-mercury (this repo's release mirror), added to the engine agent job
 2026-11-07 engine #66 Mercury install added to the python CI job so pytest engine can use mmc
+2026-11-07 engine #66 E7: Mercury port (engine/mercury rules.m det + exhaustive switches, json_io.m, mercury_engine.m CLI, Makefile with --halt-at-warn); build.py --kind mercury publishes bin/mercury_engine; engine/tests/test_parity.py (fixtures, E4 grid, 3k random inputs, error shape, missing-arm compile error)

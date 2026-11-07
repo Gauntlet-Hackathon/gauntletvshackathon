@@ -1,11 +1,13 @@
 """Build an immutable engine artifact: engine/dist/<rules_version>/.
 
-    python -m rescue_engine.build [--dist DIR]
+    python -m rescue_engine.build [--dist DIR] [--kind python|mercury]
 
-Copies the fallback engine sources into the version directory and writes manifest.json
-(contracts/engine_manifest.schema.json). rules_sha is the git SHA of the last commit touching the
-rule sources; bin_hash is the sha256 (first 16 hex) over the copied files. An existing version
-directory is never overwritten.
+python (default): copies the fallback engine sources into the version directory.
+mercury: builds engine/mercury with make (needs mmc and MERCURY_JSON_SRC) and copies the binary
+to bin/mercury_engine in the version directory.
+Both write manifest.json (contracts/engine_manifest.schema.json). rules_sha is the git SHA of the
+last commit touching the rule sources; bin_hash is the sha256 (first 16 hex) over the copied files.
+An existing version directory is never overwritten.
 """
 
 from __future__ import annotations
@@ -16,6 +18,8 @@ import json
 import shutil
 import subprocess
 import sys
+import tempfile
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -26,6 +30,9 @@ REPO_ROOT = ENGINE_DIR.parent.parent
 SOURCE_DIR = ENGINE_DIR / "fallback"
 DEFAULT_DIST = ENGINE_DIR.parent / "dist"
 ENTRYPOINT = "python -m rescue_engine.fallback"
+MERCURY_DIR = ENGINE_DIR.parent / "mercury"
+MERCURY_BINARY = "mercury_engine"
+MERCURY_ENTRYPOINT = f"bin/{MERCURY_BINARY}"
 
 
 class VersionExists(Exception):
@@ -57,12 +64,10 @@ def git_sha(path: Path, repo: Path = REPO_ROOT) -> str:
     raise RuntimeError("cannot determine git SHA of the rule sources")
 
 
-def build(
-    dist: Path = DEFAULT_DIST, source: Path = SOURCE_DIR, rules_sha: str | None = None
+def _publish(
+    dist: Path, sha: str, bin_hash: str, kind: str, entrypoint: str, stage: Callable[[Path], None]
 ) -> Path:
-    files = source_files(source)
-    bin_hash = hash_files(files, source)[:16]
-    sha = rules_sha or git_sha(source)
+    """Fill a temp dir with stage(tmp), add manifest.json, rename it to dist/<rules_version>."""
     version = rules_version(sha, bin_hash)
     target = dist / version
     if target.exists():
@@ -72,17 +77,14 @@ def build(
     if tmp.exists():
         shutil.rmtree(tmp)
     try:
-        for f in files:
-            dest = tmp / "rescue_engine" / "fallback" / f.relative_to(source)
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(f, dest)
-        (tmp / "rescue_engine" / "__init__.py").write_text((ENGINE_DIR / "__init__.py").read_text())
+        tmp.mkdir()
+        stage(tmp)
         manifest = {
             "rules_version": version,
             "rules_sha": sha,
             "bin_hash": bin_hash,
-            "engine_kind": "python",
-            "entrypoint": ENTRYPOINT,
+            "engine_kind": kind,
+            "entrypoint": entrypoint,
             "built_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
         (tmp / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
@@ -93,13 +95,59 @@ def build(
     return target
 
 
+def build(
+    dist: Path = DEFAULT_DIST, source: Path = SOURCE_DIR, rules_sha: str | None = None
+) -> Path:
+    files = source_files(source)
+    bin_hash = hash_files(files, source)[:16]
+    sha = rules_sha or git_sha(source)
+
+    def stage(tmp: Path) -> None:
+        for f in files:
+            dest = tmp / "rescue_engine" / "fallback" / f.relative_to(source)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(f, dest)
+        (tmp / "rescue_engine" / "__init__.py").write_text((ENGINE_DIR / "__init__.py").read_text())
+
+    return _publish(dist, sha, bin_hash, "python", ENTRYPOINT, stage)
+
+
+def compile_mercury(build_dir: Path, source: Path = MERCURY_DIR) -> Path:
+    """Run engine/mercury's Makefile into build_dir; return the binary's path."""
+    proc = subprocess.run(
+        ["make", "-C", str(source), f"BUILD_DIR={build_dir.resolve()}"],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(f"mercury build failed:\n{proc.stdout}\n{proc.stderr}")
+    return build_dir / MERCURY_BINARY
+
+
+def build_mercury(
+    dist: Path = DEFAULT_DIST, source: Path = MERCURY_DIR, rules_sha: str | None = None
+) -> Path:
+    """Compile the Mercury engine and publish it as dist/<rules_version>/bin/mercury_engine."""
+    sha = rules_sha or git_sha(source)
+    with tempfile.TemporaryDirectory(prefix="mercury-build-") as work:
+        binary = compile_mercury(Path(work), source)
+        bin_hash = hash_files([binary], binary.parent)[:16]
+
+        def stage(tmp: Path) -> None:
+            (tmp / "bin").mkdir()
+            shutil.copy2(binary, tmp / MERCURY_ENTRYPOINT)
+
+        return _publish(dist, sha, bin_hash, "mercury", MERCURY_ENTRYPOINT, stage)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="rescue_engine.build")
     parser.add_argument("--dist", type=Path, default=DEFAULT_DIST)
+    parser.add_argument("--kind", choices=["python", "mercury"], default="python")
     args = parser.parse_args(argv)
     try:
-        target = build(args.dist)
-    except VersionExists as exc:
+        target = build_mercury(args.dist) if args.kind == "mercury" else build(args.dist)
+    except (VersionExists, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     print(target)
