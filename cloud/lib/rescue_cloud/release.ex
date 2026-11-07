@@ -25,6 +25,51 @@ defmodule RescueCloud.Release do
     {:ok, _, _} = Ecto.Migrator.with_repo(repo, &Ecto.Migrator.run(&1, :down, to: version))
   end
 
+  @reset_confirm "yes-delete-all-demo-data"
+  @keep_tables ~w(schema_migrations models)
+
+  @doc """
+  Deletes every synced event, record, heartbeat and replay row on a DEMO stack. Keeps the
+  `schema_migrations` and `models` tables. Refuses unless `confirm` is `"yes-delete-all-demo-data"`.
+
+  Run only by hand: `bin/rescue_cloud eval 'RescueCloud.Release.reset_demo("yes-delete-all-demo-data")'`.
+  """
+  def reset_demo(confirm) do
+    if confirm != @reset_confirm do
+      raise ArgumentError,
+            "reset_demo refused: pass #{inspect(@reset_confirm)} to confirm that ALL demo data " <>
+              "(except the model registry) will be deleted"
+    end
+
+    load_app()
+
+    for repo <- repos() do
+      {:ok, tables, _} = Ecto.Migrator.with_repo(repo, &reset_demo_tables/1)
+      IO.puts("Cleared #{inspect(repo)}: #{Enum.join(tables, ", ")}")
+    end
+
+    :ok
+  end
+
+  # WARNING: this DELETES DATA. Called only by reset_demo/1 and the tests.
+  @doc false
+  def reset_demo_tables(repo) do
+    %{rows: rows} =
+      repo.query!(
+        "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> ALL($1) ORDER BY tablename",
+        [@keep_tables]
+      )
+
+    tables = List.flatten(rows)
+
+    if tables != [] do
+      quoted = Enum.map_join(tables, ", ", &~s("#{&1}"))
+      repo.query!("TRUNCATE #{quoted} RESTART IDENTITY CASCADE")
+    end
+
+    tables
+  end
+
   defp repos do
     Application.fetch_env!(@app, :ecto_repos)
   end

@@ -55,6 +55,26 @@ The gate **fails closed** until `evals/results/summary.json` (with `calibration.
 `../evals/results/summary.json` relative to the release's working directory; override it with
 `config :rescue_cloud, RescueCloud.Models, summary_path: ...`.
 
+## Reset a demo stack
+
+Between rehearsals, wipe the hosted demo stack with an explicit release command (it is never run by
+`migrate`, the Fly `release_command` or any script):
+
+```sh
+bin/rescue_cloud eval 'RescueCloud.Release.reset_demo("yes-delete-all-demo-data")'
+
+# on Fly (replace <app>)
+fly ssh console --app <app> -C "/app/bin/rescue_cloud eval 'RescueCloud.Release.reset_demo(\"yes-delete-all-demo-data\")'"
+```
+
+It truncates every table in the `public` schema (read from `pg_tables`, so later tables are covered) except
+`schema_migrations` and `models`, and prints the tables it cleared. Any other argument raises and deletes nothing.
+
+* It deletes **every synced event**, plus records, fleet heartbeats, corrections and replay rows.
+* Reset the field laptops at the same time: their down-sync cursor follows the cloud's sequence numbers,
+  which restart from 1.
+* Never use it on a real deployment.
+
 ## Learn more
 
 * Official website: https://www.phoenixframework.org/

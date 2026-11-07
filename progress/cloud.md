@@ -32,3 +32,4 @@ One line per merged change: date, lane, issue, what changed.
 - cloud #170 C20b: phx-disable-with on verify/correction/search buttons, Loading… until LiveView connects (phx-loading CSS), EvalResults.summary_status/0, evals page distinguishes missing vs unreadable summary, tests
 - cloud #204 C23: dashboard home re-ages fleet summary on FleetLive.tick_ms timer using FleetLive.now clock (both made public), test in dashboard_fleet_tick_test
 - cloud #205 C24: evals panel readable metric labels, headline row, yes/no and $ formats, rubric/HumAID/sealed notes, tests in evals_live_test
+- cloud #206 C25: RescueCloud.Release.reset_demo/1 (guarded TRUNCATE of all public tables except schema_migrations and models), README section, release_test
