@@ -9,9 +9,9 @@
     rules <span class="rules-version">{{ s.rules_version }}</span> ·
     model <span class="model-version">{{ s.model_version }}</span> · {{ r.received_at }}
   </div>
-  {% if s.decision.outcome == 'prioritized' and s.decision.follow_up_question %}
-  <div class="needs-confirmation"><strong class="confirm-label">Needs confirmation</strong>:
-    <span class="question">{{ s.decision.follow_up_question }}</span></div>
+  {% if r.question %}
+  <div class="needs-confirmation"><strong class="confirm-label">{{ r.question.label }}</strong>:
+    <span class="question">{{ r.question.text }}</span></div>
   {% endif %}
   {% set loc = r.extracted.location.text %}
   <form class="status-form" data-request-id="{{ r.request_id }}">
