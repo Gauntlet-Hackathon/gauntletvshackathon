@@ -15,12 +15,15 @@ from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from rescue_field.pipeline import PipelineConfig
+from rescue_field.sanitize import clean_text
 from rescue_field.store import EventStore
 from rescue_shared.contracts_io import validator_for
 from rescue_shared.ulid import new_ulid
 
 ORDER = ("assigned", "escalated", "rescued")
 RANK = {s: i for i, s in enumerate(ORDER, 1)}
+# Far above any real rescue, far below the cloud's int4 columns (review L-05).
+MAX_RESCUED_COUNT = 100_000
 router = APIRouter()
 
 
@@ -35,7 +38,28 @@ class StatusError(Exception):
 
 
 def _text(value: Any) -> str | None:
-    return value.strip() or None if isinstance(value, str) else None
+    return clean_text(value).strip() or None if isinstance(value, str) else None
+
+
+def _count(value: Any) -> int:
+    """A whole, non-negative, bounded number: an int, an integral float (JS `Number()` sends
+    2.0 as 2, but 1e30 is a float too) or digits from a form. Never a bool, a fraction or
+    a non-finite value (review L-05: 1e999 was a 500, 1e30 and true were stored)."""
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    elif isinstance(value, str):
+        try:
+            value = int(value.strip())
+        except ValueError:
+            value = None
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise StatusError(422, "invalid_input", "rescued_count must be an integer")
+    if value < 0:
+        raise StatusError(422, "invalid_input", "rescued_count must not be negative")
+    if value > MAX_RESCUED_COUNT:
+        detail = f"rescued_count must be at most {MAX_RESCUED_COUNT}"
+        raise StatusError(422, "invalid_input", detail)
+    return value
 
 
 def _payload(status: str, data: dict[str, Any]) -> dict[str, Any]:
@@ -53,13 +77,7 @@ def _payload(status: str, data: dict[str, Any]) -> dict[str, Any]:
     count = data.get("rescued_count")
     if count in (None, ""):
         return {"rescued_count": None, "note": note}
-    try:
-        count = int(count)
-    except (TypeError, ValueError):
-        raise StatusError(422, "invalid_input", "rescued_count must be an integer") from None
-    if count < 0:
-        raise StatusError(422, "invalid_input", "rescued_count must not be negative")
-    return {"rescued_count": count, "note": note}
+    return {"rescued_count": _count(count), "note": note}
 
 
 def apply_status(

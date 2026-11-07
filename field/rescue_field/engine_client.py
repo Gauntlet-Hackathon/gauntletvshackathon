@@ -44,7 +44,7 @@ def _run(
     try:
         proc = subprocess.run(
             argv,
-            input=json.dumps(payload),
+            input=json.dumps(payload, allow_nan=False),
             capture_output=True,
             text=True,
             timeout=timeout,

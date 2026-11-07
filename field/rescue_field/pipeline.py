@@ -6,6 +6,7 @@ Context is built with rescue_shared.logic so field, cloud and evals agree on it.
 
 from __future__ import annotations
 
+import logging
 import os
 import secrets
 import time
@@ -16,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from rescue_field import engine_client
-from rescue_field.slm import Extractor, FixtureExtractor
+from rescue_field.slm import Extraction, Extractor, FixtureExtractor, KeywordExtractor
 from rescue_field.store import EventStore
 from rescue_shared import frozen_config, logic
 from rescue_shared.contracts_io import CONTRACTS, validator_for
@@ -31,6 +32,7 @@ DEFAULT_HOAX_MARKERS_PATH = CONTRACTS / "fixtures" / "hoax_markers.txt"
 # The one default device id for the field app (DECISIONS A5): the pipeline stamps it on events
 # and the sync worker authenticates as it, so the two must agree (CLAUDE.md dev device).
 DEFAULT_DEVICE_ID = "laptop-dev-01"
+log = logging.getLogger(__name__)
 
 Decider = Callable[[dict[str, Any]], dict[str, Any]]
 BatchDecider = Callable[[Sequence[dict[str, Any]]], list[dict[str, Any]]]
@@ -148,6 +150,19 @@ class IntakeItem:
     lang_hint: str | None = None
 
 
+def _extract(extractor: Extractor, raw: str) -> Extraction:
+    """The extractor's reading of `raw`; if it raises, the keyword extractor's, stamped with its
+    own model_version, so a model error never loses the request (review M-05). The keyword
+    extractor itself is not wrapped: its errors propagate."""
+    try:
+        return extractor.extract(raw)
+    except Exception:
+        if isinstance(extractor, (FixtureExtractor, KeywordExtractor)):
+            raise
+        log.exception("extractor failed; using the keyword extractor for this request")
+        return KeywordExtractor().extract(raw)
+
+
 def _ordered_ids(n: int) -> list[str]:
     """n ULIDs that sort in the given order (plain ULIDs made in the same ms do not)."""
     ms = int(time.time() * 1000)
@@ -182,7 +197,7 @@ def process_batch(
     received_at = now or _now()
     ids = _ordered_ids(len(items))
 
-    extractions = [extractor.extract(item.raw) for item in items]
+    extractions = [_extract(extractor, item.raw) for item in items]
     records = [
         _record(rid, received_at, item.contact, ex.payload)
         for rid, item, ex in zip(ids, items, extractions, strict=True)
