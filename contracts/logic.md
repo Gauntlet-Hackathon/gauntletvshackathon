@@ -57,7 +57,12 @@ of `vulnerable` entries with confidence ≥ 0.5 and `people` is `people_count.va
 ## Request status order
 A request's status only moves forward, in this order (field and cloud alike):
 `received < extracted < decided < assigned < escalated < rescued`, with `closed_duplicate` ranked equal to `rescued`.
-Escalation follows an assignment (the assigned team asks for more help), so `assigned → escalated` is a forward move and
-`escalated → assigned` is not. A status event whose rank is not above the current status does not change it; skipping ahead
+Escalation follows an assignment (the assigned team asks for more help, or "couldn't get there"), so `assigned → escalated`
+is a forward move. One exception to rank order (#306): `escalated → assigned` is also a forward move, so a second boat can be
+sent after an escalation; the request then reads `assigned` again and may escalate again. (The cloud projection follows this now; the field status
+API adopts it with #309.) Exact rule: a status event moves the
+status when its rank is above the current status's rank, or when the current status is `escalated` and the event is
+`assigned`. Any other status event (a repeat of the current status, a lower rank, anything after `rescued` or
+`closed_duplicate`) does not change it, so `rescued` and `closed_duplicate` stay terminal. Skipping ahead
 (e.g. `decided → rescued`) is allowed. The field status API covers only the operator statuses (`assigned < escalated < rescued`,
 `field/rescue_field/status.py`); the cloud projection (`cloud/lib/rescue_cloud/projection.ex`) folds the full order.

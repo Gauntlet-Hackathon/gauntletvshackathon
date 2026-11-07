@@ -272,3 +272,13 @@ Decisions taken while fixing the three-model review (reviews 01-03; PRs #264, #2
   Optional means "not in `required`": every older payload stays valid, and the Pydantic model leaves an unset optional
   out of `model_dump` so old payloads still round-trip. The cloud projects them to `requests.incident` / `sample`; the
   dashboard request counts leave samples out ("samples hidden: N").
+- **Second dispatch after escalation (#306):** `escalated → assigned` is a forward move, so a second boat can go out
+  after "Couldn't get there" (`contracts/logic.md`, "Request status order", has the exact rule). `rescued` and
+  `closed_duplicate` stay terminal, and repeats still do not change status. The field app never sends `assigned` after
+  `escalated` today (`field/rescue_field/status.py`), so a single laptop's history projects the same. One cross-laptop
+  edge case changes: laptop B's own `assigned` stamped later than laptop A's `escalated` for the same request (clock skew,
+  `escalated` is not down-synced) used to project `escalated` and now projects `assigned`. The field half (#309) is
+  deferred; until it ships the field status API still refuses `escalated → assigned`. Before any laptop sends `outcome` or
+  `destination`, upgrade all laptops together: an older field build drops a down-synced `rescued` with unknown keys. `rescued` gains optional
+  `outcome` (`all` / `some` / `nobody`) and `destination` (up to 200 characters); the record page shows both and a
+  details column on the event history.

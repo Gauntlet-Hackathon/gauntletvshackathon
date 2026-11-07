@@ -85,8 +85,15 @@ defmodule RescueCloud.Events.Payload do
 
   defp spec("assigned"), do: obj(%{"crew" => text(), "note" => nullable(str())})
 
-  defp spec("rescued"),
-    do: obj(%{"rescued_count" => nullable({:integer, 0}), "note" => nullable(str())})
+  defp spec("rescued") do
+    obj(%{
+      "rescued_count" => nullable({:integer, 0}),
+      "note" => nullable(str()),
+      # Optional (#306): how many the boat brought out, and where they were taken.
+      "outcome" => optional(nullable(enum(~w(all some nobody)))),
+      "destination" => optional(nullable({:max_string, 200}))
+    })
+  end
 
   defp spec("corrected") do
     obj(%{
@@ -234,6 +241,13 @@ defmodule RescueCloud.Events.Payload do
 
   defp check({:string, min}, v, path) when is_binary(v),
     do: if(String.length(v) >= min, do: [], else: ["#{path} is too short"])
+
+  # maxLength as JSON Schema counts it: code points.
+  defp check({:max_string, max}, v, path) when is_binary(v) do
+    if length(String.to_charlist(v)) <= max,
+      do: [],
+      else: ["#{path} must be at most #{max} characters"]
+  end
 
   defp check({:pattern, re}, v, path) when is_binary(v),
     do: if(Regex.match?(re, v), do: [], else: ["#{path} has invalid format"])

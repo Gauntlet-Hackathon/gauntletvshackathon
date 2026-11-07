@@ -242,6 +242,11 @@ class Assigned(Contract):
 class Rescued(Contract):
     rescued_count: Count | None
     note: str | None
+    # Optional (#306): how many the boat brought out, and where they were taken.
+    outcome: Literal["all", "some", "nobody"] | None = None
+    destination: Annotated[str, StringConstraints(max_length=200)] | None = None
+
+    _optional: ClassVar[frozenset[str]] = frozenset({"outcome", "destination"})
 
 
 class Escalated(Contract):

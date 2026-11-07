@@ -23,6 +23,33 @@
           "type": "null"
         }
       ]
+    },
+    "outcome": {
+      "anyOf": [
+        {
+          "enum": [
+            "all",
+            "some",
+            "nobody"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Optional (#306). Whether the boat brought out everyone, some, or nobody."
+    },
+    "destination": {
+      "anyOf": [
+        {
+          "type": "string",
+          "maxLength": 200
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Optional (#306). Where the people were taken, e.g. a shelter name."
     }
   },
   "required": [
