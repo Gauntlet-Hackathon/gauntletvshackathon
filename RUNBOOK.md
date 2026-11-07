@@ -129,17 +129,19 @@ fly volumes create field_data --size 1 --region iad --app <app>
 # 3. Secrets (never in fly.toml).
 fly secrets set --app <app> DEVICE_TOKEN=<long-random-token> CLOUD_URL=https://<cloud-app>.fly.dev
 
-# 4. Deploy.
-fly deploy . --config field/fly.toml --dockerfile field/Dockerfile --app <app>
+# 4. Deploy. fly.toml pins the trained model (gated repo), so the build needs a read-only HF token.
+fly deploy . --config field/fly.toml --dockerfile field/Dockerfile --app <app> --build-secret HF_TOKEN=<hf-token>
 
 # 5. Check it.
 curl https://<app>.fly.dev/sync/status
 ```
 
-### Bake the trained model into the field image (optional)
+### Bake the trained model into the field image
+`field/fly.toml` `[build.args]` pins the model (currently the interim laya-s13 pin, #104), so every Fly deploy from the checked-in config installs CPU torch, downloads the gated weights (slower build) and needs `--build-secret HF_TOKEN=...`. `--build-arg HF_REPO=... --build-arg HF_REVISION=...` on the command line overrides that pin. The keyword-only image is now a local `docker build` / `docker compose build` without build args.
 Without build args the image has no torch and uses the keyword extractor. With both `HF_REPO` and `HF_REVISION` (a 40-hex commit SHA) the build installs CPU torch, downloads the weights into `/models/current`, and the app runs fully offline (`HF_HUB_OFFLINE=1`).
 The HF repo is **gated** (CC BY-NC-SA, research-only, #213). Pass the token as a build secret only, never as an arg or env:
 ```bash
+# override the fly.toml pin with another revision:
 fly deploy . --config field/fly.toml --dockerfile field/Dockerfile --app <app> \
   --build-arg HF_REPO=<org>/<model> --build-arg HF_REVISION=<40-hex-sha> --build-secret HF_TOKEN=<hf-token>
 # local / compose-style build:
