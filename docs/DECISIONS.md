@@ -91,6 +91,7 @@ Decided 2026-11-07 (H11, #177) from the SLM trainer's answer, relayed by Paawan.
   ```
   Known weak spots in this sample: "on oxygen" did not set `medical`, and "2 days" went to water only. The trainer is adding both as eval edge cases.
 - **Repo and revision:** read from env `HF_REPO` / `HF_REVISION`. The revision must be a pinned 40-character commit SHA, never `main`, and is filled in by H1b (#104). Until then, tests mock the model.
+- **Interim pin (Paawan, 2026-11-07 15:54Z):** `hf:paawandesai/rescue-tagger@0588ed4e1725b1034c490486e6c1296a16cd6f8d` (checkpoint laya-s13, the best so far; the HF repo is gated and its card says CC BY-NC-SA, research only). Paawan asked for this pin in the product while training continues, so it goes into `field/fly.toml` `[build.args]` ahead of the eval and cloud `promote` steps below; a better checkpoint later is a revision swap in both places. #104 stays open until the final revision is evaluated and promoted.
 - **Training data and publishing (Paawan, 2026-11-07; overrides H2's "do not train on HumAID"):**
   - The trainer's data includes HumAID (source share 0.2-0.25), Munro (CC BY 4.0) and OpenAI-generated synthetic data.
   - The model is published only under H2's conditions: CC BY-NC-SA 4.0, a card marked non-commercial and research-only, gated access on Hugging Face, HumAID cited (see Required citations), and no training data shipped. Details are in H16 (#213).

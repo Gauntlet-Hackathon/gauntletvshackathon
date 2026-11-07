@@ -49,3 +49,10 @@ def test_vm_has_enough_memory_for_baked_model():
 def test_health_check_grace_covers_model_load():
     for check in CFG["http_service"]["checks"]:
         assert int(check["grace_period"].rstrip("s")) >= 60
+
+
+def test_model_pin_is_a_full_commit_sha():
+    args = CFG["build"]["args"]
+    assert args["HF_REPO"].count("/") == 1
+    rev = args["HF_REVISION"]
+    assert len(rev) == 40 and all(c in "0123456789abcdef" for c in rev)
