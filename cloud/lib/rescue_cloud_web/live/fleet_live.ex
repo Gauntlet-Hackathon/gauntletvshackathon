@@ -75,7 +75,8 @@ defmodule RescueCloudWeb.FleetLive do
     end
   end
 
-  defp tick_ms do
+  @doc "Milliseconds between re-aging ticks."
+  def tick_ms do
     case conf(:tick_ms, nil) do
       nil -> thresholds() |> elem(0) |> Kernel.*(500) |> min(@default_tick_ms) |> max(100)
       ms -> ms
@@ -85,7 +86,8 @@ defmodule RescueCloudWeb.FleetLive do
   defp conf(key, default),
     do: :rescue_cloud |> Application.get_env(__MODULE__, []) |> Keyword.get(key, default)
 
-  defp now do
+  @doc "Current time, honouring the `clock:` config."
+  def now do
     case conf(:clock, nil) do
       nil -> DateTime.utc_now()
       fun -> fun.()

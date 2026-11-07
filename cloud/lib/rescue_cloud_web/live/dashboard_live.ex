@@ -14,6 +14,8 @@ defmodule RescueCloudWeb.DashboardLive do
     if connected?(socket) do
       for topic <- [Replay.topic(), Fleet.topic(), "events"],
           do: Phoenix.PubSub.subscribe(RescueCloud.PubSub, topic)
+
+      :timer.send_interval(FleetLive.tick_ms(), self(), :tick)
     end
 
     {:ok,
@@ -21,7 +23,7 @@ defmodule RescueCloudWeb.DashboardLive do
   end
 
   defp load(socket) do
-    now = DateTime.utc_now()
+    now = FleetLive.now()
     beats = Fleet.list_heartbeats()
     by_status = Enum.frequencies_by(beats, &FleetLive.status(&1, now))
 
@@ -42,6 +44,7 @@ defmodule RescueCloudWeb.DashboardLive do
   def handle_info({:replay, _run}, socket),
     do: {:noreply, assign(socket, :replay, Replay.counts())}
 
+  def handle_info(:tick, socket), do: {:noreply, load(socket)}
   def handle_info({:heartbeat, _hb}, socket), do: {:noreply, load(socket)}
   def handle_info({:event, _event}, socket), do: {:noreply, load(socket)}
   def handle_info(_, socket), do: {:noreply, socket}
