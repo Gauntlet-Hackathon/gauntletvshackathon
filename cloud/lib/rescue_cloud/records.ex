@@ -33,10 +33,11 @@ defmodule RescueCloud.Records do
   @doc """
   Searches requests. Filters (string keys, blank values ignored):
     * `"q"`: case-insensitive substring of raw text, location, contact or request id
-    * `"tier"`: `P1` | `P2` | `P3`
+    * `"tier"`: `P1` | `P2` | `P3`, matching `priority_tier` or an abstain's `provisional_tier`
     * `"status"`: a request status
-  Ordered by tier (P1 first, untiered last); untiered abstain follow-ups by their
-  `provisional_tier` (P1 first, DECISIONS R1), then newest first. At most `limit` rows.
+  Ordered by tier, where an abstain follow-up counts at its `provisional_tier` (DECISIONS R1),
+  so a "P1?" abstain ranks with the P1 rows (P1 first, untiered last); within a tier, ranked
+  rows come before abstains, then newest first. At most `limit` rows.
   """
   @spec search_requests(map(), keyword()) :: [%Request{}]
   def search_requests(filters \\ %{}, opts \\ []) do
@@ -44,15 +45,15 @@ defmodule RescueCloud.Records do
 
     from(r in Request,
       order_by: [
-        asc_nulls_last: r.priority_tier,
-        asc_nulls_last: r.provisional_tier,
+        asc_nulls_last: coalesce(r.priority_tier, r.provisional_tier),
+        asc: is_nil(r.priority_tier),
         desc: r.received_at,
         asc: r.request_id
       ],
       limit: ^limit
     )
     |> filter_text(blank_to_nil(filters["q"]))
-    |> filter_eq(:priority_tier, blank_to_nil(filters["tier"]))
+    |> filter_tier(blank_to_nil(filters["tier"]))
     |> filter_eq(:status, blank_to_nil(filters["status"]))
     |> Repo.all()
   end
@@ -105,6 +106,11 @@ defmodule RescueCloud.Records do
         ilike(r.raw_text, ^pattern) or ilike(r.location_text, ^pattern) or
           ilike(r.contact, ^pattern) or ilike(r.request_id, ^pattern)
   end
+
+  defp filter_tier(query, nil), do: query
+
+  defp filter_tier(query, tier),
+    do: from(r in query, where: r.priority_tier == ^tier or r.provisional_tier == ^tier)
 
   defp filter_eq(query, _field, nil), do: query
   defp filter_eq(query, field, value), do: from(r in query, where: field(r, ^field) == ^value)

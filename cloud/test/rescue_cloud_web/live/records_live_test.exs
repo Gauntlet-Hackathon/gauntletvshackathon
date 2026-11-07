@@ -46,7 +46,7 @@ defmodule RescueCloudWeb.RecordsLiveTest do
     assert has_element?(view, "#record-#{rid("A1")} [data-role=status]", "escalated")
   end
 
-  test "abstain follow-ups sort by provisional_tier after tiered rows and show it (R1)", %{
+  test "abstain follow-ups rank at their provisional_tier, after ranked rows of it (R1)", %{
     conn: conn
   } do
     sync!(
@@ -67,13 +67,21 @@ defmodule RescueCloudWeb.RecordsLiveTest do
 
     {:ok, view, _} = live(conn, ~p"/records")
 
-    # tiered first (P1, P3), then abstains P1?, P2? (C3, the fixture default), P3?; the newest
-    # abstain (E5) does not jump ahead of an older but more urgent one
+    # P1 (A1), P1? (D4), P2? (C3, the fixture default), P3 (B2), P3? (E5): a "P1?" abstain
+    # ranks with the P1 rows, not after every P3; within a tier ranked rows come first, and the
+    # newest abstain (E5) does not jump ahead of an older but more urgent one
     assert rows(view) ==
-             Enum.map(~w(A1 B2 D4 C3 E5), &("record-" <> rid(&1)))
+             Enum.map(~w(A1 D4 C3 B2 E5), &("record-" <> rid(&1)))
 
     assert has_element?(view, "#record-#{rid("D4")} [data-role=tier]", "P1?")
     assert has_element?(view, "#record-#{rid("E5")} [data-role=tier]", "P3?")
+
+    # The tier filter matches the provisional tier too, so filtering P1 shows the "P1?" abstain.
+    {:ok, view, _} = live(conn, ~p"/records?tier=P1")
+    assert rows(view) == Enum.map(~w(A1 D4), &("record-" <> rid(&1)))
+
+    {:ok, view, _} = live(conn, ~p"/records?tier=P3")
+    assert rows(view) == Enum.map(~w(B2 E5), &("record-" <> rid(&1)))
   end
 
   test "searches by text (case-insensitive, LIKE wildcards are literal)", %{conn: conn} do

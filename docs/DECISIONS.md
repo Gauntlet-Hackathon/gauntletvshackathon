@@ -126,7 +126,7 @@ HumAID (required by ToU clause "cite the corresponding paper in derived publicat
 Findings R1–R13 (engine rules) and A1–A12 (agent assumptions) are in the step 3 review. Paawan approved fixing them; where a finding needed a product call, the option below was chosen. These supersede the conflicting Wave 0 lines above.
 
 **Engine rules**
-- R1: every `abstain` carries `provisional_tier` (P1/P2/P3): the step-4 tier computed with firm, uncertain and weak signals together (the most cautious reading), whatever the abstain cause. Other outcomes have `provisional_tier: null`. Boards sort follow-ups by `provisional_tier`, then by the within-tier key.
+- R1: every `abstain` carries `provisional_tier` (P1/P2/P3): the step-4 tier computed with firm, uncertain and weak signals together (the most cautious reading), whatever the abstain cause. Other outcomes have `provisional_tier: null`. Boards sort follow-ups by `provisional_tier`, then by the within-tier key. Version skew: `engine_output.schema.json` stays strict (the key is required, so new engines must emit it), but the cloud accepts a decided `engine_output` that lacks the key as `provisional_tier: null`, for every outcome, so events queued on a pre-upgrade field build are not rejected for good; a present key is checked strictly. The cloud `/records` list ranks an abstain at its `provisional_tier` (a "P1?" with the P1 rows, after the ranked P1s) and its tier filter matches either column.
 - R2: a weak (0.25–0.5) signal that would raise the tier no longer abstains a request that is already P1 or P2: it stays `prioritized` at that tier with the `low_confidence_hazard` question as its follow-up. It still abstains `low_confidence_hazard` when the request would otherwise be P3. (Replaces the `low_confidence_hazard` line above.)
 - R3: the hoax check moves after tiering. A possible hoax whose tier is P1 stays `prioritized` with the `possible_hoax` question as follow-up; P2/P3 still abstain `possible_hoax`. Default thresholds and the marker list are unchanged. (Replaces "hoax comes second".)
 - R4: `conflicting_counts` stays an abstain, but now carries the tier via `provisional_tier` (R1), taken as the highest of the request and its candidates.
@@ -134,7 +134,7 @@ Findings R1–R13 (engine rules) and A1–A12 (agent assumptions) are in the ste
 - R6: extraction convention: any acute medical emergency (unconscious, not breathing, chest pain, severe bleeding, someone drowning) is extracted as hazard `injury`. R-P1-04 stays as the plan states it (child, elderly, disabled).
 - R7: count-only duplicate matching needs the same known count **and** a count of at least 3; same-contact matching is unchanged.
 - R8: thresholds must satisfy `hazard_weak_min ≤ hazard_uncertain_min ≤ hazard_firm_min`; engines exit 1 otherwise.
-- R9: a duplicate whose own uncertain signal set the group tier keeps the confirm question.
+- R9: a duplicate whose own uncertain signal set the group tier keeps the confirm question. It also keeps its own question when its `weak_tier` is above the group tier, so a weak P1 hint on a P2 duplicate keeps the `low_confidence_hazard` question (PR #181 review, B1).
 - R10: `duplicate_of` is the oldest direct candidate and may be an intermediate member; consumers resolve groups with `duplicate_groups`.
 - R11: an `address` or `coords` location with null or blank text counts as no usable location.
 - R12: conflicting *locations* across duplicates are not detected (04:33 asks for it). Deferred: the candidate shape cannot express it. Recorded here as a known deviation.
