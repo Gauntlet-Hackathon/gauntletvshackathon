@@ -77,3 +77,18 @@ PR ─► ci.yml (test) + agent-review.yml (verdict, prompt and CLAUDE.md taken 
 
 ## Tunables (repo variables)
 `READY_LABEL` (night-safe) · `FIX_LANE` · `CI_WORKFLOW` (ci.yml) · `MAX_TURNS` (80) · `CLAUDE_CODE_VERSION` (latest; pin after the rehearsal) · `CLAUDE_PERMISSION_FLAGS` (`--dangerously-skip-permissions`; the runner is disposable and holds no push credentials) · `ESCALATE_MODEL` (opus) · `REVIEW_MODEL` (opus)
+
+## Deploy cloud to Fly
+`cloud/fly.toml` uses the placeholder app name `rescue-cloud-demo`; pick your own. Run everything from `cloud/` (needs `flyctl` and `fly auth login`).
+```
+cd cloud
+fly launch --no-deploy --copy-config --name <your-app>      # keep fly.toml; say no to a new Postgres/Redis if asked
+fly postgres create --name <your-app>-db --region iad --vm-size shared-cpu-1x --volume-size 1
+fly postgres attach <your-app>-db --app <your-app>          # sets DATABASE_URL secret
+fly secrets set SECRET_KEY_BASE="$(mix phx.gen.secret)" \
+  DEVICE_TOKENS="laptop-dev-01:<long-random-token>" \
+  PHX_HOST=<your-app>.fly.dev --app <your-app>
+fly deploy --app <your-app>                                   # release_command runs bin/migrate first
+curl -i https://<your-app>.fly.dev/healthz                    # expect 200 {"status":"ok"}-style body; 503 means the DB is unreachable
+```
+Set the field laptop's `CLOUD_URL=https://<your-app>.fly.dev` and `DEVICE_TOKEN` to the token above. Auto-stop is off and one machine stays up for the demo. Logs: `fly logs --app <your-app>`.
