@@ -98,6 +98,6 @@ def test_header_who_block_and_segmented_toggle():
     html = client().get("/app?mode=respond").text
     assert '<span class="avatar" aria-hidden="true">' in html
     assert '<span class="who-sub">Volunteer</span><span class="who-sub">ECC 1</span>' in html
-    assert '<a href="/app?mode=respond" class="selected" aria-current="page">Respond</a>' in html
+    assert '<a href="/respond" class="selected" aria-current="page">Respond</a>' in html
     css = client().get("/static/app.css").text
     assert "#E9EBEF" in css and "#0A3A8C" in css
