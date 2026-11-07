@@ -52,3 +52,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 field #245 F38: HFExtractor builds model_version with rescue_shared.versions.model_version before resolving the checkpoint, so HF_REPO without an org fails in __init__ and select_extractor falls back; tests (incl. real-env select_extractor_with_info check)
 2026-11-07 field #246 F39: location.confidence = min(type head, span confidence) via torch-free tagger/assemble.py (used by infer.py); DECISIONS.md bullet; tests
 2026-11-07 field #254 F40: header lists local edits in vendored tagger/infer.py; torch-free AST guard test (test_tagger_vendored.py)
+2026-11-07 field edge cases: sync worker backs off on any cycle error (a malformed 200 reply killed the thread), resume() cuts a running backoff short, tagger load drops calibration temperatures that are not finite or > 0 (T=0 made every text not_a_request); tests in test_sync.py and test_tagger_vendored.py

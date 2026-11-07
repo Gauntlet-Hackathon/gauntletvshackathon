@@ -40,3 +40,23 @@ def test_assemble_location_imported_and_called():
         for n in ast.walk(tree)
     )
     assert imported and called
+
+
+def test_load_rejects_non_positive_or_non_finite_temperatures():
+    # A calibration temperature of 0 made every text "not a request" with confidence 1.0.
+    tree = ast.parse(_source())
+    cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "Extractor")
+    load = next(n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == "load")
+    calls = {
+        f"{n.func.value.id}.{n.func.attr}"
+        for n in ast.walk(load)
+        if isinstance(n, ast.Call)
+        and isinstance(n.func, ast.Attribute)
+        and isinstance(n.func.value, ast.Name)
+    }
+    assert "math.isfinite" in calls
+    compares = [
+        n for n in ast.walk(load)
+        if isinstance(n, ast.Compare) and any(isinstance(o, ast.LtE) for o in n.ops)
+    ]
+    assert compares, "load() must drop temperatures <= 0"

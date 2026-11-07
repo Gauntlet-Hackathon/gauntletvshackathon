@@ -100,6 +100,7 @@ class SyncWorker:
         self.last_error: str | None = None
         self._paused = threading.Event()
         self._stop = threading.Event()
+        self._wake = threading.Event()  # cuts a backoff/idle wait short (resume)
         self._thread: threading.Thread | None = None
 
     # ---- one cycle --------------------------------------------------------------------
@@ -186,10 +187,11 @@ class SyncWorker:
         """One attempt; returns seconds to wait before the next."""
         try:
             self.sync_once()
-        except SyncError as exc:
+        except Exception as exc:  # noqa: BLE001 - any failure must back off, never kill the worker
             self.failures += 1
             self.online = False
-            self.last_error = str(exc)
+            name = "" if isinstance(exc, SyncError) else f"{type(exc).__name__}: "
+            self.last_error = f"{name}{exc}"
             return backoff_delay(self.failures, self.rng)
         self.failures = 0
         self.online = True
@@ -203,17 +205,21 @@ class SyncWorker:
                 self.online = False
                 self._stop.wait(0.2)
                 continue
-            self._stop.wait(self.run_cycle())
+            delay = self.run_cycle()
+            self._wake.wait(delay)
+            self._wake.clear()
 
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():
             return
         self._stop.clear()
+        self._wake.clear()
         self._thread = threading.Thread(target=self._loop, name="sync-worker", daemon=True)
         self._thread.start()
 
     def stop(self) -> None:
         self._stop.set()
+        self._wake.set()
         if self._thread is not None:
             self._thread.join(timeout=REQUEST_TIMEOUT_S + 5)
             self._thread = None
@@ -231,8 +237,10 @@ class SyncWorker:
         self._paused.set()
 
     def resume(self) -> None:
+        """Go back online and retry now, even if a long backoff wait is running."""
         self._paused.clear()
         self.failures = 0
+        self._wake.set()
 
     def status(self) -> dict[str, Any]:
         return {

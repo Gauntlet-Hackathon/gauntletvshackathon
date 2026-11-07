@@ -1,7 +1,8 @@
 # Source: fastresponderSLM src/rescue_tagger/infer.py @ c287541c25e08bd3c8173d74e106384c58e26f74
 # Local changes (keep when re-vendoring): calibrated flag + ERROR log when calibration.json is
 # missing (F37, #244); location confidence via assemble.assemble_location = min(type head, span)
-# (F39, #246).
+# (F39, #246); invalid calibration temperatures (not finite or <= 0) are dropped with an ERROR
+# log and the model reports uncalibrated.
 """Deterministic CPU inference: raw text -> schema-valid `extracted` payload.
 
 This is the module the field adapter (ticket F11) wraps:
@@ -104,8 +105,21 @@ class Extractor:
             logging.getLogger(__name__).error(
                 "uncalibrated: calibration.json missing in %s", model_dir
             )
+        # local change to the vendored file: a temperature that is not a finite number > 0 would
+        # flip or flatten every probability (T=0 made every text "not a request"); drop it, log
+        # at ERROR and report the model as uncalibrated.
+        bad = sorted(
+            k for k, v in temps.items()
+            if isinstance(v, bool) or not isinstance(v, (int, float))
+            or not math.isfinite(v) or v <= 0
+        )
+        if bad:
+            logging.getLogger(__name__).error(
+                "uncalibrated: invalid temperatures for %s in %s (using 1.0)", bad, cal
+            )
+            temps = {k: v for k, v in temps.items() if k not in bad}
         out = cls(model, tok, temps, model_version, threads)
-        out.calibrated = cal.exists()
+        out.calibrated = cal.exists() and not bad
         return out
 
     def _T(self, head: str) -> float:
