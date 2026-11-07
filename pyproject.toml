@@ -1,0 +1,26 @@
+# Tooling config for every Python lane (shared/, field/, engine/, evals/). Owned by the integrator.
+# This is not an installable package: lanes import each other through pytest's `pythonpath`
+# (see [tool.pytest.ini_options]) and install their third-party deps from <lane>/requirements.txt.
+# Python 3.12 only.
+
+[dependency-groups]
+dev = ["pytest", "ruff"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["shared", "field", "engine", "evals"]
+extend-exclude = ["cloud", ".github"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "W"]
+
+[tool.pytest.ini_options]
+# importlib mode: same-named test files in different lanes (every lane has tests/test_smoke.py)
+# do not clash, and tests/ folders need no __init__.py.
+addopts = "--import-mode=importlib -m 'not slow'"
+pythonpath = ["shared", "field", "engine", "evals"]
+testpaths = ["shared", "field", "engine", "evals"]
+markers = [
+  "slow: real model downloads or long-running checks; skipped by default and in CI (run with `pytest -m slow`)",
+]

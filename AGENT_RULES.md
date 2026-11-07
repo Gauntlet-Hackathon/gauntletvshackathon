@@ -9,10 +9,12 @@ Paste this section into the project's CLAUDE.md (and AGENTS.md for non-Claude ha
 
 | Lane | Owns |
 |---|---|
-| `backend` | `server/` |
-| `frontend` | `web/` |
-| `data` | `data/`, `jobs/` |
-<!-- EDIT the table once Wave 0 fixes the folder layout. -->
+| `field` | `field/` |
+| `cloud` | `cloud/` (the Phoenix app; owns its own `mix.exs`, `mix.lock` and `priv/repo/migrations`) |
+| `engine` | `engine/` and `evals/` |
+| integrator (no agent lane) | `shared/`, `contracts/`, `pyproject.toml`, `constraints.txt`, `docs/`, `.github/` (CI) |
+
+Python lanes list their own dependencies in `<lane>/requirements.txt`; the pins live in the integrator's `constraints.txt`.
 
 ## Branches and PRs
 - One issue = one branch = one PR. Branch name: `agent/<lane>/issue-<n>` for agents, `<name>/issue-<n>` for humans.
