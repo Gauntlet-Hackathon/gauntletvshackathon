@@ -1,4 +1,4 @@
-{% if state == "offline" %}<span class="badge badge-offline" data-state="offline">Offline{% if paused %} (simulated){% endif %} · backlog {{ backlog }}</span>
-{% elif state == "no-sync" %}<span class="badge badge-nosync" data-state="no-sync">Sync not configured · backlog {{ backlog }}</span>
-{% else %}<span class="badge badge-online" data-state="online">Online · backlog {{ backlog }}{% if last_sync_at %} · last sync {{ last_sync_at }}{% endif %}</span>
+{% if state == "offline" %}<span class="badge badge-offline" data-state="offline">Offline{% if paused %} (simulated){% endif %} · {{ backlog }} queued</span>
+{% elif state == "no-sync" %}<span class="badge badge-nosync" data-state="no-sync">Sync not configured · {{ backlog }} queued</span>
+{% else %}<span class="badge badge-online" data-state="online">Online · {{ backlog }} queued{% if last_sync_at %} · last sync {{ last_sync_at }}{% endif %}</span>
 {% endif %}
