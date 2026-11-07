@@ -216,4 +216,79 @@ defmodule RescueCloudWeb.RecordsLiveTest do
       refute has_element?(view, "#record-detail [data-role=sample]")
     end
   end
+
+  describe "second dispatch, rescue outcome and destination (#306)" do
+    setup do
+      rescued =
+        Map.merge(payload("rescued"), %{
+          "rescued_count" => 2,
+          "outcome" => "some",
+          "destination" => "Shelter 1 (Lincoln High)"
+        })
+
+      sync!(
+        [
+          event("E5", 1, "received", "2026-11-07T14:00:00Z"),
+          event("E5", 2, "decided", "2026-11-07T14:00:05Z", tier: "P1"),
+          event("E5", 3, "assigned", "2026-11-07T14:10:00Z",
+            payload: %{"crew" => "Boat 3", "note" => nil}
+          ),
+          event("E5", 4, "escalated", "2026-11-07T14:20:00Z",
+            payload: %{"reason" => "Couldn't get there", "note" => nil}
+          ),
+          event("E5", 5, "assigned", "2026-11-07T14:30:00Z",
+            payload: %{"crew" => "Boat 7", "note" => nil}
+          ),
+          event("E5", 6, "rescued", "2026-11-07T15:00:00Z", payload: rescued)
+        ],
+        @t
+      )
+
+      :ok
+    end
+
+    test "each step is on the record page, with outcome and destination", %{conn: conn} do
+      {:ok, view, _} = live(conn, ~p"/records/#{rid("E5")}")
+
+      assert has_element?(view, "#record-detail [data-role=status]", "rescued")
+      assert has_element?(view, "#record-detail [data-role=rescue-outcome]", "some people")
+
+      assert has_element?(
+               view,
+               "#record-detail [data-role=destination]",
+               "Shelter 1 (Lincoln High)"
+             )
+
+      types =
+        view
+        |> render()
+        |> LazyHTML.from_fragment()
+        |> LazyHTML.query("#record-events tbody tr [data-role=type]")
+        |> Enum.map(&(&1 |> LazyHTML.text() |> String.trim()))
+
+      assert types == ~w(received decided assigned escalated assigned rescued)
+      assert has_element?(view, "#event-#{eid("E5", 3)} [data-role=details]", "crew: Boat 3")
+
+      assert has_element?(
+               view,
+               "#event-#{eid("E5", 4)} [data-role=details]",
+               "reason: Couldn't get there"
+             )
+
+      assert has_element?(view, "#event-#{eid("E5", 5)} [data-role=details]", "crew: Boat 7")
+
+      assert has_element?(
+               view,
+               "#event-#{eid("E5", 6)} [data-role=details]",
+               "taken to: Shelter 1"
+             )
+    end
+
+    test "an old rescued event without the fields shows neither", %{conn: conn} do
+      sync!([event("F6", 1, "rescued", "2026-11-07T15:00:00Z")], @t)
+      {:ok, view, _} = live(conn, ~p"/records/#{rid("F6")}")
+      refute has_element?(view, "#record-detail [data-role=rescue-outcome]")
+      refute has_element?(view, "#record-detail [data-role=destination]")
+    end
+  end
 end

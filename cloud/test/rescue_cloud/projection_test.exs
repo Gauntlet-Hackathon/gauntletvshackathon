@@ -148,7 +148,7 @@ defmodule RescueCloud.ProjectionTest do
       assert Projection.get_request(r).status == "rescued"
     end
 
-    test "escalated follows assigned; a later assigned does not move escalated back" do
+    test "escalated follows assigned; a second assigned after escalated is a forward move (#306)" do
       r = rid("0A")
       push([received(r, 1, "2026-11-07T14:00:00Z")])
       push([event(r, 2, "assigned", "2026-11-07T14:10:00Z")])
@@ -156,10 +156,49 @@ defmodule RescueCloud.ProjectionTest do
       assert Projection.get_request(r).status == "escalated"
 
       push([event(r, 4, "assigned", "2026-11-07T14:30:00Z")])
+      assert Projection.get_request(r).status == "assigned"
+
+      push([event(r, 5, "escalated", "2026-11-07T14:40:00Z")])
       assert Projection.get_request(r).status == "escalated"
 
-      push([event(r, 5, "rescued", "2026-11-07T15:00:00Z")])
+      push([event(r, 6, "rescued", "2026-11-07T15:00:00Z")])
       assert Projection.get_request(r).status == "rescued"
+    end
+
+    test "decided -> assigned -> escalated -> assigned -> rescued projects to rescued (#306)" do
+      r = rid("0B")
+
+      push([
+        received(r, 1, "2026-11-07T14:00:00Z"),
+        decided(r, 2, "2026-11-07T14:00:06Z", "P1", "R-P1-ROOF"),
+        event(r, 3, "assigned", "2026-11-07T14:10:00Z"),
+        event(r, 4, "escalated", "2026-11-07T14:20:00Z"),
+        event(r, 5, "assigned", "2026-11-07T14:30:00Z"),
+        event(r, 6, "rescued", "2026-11-07T15:00:00Z")
+      ])
+
+      assert %{status: "rescued", event_count: 6} = Projection.get_request(r)
+    end
+
+    test "rescued and closed_duplicate stay terminal; repeats do not move status (#306)" do
+      r = rid("0C")
+      push([received(r, 1, "2026-11-07T14:00:00Z")])
+      push([event(r, 2, "rescued", "2026-11-07T14:10:00Z")])
+      push([event(r, 3, "assigned", "2026-11-07T14:20:00Z")])
+      push([event(r, 4, "escalated", "2026-11-07T14:30:00Z")])
+      assert Projection.get_request(r).status == "rescued"
+
+      d = rid("0D")
+      push([received(d, 1, "2026-11-07T14:00:00Z")])
+      push([event(d, 2, "closed_duplicate", "2026-11-07T14:10:00Z")])
+      push([event(d, 3, "assigned", "2026-11-07T14:20:00Z")])
+      assert Projection.get_request(d).status == "closed_duplicate"
+
+      e = rid("0E")
+      push([received(e, 1, "2026-11-07T14:00:00Z")])
+      push([event(e, 2, "assigned", "2026-11-07T14:10:00Z")])
+      push([event(e, 3, "assigned", "2026-11-07T14:20:00Z")])
+      assert Projection.get_request(e).status == "assigned"
     end
 
     test "status ranks: assigned < escalated < rescued" do

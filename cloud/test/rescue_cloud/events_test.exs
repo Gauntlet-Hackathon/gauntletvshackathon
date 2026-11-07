@@ -52,6 +52,19 @@ defmodule RescueCloud.EventsTest do
       end
     end
 
+    test "rescued.destination: at most 200 characters, counted as code points (#306)" do
+      ok = example("extra/payload-rescued.valid")
+      base = event(%{"type" => "rescued"})
+
+      valid? = fn dest ->
+        Event.changeset(%{base | "payload" => %{ok | "destination" => dest}}).valid?
+      end
+
+      assert valid?.(String.duplicate("é", 200))
+      refute valid?.(String.duplicate("a", 201))
+      assert valid?.(nil)
+    end
+
     test "envelope violations" do
       for {k, v} <- [
             {"event_id", "nope"},

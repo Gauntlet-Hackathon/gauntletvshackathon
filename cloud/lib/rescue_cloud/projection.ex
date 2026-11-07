@@ -8,9 +8,10 @@ defmodule RescueCloud.Projection do
 
   Fold rules (events in `(occurred_at, sequence)` order, deduplicated on `event_id`):
     * status only moves forward: received → extracted → decided → assigned → escalated →
-      rescued / closed_duplicate (`contracts/logic.md`, "Request status order"). Events that
-      are not statuses (`corrected`) never move it, and an event with a lower rank than the
-      current status is ignored.
+      rescued / closed_duplicate (`contracts/logic.md`, "Request status order"), with one
+      exception: `assigned` after `escalated` moves the request back to `assigned` (a second
+      boat, #306). Events that are not statuses (`corrected`) never move it, and any other
+      event whose rank is not above the current status is ignored.
     * `extracted` is the latest extraction with every `corrected` event applied on top, in order
       (`field` is a dotted path into the extracted payload, e.g. `people_count.value`).
     * `incident` and `sample` come from the `received` payload (both optional, #305; `sample`
@@ -238,9 +239,13 @@ defmodule RescueCloud.Projection do
   defp advance(acc, type) do
     case status_rank(type) do
       nil -> acc
-      rank -> if rank > status_rank(acc.status), do: %{acc | status: type}, else: acc
+      rank -> if moves?(acc.status, type, rank), do: %{acc | status: type}, else: acc
     end
   end
+
+  # A second dispatch after an escalation ("Couldn't get there") is a forward move (#306).
+  defp moves?("escalated", "assigned", _rank), do: true
+  defp moves?(current, _type, rank), do: rank > status_rank(current)
 
   defp apply_payload(acc, %{type: "received"} = e) do
     %{

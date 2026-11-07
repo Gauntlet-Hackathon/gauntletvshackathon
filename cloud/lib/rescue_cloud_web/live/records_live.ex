@@ -44,6 +44,7 @@ defmodule RescueCloudWeb.RecordsLive do
     |> assign(:requests, Records.search_requests(filters))
     |> assign(:record, id && Records.get_record(id))
     |> assign(:verifications, if(id, do: Replay.for_request(id), else: %{}))
+    |> then(&assign(&1, :rescue_info, &1.assigns.record && rescue_payload(&1.assigns.record)))
   end
 
   # Replay status of the request's latest decided event ("not verified" before the first run).
@@ -64,6 +65,39 @@ defmodule RescueCloudWeb.RecordsLive do
   defp replay_kind("mismatch"), do: :alarm
   defp replay_kind("not verified"), do: :neutral
   defp replay_kind(_), do: :ok
+
+  # The latest `rescued` event's payload (outcome and destination, #306), or nil.
+  defp rescue_payload(%{events: events}) do
+    case events |> Enum.filter(&(&1.type == "rescued")) |> List.last() do
+      nil -> nil
+      e -> e.payload
+    end
+  end
+
+  defp outcome_label("all"), do: "everyone"
+  defp outcome_label("some"), do: "some people"
+  defp outcome_label("nobody"), do: "nobody"
+  defp outcome_label(_), do: nil
+
+  # One-line summary of an operator event for the history table.
+  defp event_details(%{type: "assigned", payload: p}),
+    do: join(["crew: " <> p["crew"], p["note"]])
+
+  defp event_details(%{type: "escalated", payload: p}),
+    do: join(["reason: " <> p["reason"], p["note"]])
+
+  defp event_details(%{type: "rescued", payload: p}) do
+    join([
+      p["rescued_count"] && "rescued: #{p["rescued_count"]}",
+      p["outcome"] && "outcome: " <> outcome_label(p["outcome"]),
+      p["destination"] && "taken to: " <> p["destination"],
+      p["note"]
+    ])
+  end
+
+  defp event_details(_event), do: nil
+
+  defp join(parts), do: parts |> Enum.reject(&(&1 in [nil, ""])) |> Enum.join(" · ")
 
   defp verification_label(nil), do: "not verified"
   defp verification_label(%{status: status}), do: status
@@ -194,6 +228,14 @@ defmodule RescueCloudWeb.RecordsLive do
           <dd data-role="follow-up">{@record.request.follow_up_question}</dd>
           <dt>Duplicate group</dt>
           <dd data-role="duplicate-group">{@record.request.duplicate_group}</dd>
+          <dt :if={@rescue_info["outcome"]}>Rescue outcome</dt>
+          <dd :if={@rescue_info["outcome"]} data-role="rescue-outcome">
+            {outcome_label(@rescue_info["outcome"])}
+          </dd>
+          <dt :if={@rescue_info["destination"]}>Taken to</dt>
+          <dd :if={@rescue_info["destination"]} data-role="destination">
+            {@rescue_info["destination"]}
+          </dd>
           <dt>Replay</dt>
           <dd data-role="replay-status">
             <.status_badge
@@ -212,6 +254,7 @@ defmodule RescueCloudWeb.RecordsLive do
             <tr>
               <th scope="col">Occurred (laptop)</th>
               <th scope="col">Type</th>
+              <th scope="col">Details</th>
               <th scope="col">Device</th>
               <th scope="col">Rules</th>
               <th scope="col">Model</th>
@@ -223,6 +266,7 @@ defmodule RescueCloudWeb.RecordsLive do
             <tr :for={e <- @record.events} id={"event-#{e.event_id}"}>
               <td data-role="occurred-at">{fmt(e.occurred_at)}</td>
               <td data-role="type">{e.type}</td>
+              <td data-role="details" class="break-words">{event_details(e)}</td>
               <td data-role="device">{e.device_id}</td>
               <td data-role="rules-version">{e.rules_version}</td>
               <td data-role="model-version">{e.model_version}</td>
