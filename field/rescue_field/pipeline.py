@@ -18,23 +18,14 @@ from typing import Any
 from rescue_field import engine_client
 from rescue_field.slm import Extractor, FixtureExtractor
 from rescue_field.store import EventStore
-from rescue_shared import logic
+from rescue_shared import frozen_config, logic
 from rescue_shared.contracts_io import CONTRACTS, validator_for
 from rescue_shared.ulid import new_ulid
 
-# Defaults from contracts/engine_rules.md (the values the fixtures use).
-DEFAULT_THRESHOLDS: dict[str, float | int] = {
-    "request_confidence_min": 0.6,
-    "stale_confidence_min": 0.6,
-    "hoax_marker_min": 1,
-    "hoax_request_confidence_max": 0.85,
-    "location_confidence_min": 0.6,
-    "hazard_firm_min": 0.75,
-    "hazard_uncertain_min": 0.5,
-    "hazard_weak_min": 0.25,
-    "need_hours_over": 24,
-    "duplicate_window_hours": 12,
-}
+# Defaults from contracts/engine_rules.md (the values the fixtures use), frozen with the engine
+# build in contracts/fixtures/thresholds.json (DECISIONS H12 / R15).
+DEFAULT_THRESHOLDS_PATH = frozen_config.FIXTURES_DIR / frozen_config.CONFIG_FILES["thresholds"]
+DEFAULT_THRESHOLDS: dict[str, float | int] = frozen_config.read_thresholds(DEFAULT_THRESHOLDS_PATH)
 DEFAULT_STREETS_PATH = CONTRACTS / "fixtures" / "streets.txt"
 DEFAULT_HOAX_MARKERS_PATH = CONTRACTS / "fixtures" / "hoax_markers.txt"
 # The one default device id for the field app (DECISIONS A5): the pipeline stamps it on events
@@ -46,9 +37,8 @@ BatchDecider = Callable[[Sequence[dict[str, Any]]], list[dict[str, Any]]]
 
 
 def read_list(path: str | Path) -> tuple[str, ...]:
-    """Non-empty, non-comment lines of a text file."""
-    lines = Path(path).read_text(encoding="utf-8").splitlines()
-    return tuple(s for s in (ln.strip() for ln in lines) if s and not s.startswith("#"))
+    """Non-empty, non-comment lines of a text file (the parsing config_hash covers)."""
+    return frozen_config.read_list(path)
 
 
 @dataclass(frozen=True)

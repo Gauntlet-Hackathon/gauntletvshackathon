@@ -1,19 +1,28 @@
 """Build an immutable engine artifact: engine/dist/<rules_version>/.
 
     python -m rescue_engine.build [--dist DIR] [--kind python|mercury]
+    python -m rescue_engine.build [--dist DIR] --rebuild-from DIR
 
 python (default): copies the fallback engine sources into the version directory.
 mercury: builds engine/mercury with make (needs mmc and MERCURY_JSON_SRC) and copies the binary
 to bin/mercury_engine in the version directory.
-Both write manifest.json (contracts/engine_manifest.schema.json). rules_sha is the git SHA of the
-last commit touching the rule sources; bin_hash is the sha256 (first 16 hex) over the copied files
-as they are before stamping, i.e. with the placeholder version in them.
+--rebuild-from: republishes an existing build's artifact (unstamped back to its compiled bytes)
+with the current frozen config, without recompiling; used when only the config changes.
+All write manifest.json (contracts/engine_manifest.schema.json). rules_sha is the git SHA of the
+last commit touching the rule sources. artifact_hash is the sha256 (first 16 hex) over the copied
+engine files as they are before stamping, i.e. with the placeholder version in them.
+
+Frozen config (H12 extension, R15): the thresholds, hoax markers and street list
+(contracts/fixtures/, see rescue_shared.frozen_config) are copied to config/ in the version
+directory, their config_hash goes into the manifest, and
+bin_hash = combined_bin_hash(artifact_hash, config_hash), so the rules_version changes whenever
+the engine or any of those inputs changes.
 
 Stamping (A2, docs/DECISIONS.md): the published copy then carries the real rules_version, so every
 decision it emits names the build that made it. For python, the `RULES_VERSION = "<placeholder>"`
 line of rules.py is rewritten. For mercury, the binary holds the placeholder in a fixed-width,
 space-padded slot (rules.m `version_slot`), which is overwritten in place with the real version
-padded the same way. Undoing the stamp (see `unstamped`) gives back the bytes bin_hash covers.
+padded the same way. Undoing the stamp (see `unstamped`) gives back the bytes artifact_hash covers.
 An existing version directory is never overwritten.
 """
 
@@ -30,6 +39,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
+from rescue_shared import frozen_config
 from rescue_shared.versions import rules_version
 
 ENGINE_DIR = Path(__file__).resolve().parent
@@ -113,7 +123,7 @@ def stamp_binary(binary: Path, version: str) -> None:
 
 
 def unstamped(data: bytes, version: str, kind: str) -> bytes:
-    """Undo a stamp: the bytes the manifest's bin_hash was computed over."""
+    """Undo a stamp: the bytes the manifest's artifact_hash was computed over."""
     if kind == "mercury":
         return _replace_once(data, version_slot(version), version_slot(PLACEHOLDER_VERSION),
                              "version slot")  # fmt: skip
@@ -129,12 +139,16 @@ def unstamped(data: bytes, version: str, kind: str) -> bytes:
 def _publish(
     dist: Path,
     sha: str,
-    bin_hash: str,
+    artifact_hash: str,
     kind: str,
     entrypoint: str,
     stage: Callable[[Path, str], None],
+    config_dir: Path = frozen_config.FIXTURES_DIR,
 ) -> Path:
-    """Fill a temp dir with stage(tmp, version), add manifest.json, rename it to dist/<version>."""
+    """Fill a temp dir with stage(tmp, version) and the frozen config, add manifest.json, rename it
+    to dist/<version>."""
+    cfg_hash = frozen_config.config_hash_of(config_dir)
+    bin_hash = frozen_config.combined_bin_hash(artifact_hash, cfg_hash)
     version = rules_version(sha, bin_hash)
     target = dist / version
     if target.exists():
@@ -146,10 +160,17 @@ def _publish(
     try:
         tmp.mkdir()
         stage(tmp, version)
+        (tmp / frozen_config.CONFIG_SUBDIR).mkdir()
+        for name in frozen_config.CONFIG_FILES.values():
+            shutil.copy2(config_dir / name, tmp / frozen_config.CONFIG_SUBDIR / name)
+        if frozen_config.config_hash_of(tmp / frozen_config.CONFIG_SUBDIR) != cfg_hash:
+            raise RuntimeError("config changed while building; try again")
         manifest = {
             "rules_version": version,
             "rules_sha": sha,
             "bin_hash": bin_hash,
+            "artifact_hash": artifact_hash,
+            "config_hash": cfg_hash,
             "engine_kind": kind,
             "entrypoint": entrypoint,
             "built_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -163,10 +184,13 @@ def _publish(
 
 
 def build(
-    dist: Path = DEFAULT_DIST, source: Path = SOURCE_DIR, rules_sha: str | None = None
+    dist: Path = DEFAULT_DIST,
+    source: Path = SOURCE_DIR,
+    rules_sha: str | None = None,
+    config_dir: Path = frozen_config.FIXTURES_DIR,
 ) -> Path:
     files = source_files(source)
-    bin_hash = hash_files(files, source)[:16]
+    artifact_hash = hash_files(files, source)[:16]
     sha = rules_sha or git_sha(source)
 
     def stage(tmp: Path, version: str) -> None:
@@ -179,7 +203,7 @@ def build(
         if (package / RULES_PY).exists():
             stamp_python(package / RULES_PY, version)
 
-    return _publish(dist, sha, bin_hash, "python", ENTRYPOINT, stage)
+    return _publish(dist, sha, artifact_hash, "python", ENTRYPOINT, stage, config_dir)
 
 
 def compile_mercury(build_dir: Path, source: Path = MERCURY_DIR) -> Path:
@@ -194,31 +218,72 @@ def compile_mercury(build_dir: Path, source: Path = MERCURY_DIR) -> Path:
     return build_dir / MERCURY_BINARY
 
 
+def _publish_binary(
+    dist: Path, sha: str, binary: Path, config_dir: Path = frozen_config.FIXTURES_DIR
+) -> Path:
+    """Publish an unstamped (as compiled) Mercury binary as dist/<version>/bin/mercury_engine."""
+    artifact_hash = hash_files([binary], binary.parent)[:16]
+
+    def stage(tmp: Path, version: str) -> None:
+        (tmp / "bin").mkdir()
+        shutil.copy2(binary, tmp / MERCURY_ENTRYPOINT)
+        stamp_binary(tmp / MERCURY_ENTRYPOINT, version)
+
+    return _publish(dist, sha, artifact_hash, "mercury", MERCURY_ENTRYPOINT, stage, config_dir)
+
+
 def build_mercury(
-    dist: Path = DEFAULT_DIST, source: Path = MERCURY_DIR, rules_sha: str | None = None
+    dist: Path = DEFAULT_DIST,
+    source: Path = MERCURY_DIR,
+    rules_sha: str | None = None,
+    config_dir: Path = frozen_config.FIXTURES_DIR,
 ) -> Path:
     """Compile the Mercury engine and publish it as dist/<rules_version>/bin/mercury_engine."""
     sha = rules_sha or git_sha(source)
     with tempfile.TemporaryDirectory(prefix="mercury-build-") as work:
         binary = compile_mercury(Path(work), source)
-        bin_hash = hash_files([binary], binary.parent)[:16]
+        return _publish_binary(dist, sha, binary, config_dir)
 
-        def stage(tmp: Path, version: str) -> None:
-            (tmp / "bin").mkdir()
-            shutil.copy2(binary, tmp / MERCURY_ENTRYPOINT)
-            stamp_binary(tmp / MERCURY_ENTRYPOINT, version)
 
-        return _publish(dist, sha, bin_hash, "mercury", MERCURY_ENTRYPOINT, stage)
+def artifact_hash_of(manifest: dict) -> str:
+    """The hash of the engine artifact alone. Builds made before the config freeze have no
+    artifact_hash: their bin_hash covered only the artifact."""
+    return manifest.get("artifact_hash") or manifest["bin_hash"]
+
+
+def rebuild(
+    existing: Path, dist: Path = DEFAULT_DIST, config_dir: Path = frozen_config.FIXTURES_DIR
+) -> Path:
+    """Republish an existing Mercury build's binary (same compiled bytes, same rules_sha) with the
+    current frozen config. Checks the unstamped binary against the old manifest first."""
+    manifest = json.loads((existing / "manifest.json").read_text())
+    if manifest["engine_kind"] != "mercury":
+        raise RuntimeError("--rebuild-from supports mercury builds only")
+    data = unstamped((existing / manifest["entrypoint"]).read_bytes(), manifest["rules_version"],
+                     "mercury")  # fmt: skip
+    with tempfile.TemporaryDirectory(prefix="mercury-rebuild-") as work:
+        binary = Path(work) / MERCURY_BINARY
+        binary.write_bytes(data)
+        binary.chmod(0o755)
+        if hash_files([binary], binary.parent)[:16] != artifact_hash_of(manifest):
+            raise RuntimeError(f"{existing}: binary does not match its manifest")
+        return _publish_binary(dist, manifest["rules_sha"], binary, config_dir)
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="rescue_engine.build")
     parser.add_argument("--dist", type=Path, default=DEFAULT_DIST)
     parser.add_argument("--kind", choices=["python", "mercury"], default="python")
+    parser.add_argument("--rebuild-from", type=Path, dest="rebuild_from")
     args = parser.parse_args(argv)
     try:
-        target = build_mercury(args.dist) if args.kind == "mercury" else build(args.dist)
-    except (VersionExists, RuntimeError) as exc:
+        if args.rebuild_from:
+            target = rebuild(args.rebuild_from, args.dist)
+        elif args.kind == "mercury":
+            target = build_mercury(args.dist)
+        else:
+            target = build(args.dist)
+    except (VersionExists, RuntimeError, OSError, KeyError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     print(target)

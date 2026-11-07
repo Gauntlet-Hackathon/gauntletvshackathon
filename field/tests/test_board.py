@@ -409,3 +409,84 @@ def test_colour_pairs_meet_aa_contrast(store):
     for fg, bg in pairs:
         assert fg in page and bg in page
         assert _contrast(fg, bg) >= 4.5, (fg, bg)
+
+
+# ---- A17: a duplicate's own question; A19: offline button label after reload ------------
+
+import os  # noqa: E402
+
+from rescue_field.api import default_decide_batch  # noqa: E402
+
+A17_ROOT = "We'd like to evacuate, 311 Washington Avenue, 4 people, dry for now"
+A17_DUP = "help at 311 Washington Avenue, 4 people, the water keeps coming and we are stuck"
+Q_HOAX = "Can you confirm this request is real and tell us exactly what help you need?"
+
+
+def test_duplicate_that_sets_the_tier_shows_its_question(store):
+    env = {k: v for k, v in os.environ.items() if k != "ENGINE_CMD"}
+    app = create_app(store=store, decide_batch=default_decide_batch(env))
+    with TestClient(app) as client:
+        for text in (A17_ROOT, A17_DUP):
+            body = {"raw_text": text, "channel": "sms", "contact": "+17135550111"}
+            r = client.post("/requests", json=body)
+            assert r.status_code == 200, r.text
+        d = r.json()["decision"]
+        page = client.get("/").text
+    assert (d["outcome"], d["priority_tier"]) == ("duplicate", "P1"), d
+    assert d["follow_up_question"]
+    p1 = page[page.index('id="tier-P1"') : page.index('id="tier-P2"')]
+    assert f'<span class="question">{d["follow_up_question"]}</span>' in p1
+    assert "Needs confirmation" in p1
+
+
+def test_row_question_label_names_a_possible_hoax(store):
+    add(store, "H", output("P1", "R-P1-01", question=Q_HOAX), extracted(location="loc-h"))
+    add(store, "R", output("P3", "R-P3-01"), extracted(location="loc-r"),
+        at="2026-11-07T09:00:00Z")
+    add(store, "D", output("P2", "R-P2-01", "duplicate", duplicate_of="R", question="Sure?"),
+        extracted(location="loc-d"), at="2026-11-07T09:30:00Z")
+    text = get(store).text
+    h = row_html(text, "H")
+    assert '<strong class="confirm-label">Possible hoax</strong>' in h
+    assert f'<span class="question">{Q_HOAX}</span>' in h
+    r = row_html(text, "R")
+    assert '<strong class="confirm-label">Needs confirmation</strong>' in r
+    assert '<span class="question">Sure?</span>' in r
+
+
+class PausedWorker:
+    def __init__(self, store, url):
+        self.paused = True
+
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
+
+def test_offline_button_says_go_back_online_while_paused(store, monkeypatch):
+    monkeypatch.setenv("CLOUD_URL", "http://cloud:4000")
+    monkeypatch.setenv("DEMO_MODE", "1")
+    with TestClient(create_app(store=store, sync_worker_factory=PausedWorker)) as client:
+        page = client.get("/").text
+    assert '<button type="button" id="offline-toggle">Go back online</button>' in page
+
+
+def test_offline_button_says_simulate_offline_when_not_paused(store, monkeypatch):
+    monkeypatch.delenv("CLOUD_URL", raising=False)
+    monkeypatch.setenv("DEMO_MODE", "1")
+    page = get(store).text
+    assert '<button type="button" id="offline-toggle">Simulate offline</button>' in page
+
+
+def test_board_hoax_text_matches_the_contract():
+    """board.Q_HOAX is a copy of the possible_hoax question in contracts/engine_rules.md."""
+    import re
+    from pathlib import Path
+
+    rules = (Path(__file__).resolve().parents[2] / "contracts" / "engine_rules.md").read_text()
+    m = re.search(r"^\| `possible_hoax` \| `([^`]+)` \|", rules, re.M)
+    from rescue_field.board import Q_HOAX
+
+    assert m and m.group(1) == Q_HOAX

@@ -1,8 +1,0 @@
-{
-  "rules_version": "rules@a4dbac566db96b00951930ad9da941e85c1b2429+bin:36c2f7f7da6998e5",
-  "rules_sha": "a4dbac566db96b00951930ad9da941e85c1b2429",
-  "bin_hash": "36c2f7f7da6998e5",
-  "engine_kind": "mercury",
-  "entrypoint": "bin/mercury_engine",
-  "built_at": "2026-11-07T07:06:25Z"
-}

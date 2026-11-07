@@ -209,4 +209,25 @@ defmodule RescueCloud.ReplayTest do
     assert tampered.detail == "differs in: provisional_tier"
     assert tampered.replayed_output["provisional_tier"] == "P2"
   end
+
+  test "an event decided with thresholds other than the build's frozen config is a mismatch", %{
+    dist: dist
+  } do
+    frozen = payload("decided")["engine_input"]["context"]["thresholds"]
+    config = dist |> Path.join(@v1) |> Path.join("config")
+    File.mkdir_p!(config)
+    File.write!(Path.join(config, "thresholds.json"), Jason.encode!(frozen))
+
+    drifted =
+      decided("DR", @v1, 3, "P1", "R-P1-ALL")
+      |> put_in(["payload", "engine_input", "context", "thresholds", "hazard_firm_min"], 0.5)
+
+    sync!([decided("GD", @v1, 3, "P1", "R-P1-ALL"), drifted])
+
+    assert {:ok, %{"match" => 1, "mismatch" => 1}} = Replay.verify(engine_dist: dist)
+    assert statuses() == %{rid("GD") => "match", rid("DR") => "mismatch"}
+
+    assert Repo.get_by!(Verification, request_id: rid("DR")).detail ==
+             "context.thresholds differ from the build's frozen config"
+  end
 end

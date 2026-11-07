@@ -75,7 +75,7 @@ def test_english_text_graded():
     haz = {h["kind"]: h["confidence"] for h in p["hazards"]}
     assert haz["on_roof"] == haz["trapped"] == haz["rising_water"] == 0.8
     assert {"kind": "child", "confidence": 0.8} in p["vulnerable"]
-    assert p["is_request"] == {"value": True, "confidence": 0.8}
+    assert p["is_request"] == {"value": True, "confidence": 0.9}  # explicit "help" (F34)
     assert p["spans"][0]["label"] == "CONTACT"
 
 
@@ -92,7 +92,7 @@ def test_spanish_text_graded():
     assert p["people_count"] == {"value": 3, "confidence": 0.8}
     kinds = {v["kind"]: v["confidence"] for v in p["vulnerable"]}
     assert kinds == {"child": 0.6, "elderly": 0.8}
-    assert p["is_request"]["confidence"] == 0.8
+    assert p["is_request"]["confidence"] == 0.9  # explicit "ayuda" (F34)
 
 
 def test_coords_and_stale_and_no_location():
@@ -124,3 +124,92 @@ def test_prompt_injection_yields_fields_only():
     validate_extracted(p)
     assert not DECISION_KEYS & set(p)
     assert "P1" not in json.dumps(p)
+
+
+# ---- stale false positives (A14) and SMS request words (A15) ---------------------------
+
+NOT_STALE = [
+    "stuck at home in 2014 Elm Street with my grandma, need help",
+    "help, my mom is in a wheelchair at 33 Oak Street, last year we evacuated but now we can't",
+    "trapped in 2015 Westheimer Rd, water rising, please help",
+]
+STILL_STALE = ["this is an old post from 2017, roof flooding", "photo from last year, water rising"]
+SMS_REQUESTS = [
+    "plz hlp the car is flooded & wi cannot get out @ 4699 lakeview court 2 of us including a baby",
+    "SOS 12 Oak Street on the roof water rising",
+    "Water rising fast, we are on the roof at 12 Oak Street, 3 people",
+]
+
+
+@pytest.mark.parametrize("text", NOT_STALE)
+def test_house_numbers_and_past_events_are_not_stale(text):
+    p = KeywordExtractor.payload(text)
+    assert p["time_ref"]["is_stale_post"] is False
+    assert p["is_request"]["value"] is True
+
+
+@pytest.mark.parametrize("text", STILL_STALE)
+def test_old_posts_stay_stale(text):
+    assert KeywordExtractor.payload(text)["time_ref"]["is_stale_post"] is True
+
+
+@pytest.mark.parametrize("text", SMS_REQUESTS)
+def test_sms_and_danger_only_texts_are_requests(text):
+    p = KeywordExtractor.payload(text)
+    assert p["is_request"]["value"] is True
+    assert p["is_request"]["confidence"] >= 0.6
+
+
+def test_short_request_tokens_need_word_boundaries():
+    assert KeywordExtractor.payload("sospecho que llueve")["is_request"]["value"] is False
+    assert KeywordExtractor.payload("SOS")["is_request"]["value"] is True
+
+
+# ---- acute medical (A16), clear-request confidence and address capture (A18) -----------
+
+
+def _hazards(text):
+    return {h["kind"]: h["confidence"] for h in KeywordExtractor.payload(text)["hazards"]}
+
+
+def test_medical_device_without_power_is_firm():
+    assert _hazards("help, oxygen machine has no power at 12 Oak Street") == {
+        "medical_device_no_power": 0.8
+    }
+    assert _hazards("se fue la luz y mi papá usa oxígeno")["medical_device_no_power"] == 0.8
+    assert _hazards("my cpap, worried about the power")["medical_device_no_power"] == 0.6
+    assert "medical_device_no_power" not in _hazards("grandma needs oxygen")
+    # the vulnerable `medical` entry is unchanged
+    p = KeywordExtractor.payload("grandma needs oxygen")
+    assert {"kind": "medical", "confidence": 0.8} in p["vulnerable"]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "my dad is unconscious and not breathing at 12 Oak Street, please help",
+        "help at 12 Oak Street, someone drowning",
+        "chest pain, can't breathe",
+        "mi abuelo está inconsciente y no respira",
+    ],
+)
+def test_acute_medical_is_firm_injury(text):
+    assert _hazards(text)["injury"] == 0.8
+
+
+def test_request_confidence_by_signal_strength():
+    assert KeywordExtractor.payload("need help at 12 Oak Street")["is_request"]["confidence"] == 0.9
+    assert KeywordExtractor.payload("we need water")["is_request"]["confidence"] == 0.8
+    assert KeywordExtractor.payload("water rising")["is_request"]["confidence"] == 0.8
+    assert KeywordExtractor.payload("hello")["is_request"] == {"value": False, "confidence": 0.4}
+
+
+def test_address_skips_counts_and_prepositions():
+    p = KeywordExtractor.payload("3 people at Main St need help water rising")
+    assert p["location"]["text"] != "3 people at Main St"
+    assert p["location"]["type"] != "address"
+    for text, addr in [
+        ("plz hlp stuck @ 4699 lakeview court 2 of us", "4699 lakeview court"),
+        ("on the roof at 12 Oak Street", "12 Oak Street"),
+    ]:
+        assert KeywordExtractor.payload(text)["location"]["text"] == addr

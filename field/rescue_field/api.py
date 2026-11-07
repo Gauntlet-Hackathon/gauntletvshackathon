@@ -29,7 +29,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
 
 from rescue_field import board as board_module
-from rescue_field import engine_client
+from rescue_field import engine_client, freeze
 from rescue_field import status as status_module
 from rescue_field import sync as sync_module
 from rescue_field.pipeline import BatchDecider, IntakeItem, PipelineConfig, process_batch
@@ -330,6 +330,9 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        # Refuse to start when the decision config differs from the frozen engine build (R15).
+        cfg = app.state.config
+        freeze.check(cfg.thresholds, cfg.hoax_markers, cfg.streets)
         opened = None
         if app.state.store is None:
             opened = app.state.store = open_store()
