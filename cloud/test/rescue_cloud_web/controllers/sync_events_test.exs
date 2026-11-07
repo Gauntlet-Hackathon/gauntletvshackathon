@@ -34,6 +34,12 @@ defmodule RescueCloudWeb.SyncEventsTest do
     assert_receive {:event, %{event_id: ^id}}
   end
 
+  test "stored events update the requests read model", %{conn: conn} do
+    [%{"request_id" => rid}] = valid()["events"]
+    conn |> auth() |> post(~p"/sync/events", valid()) |> json_response(200)
+    assert %{status: "received", event_count: 1} = RescueCloud.Projection.get_request(rid)
+  end
+
   test "invalid events are rejected individually, valid ones acked", %{conn: conn} do
     good = second_event()
 
