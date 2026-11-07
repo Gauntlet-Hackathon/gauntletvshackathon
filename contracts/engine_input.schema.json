@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.rescue.invalid/engine_input.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "extracted": {
+      "$ref": "payloads/extracted.schema.json"
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "duplicate_candidates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "request_id": {
+                "$ref": "common.schema.json#/$defs/ulid"
+              },
+              "received_at": {
+                "$ref": "common.schema.json#/$defs/timestamp"
+              },
+              "people_count": {
+                "anyOf": [
+                  {
+                    "$ref": "common.schema.json#/$defs/people_count_value"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "contact_match": {
+                "type": "boolean"
+              },
+              "priority_tier": {
+                "anyOf": [
+                  {
+                    "$ref": "common.schema.json#/$defs/tier"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "request_id",
+              "received_at",
+              "people_count",
+              "contact_match",
+              "priority_tier"
+            ]
+          }
+        },
+        "street_list_hits": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "hoax_marker_hits": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "thresholds": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "request_confidence_min": {
+              "$ref": "common.schema.json#/$defs/confidence"
+            },
+            "stale_confidence_min": {
+              "$ref": "common.schema.json#/$defs/confidence"
+            },
+            "hoax_marker_min": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "hoax_request_confidence_max": {
+              "$ref": "common.schema.json#/$defs/confidence"
+            },
+            "location_confidence_min": {
+              "$ref": "common.schema.json#/$defs/confidence"
+            },
+            "hazard_firm_min": {
+              "$ref": "common.schema.json#/$defs/confidence"
+            },
+            "hazard_uncertain_min": {
+              "$ref": "common.schema.json#/$defs/confidence"
+            },
+            "hazard_weak_min": {
+              "$ref": "common.schema.json#/$defs/confidence"
+            },
+            "need_hours_over": {
+              "type": "number",
+              "minimum": 0
+            },
+            "duplicate_window_hours": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "required": [
+            "request_confidence_min",
+            "stale_confidence_min",
+            "hoax_marker_min",
+            "hoax_request_confidence_max",
+            "location_confidence_min",
+            "hazard_firm_min",
+            "hazard_uncertain_min",
+            "hazard_weak_min",
+            "need_hours_over",
+            "duplicate_window_hours"
+          ],
+          "title": "thresholds"
+        }
+      },
+      "required": [
+        "duplicate_candidates",
+        "street_list_hits",
+        "hoax_marker_hits",
+        "thresholds"
+      ]
+    }
+  },
+  "required": [
+    "extracted",
+    "context"
+  ],
+  "title": "engine input",
+  "description": "Extracted payload plus context. The engine never sees raw text. duplicate_candidates is sorted oldest first."
+}

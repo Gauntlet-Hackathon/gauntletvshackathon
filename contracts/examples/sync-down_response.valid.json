@@ -1,0 +1,22 @@
+{
+  "next_since": 42,
+  "events": [
+    {
+      "event_id": "01JCB00000000000000000EV09",
+      "request_id": "01JCB00000000000000000RQ02",
+      "type": "assigned",
+      "device_id": "field-07",
+      "occurred_at": "2026-11-07T14:02:11Z",
+      "rules_version": "rules@a1b2c3d+bin:9f8e7d6c5b4a3f21",
+      "model_version": "hf:rescue-org/rescue-tagger@4d5e6f7a8b",
+      "payload": {
+        "crew": "boat-crew-7",
+        "note": null
+      }
+    }
+  ],
+  "approved": {
+    "rules_version": "rules@a1b2c3d+bin:9f8e7d6c5b4a3f21",
+    "model_version": null
+  }
+}

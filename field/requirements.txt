@@ -1,0 +1,7 @@
+-c ../constraints.txt
+fastapi
+uvicorn
+httpx
+jinja2
+python-multipart
+pydantic

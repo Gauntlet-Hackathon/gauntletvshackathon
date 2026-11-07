@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.rescue.invalid/payloads/corrected.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "field": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Dotted path into the extracted payload, e.g. people_count.value."
+    },
+    "old_value": {},
+    "new_value": {},
+    "corrected_by": {
+      "type": "string",
+      "minLength": 1
+    },
+    "note": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "field",
+    "old_value",
+    "new_value",
+    "corrected_by",
+    "note"
+  ],
+  "title": "corrected payload",
+  "description": "Coordinator correction, created in the cloud. old_value and new_value are any JSON."
+}

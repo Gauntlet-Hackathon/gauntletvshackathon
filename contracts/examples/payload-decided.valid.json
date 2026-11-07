@@ -1,0 +1,90 @@
+{
+  "engine_input": {
+    "extracted": {
+      "location": {
+        "text": "behind the Kroger on Westheimer",
+        "type": "landmark",
+        "confidence": 0.81
+      },
+      "people_count": {
+        "value": 3,
+        "confidence": 0.93
+      },
+      "vulnerable": [
+        {
+          "kind": "child",
+          "confidence": 0.88
+        }
+      ],
+      "hazards": [
+        {
+          "kind": "rising_water",
+          "confidence": 0.9
+        },
+        {
+          "kind": "on_roof",
+          "confidence": 0.85
+        }
+      ],
+      "time_ref": {
+        "text": "since last night",
+        "is_stale_post": false,
+        "confidence": 0.7
+      },
+      "is_request": {
+        "value": true,
+        "confidence": 0.97
+      },
+      "spans": [
+        {
+          "start": 43,
+          "end": 74,
+          "label": "LOCATION"
+        }
+      ],
+      "needs": [
+        {
+          "kind": "water",
+          "hours_without": 30
+        }
+      ],
+      "request_kind": "rescue"
+    },
+    "context": {
+      "duplicate_candidates": [
+        {
+          "request_id": "01JCB00000000000000000RQ01",
+          "received_at": "2026-11-07T13:40:00Z",
+          "people_count": 3,
+          "contact_match": true,
+          "priority_tier": "P2"
+        }
+      ],
+      "street_list_hits": [
+        "Westheimer Road"
+      ],
+      "hoax_marker_hits": 0,
+      "thresholds": {
+        "request_confidence_min": 0.6,
+        "stale_confidence_min": 0.6,
+        "hoax_marker_min": 1,
+        "hoax_request_confidence_max": 0.85,
+        "location_confidence_min": 0.6,
+        "hazard_firm_min": 0.75,
+        "hazard_uncertain_min": 0.5,
+        "hazard_weak_min": 0.25,
+        "need_hours_over": 24,
+        "duplicate_window_hours": 12
+      }
+    }
+  },
+  "engine_output": {
+    "outcome": "duplicate",
+    "priority_tier": "P1",
+    "rule_id": "R-DUP-01",
+    "duplicate_of": "01JCB00000000000000000RQ01",
+    "abstain_reason": null,
+    "follow_up_question": null,
+    "rules_version": "rules@a1b2c3d+bin:9f8e7d6c5b4a3f21"
+  }
+}

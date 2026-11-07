@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.rescue.invalid/payloads/received.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "channel": {
+      "enum": [
+        "sms",
+        "social",
+        "form",
+        "call_note",
+        "csv"
+      ]
+    },
+    "raw_text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lang_hint": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-z]{2}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "contact": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "channel",
+    "raw_text",
+    "lang_hint",
+    "contact"
+  ],
+  "title": "received payload",
+  "description": "Raw text stays in the field DB and cloud records. It is never passed to the engine."
+}

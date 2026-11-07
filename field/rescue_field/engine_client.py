@@ -1,0 +1,109 @@
+"""Subprocess client for the decision engine.
+
+ENGINE_CMD is any command that reads one engine_input JSON object on stdin and writes one
+engine_output JSON object on stdout, or reads a JSON list of inputs and writes a list of
+outputs in the same order (batch mode). The Python engine and Mercury are interchangeable.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import shlex
+import subprocess
+from collections.abc import Mapping, Sequence
+from typing import Any
+
+from rescue_shared.contracts_io import validator_for
+
+DEFAULT_TIMEOUT_S = 5.0
+DEFAULT_BATCH_TIMEOUT_S = 30.0
+
+
+class EngineError(Exception):
+    """The engine failed, timed out, or returned something invalid."""
+
+    def __init__(self, message: str, stderr: str = "") -> None:
+        super().__init__(f"{message}: {stderr.strip()}" if stderr.strip() else message)
+        self.stderr = stderr
+
+
+def _command(cmd: str | Sequence[str] | None) -> list[str]:
+    if cmd is None:
+        cmd = os.environ.get("ENGINE_CMD", "")
+    argv = shlex.split(cmd) if isinstance(cmd, str) else list(cmd)
+    if not argv:
+        raise EngineError("ENGINE_CMD is not set")
+    return argv
+
+
+def _run(
+    payload: Any, argv: list[str], timeout: float, env: Mapping[str, str] | None = None
+) -> tuple[Any, str]:
+    """Send payload as JSON on stdin; return (parsed stdout, stderr)."""
+    try:
+        proc = subprocess.run(
+            argv,
+            input=json.dumps(payload),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+            env=None if env is None else dict(env),
+        )
+    except subprocess.TimeoutExpired as exc:
+        stderr = exc.stderr
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode(errors="replace")
+        raise EngineError(f"engine timed out after {timeout}s", stderr or "") from exc
+    except OSError as exc:
+        raise EngineError(f"cannot run engine {argv[0]!r}: {exc}") from exc
+    if proc.returncode != 0:
+        raise EngineError(f"engine exited with code {proc.returncode}", proc.stderr)
+    try:
+        return json.loads(proc.stdout), proc.stderr
+    except json.JSONDecodeError as exc:
+        raise EngineError(f"engine stdout is not JSON: {exc}", proc.stderr) from exc
+
+
+def _validate(output: Any, stderr: str) -> dict[str, Any]:
+    errors = list(validator_for("engine_output.schema.json").iter_errors(output))
+    if errors:
+        msg = f"engine output failed schema validation: {errors[0].message}"
+        raise EngineError(msg, stderr)
+    return output
+
+
+def decide(
+    engine_input: dict[str, Any],
+    *,
+    cmd: str | Sequence[str] | None = None,
+    timeout: float = DEFAULT_TIMEOUT_S,
+    env: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """Run the engine on one input and return the validated engine_output.
+
+    env replaces the engine's environment (default: inherit this process's).
+    """
+    output, stderr = _run(engine_input, _command(cmd), timeout, env)
+    return _validate(output, stderr)
+
+
+def decide_batch(
+    engine_inputs: Sequence[dict[str, Any]],
+    *,
+    cmd: str | Sequence[str] | None = None,
+    timeout: float = DEFAULT_BATCH_TIMEOUT_S,
+    env: Mapping[str, str] | None = None,
+) -> list[dict[str, Any]]:
+    """Decide many inputs with ONE engine call (a JSON list on stdin, a list on stdout).
+
+    The result list matches the input order. An empty batch does not start the engine.
+    """
+    if not engine_inputs:
+        return []
+    output, stderr = _run(list(engine_inputs), _command(cmd), timeout, env)
+    if not isinstance(output, list) or len(output) != len(engine_inputs):
+        got = len(output) if isinstance(output, list) else type(output).__name__
+        raise EngineError(f"engine batch returned {got} results for {len(engine_inputs)} inputs")
+    return [_validate(item, stderr) for item in output]

@@ -1,0 +1,18 @@
+# Progress: cloud lane
+
+One line per merged change: date, lane, issue, what changed.
+
+2026-11-07 cloud #27 C1: Events context (append_batch idempotent, read_since), Event schema + payload validators, create_events migration, tests against contracts/examples
+2026-11-07 cloud #28 C2: /health public, DeviceAuth plug (config/devices.exs tokens), POST /sync/heartbeat upsert + PubSub "fleet" broadcast, heartbeats migration, tests
+2026-11-07 cloud #34 C3: POST /sync/events (per-event validation, device_mismatch 403, idempotent acks, PubSub "events" broadcast of newly stored events), Events.append_batch also returns inserted
+2026-11-07 cloud #35 C4: requests read model (Projection.apply_events/rebuild from events only, forward-only status where corrected never moves it, corrections applied to extracted, tier/rule/versions, cross-site duplicate_group), Normalize port passing contracts/vectors, sync/events wired to the projection, tests
+2026-11-07 cloud #39 C5: /fleet LiveView (active<=5min, stale, offline>30min, configurable thresholds + injectable clock), PubSub "fleet" updates + re-age timer, LiveViewTest
+2026-11-07 cloud #47 C6: /records LiveView (search by text/tier/status, detail with rule_id, rules/model versions, full event history) and /activity LiveView (per device: requests logged, decisions, abstains, escalations with laptop timestamps, windowed to the device's latest sync: new events.synced_at column stamped by append_batch, consecutive batches <= 300 s apart count as one sync), RescueCloud.Records context, tests
+2026-11-07 cloud #55 C7: /records subscribes to PubSub "events" and reloads list + open detail (activity already did); LiveViewTest posting to /sync/events updates open /records, detail and /activity
+- C8 #50: GET /sync/down (other devices' assigned/rescued events since cursor, approved versions from config, next_since), DownsyncController, Events.read_down, tests
+- C12 #52: Corrections context (create via Events.append_batch, review queue approve/reject in correction_reviews, export approved to exports/corrections-<date>.jsonl, refuses evals paths), /corrections LiveView, tests
+- C9 #53: replay verifier (RescueCloud.Replay): per rules_version, reads ENGINE_DIST/<v>/manifest.json, runs its entrypoint once per batch via a Port with ONE JSON array of engine_inputs on stdin and ONE JSON array expected on stdout (engine contract); stores match/mismatch/missing_version/error in verifications (events untouched); replay status on /records detail, mismatch count + verify button on /; tests with two contract-shaped fake engines, a tampered event, a line-delimited format regression and the real rescue_engine.fallback CLI
+2026-11-07 cloud #69 C10: RescueCloud.Models (HF puller at pinned 40-hex SHA via Req, :crypto sha256 per file, candidate registry in models table, promotion gate per 05 reading evals/results/summary.json, approved model_version feeds /sync/down), added req dep, tests with Req.Test stubs
+2026-11-07 cloud #71 C11: /evals LiveView (judges' table from evals summary.json, sealed holdout table, candidate history with gate reasons, per-device model version linked to scores, metric click lists failing case ids from per-run result files), RescueCloud.EvalResults reader, tests
+2026-11-07 cloud #130 C13: device auth: laptop-dev-01/dev-token-laptop-dev-01 in dev+test config, DEVICE_TOKENS parsing in runtime.exs now trims whitespace and skips empty/malformed pairs, plug tests (valid, wrong, unknown, missing header, parsing)
+2026-11-07 cloud #131 C14: GET /healthz (no auth, api pipeline) with Repo SELECT 1 check, 200 ok/503 down, tests incl. simulated DB failure

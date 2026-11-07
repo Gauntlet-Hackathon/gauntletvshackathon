@@ -1,0 +1,68 @@
+<!doctype html><html><head><meta charset="utf-8"><style>body{background:#fff;margin:0;padding:24px;font-family:Inter,Arial,sans-serif}h1{font-size:22px;margin:0 0 4px}p{margin:0 0 12px;color:#555;font-size:13px}</style></head><body>
+<h1>Offline rescue triage: field + cloud architecture</h1>
+<p>SLM reads, Mercury decides. Field laptops work offline and sync to the cloud through an outbox. Kafka is the cloud's only source of truth. The cloud UI shows the live fleet, records and model evals. A hosted field instance lets judges try the laptop side live. Models are trained outside this system and pulled from Hugging Face; one ships to laptops only if it passes the eval gate.</p>
+<pre class="mermaid">
+flowchart TB
+  subgraph FIELD["FIELD LAPTOP (works offline)"]
+    direction LR
+    IN["Rescue requests<br/>SMS · posts · forms"] --> GW["API gateway<br/>Python · FastAPI · serves HTMX"]
+    GW --> SLM["SLM (trained in Python)<br/>extracts fields + confidence"]
+    SLM -->|"typed fields only,<br/>never raw text"| DE["Decision engine<br/>Mercury · rules_version stamped"]
+    DE --> LDB[("Local DB · SQLite<br/>events + read view")]
+    LDB --- OB[["Outbox table<br/>same transaction = durable queue"]]
+    OB --> SW["Sync worker<br/>ping /health, backoff,<br/>drain in batches, delete on ack"]
+  end
+  subgraph DEMO["HOSTED FIELD DEMO"]
+    direction LR
+    DF["Field instance, same image as laptop<br/>registered as device demo-field-01"] --> TOG["'Simulate offline' toggle<br/>pauses sync worker: watch outbox<br/>fill, then drain on reconnect"]
+  end
+  TOG ==>|"same sync protocol"| CGW
+  SW ==>|"HTTPS when online<br/>batched · idempotent (ULID)"| CGW
+  CGW -.->|"other sites' assigned / rescued<br/>(down-sync, avoid double dispatch)"| SW
+  subgraph EXT["OUTSIDE THIS SYSTEM"]
+    direction TB
+    HF[("Hugging Face Hub<br/>public model repo, trained separately")]
+    HFD[("Corrections dataset<br/>for the next training run")]
+  end
+  subgraph CLOUD["CLOUD (public URL for judges)"]
+    direction LR
+    CGW["Cloud API gateway<br/>auth per device"] --> K[("Kafka · only source of truth<br/>topic rescue-events, key = ULID<br/>retention forever<br/>+ compacted rescue-state")]
+    K --> RP["Replay verifier<br/>dedupe on ULID ·<br/>re-run decision with SAME rules_version"]
+    BIN[["Versioned Mercury binaries<br/>immutable, tagged by git SHA + hash, signed"]] --> RP
+    RP -->|"mismatch = bug or tampering"| K
+    K --> PRJ["Projection consumer"]
+    PRJ --> VIEW[("Read view · Postgres<br/>disposable, rebuildable from Kafka")]
+    CGW -->|"every ping = heartbeat<br/>device id · outbox backlog ·<br/>rules_version · model_version"| HB[("Kafka topic device-heartbeats")]
+    REG[("Device registry<br/>registered laptops + keys")] --> CGW
+    HB --> PRJ
+    VIEW --> UI["Cloud UI · FastAPI + HTMX<br/>live via SSE (htmx sse extension)"]
+    UI --> P1["Fleet panel<br/>active · stale &gt; X min · offline<br/>last connection, backlog, rules version"]
+    UI --> P2["Field activity since last sync<br/>requests logged offline, decisions, flags"]
+    UI --> P3["Records"]
+    MR[["Model registry<br/>fine-tuned SLM versions, tagged + hashed"]] --> EV
+    PULL["Model puller<br/>pinned repo + revision (commit SHA),<br/>verify file hashes"] --> CAND["Candidate model"]
+    CAND --> EV
+    EV -->|"promotion gate: beats current on<br/>urgent misses + abstain, no regressions"| MR
+    UI --> FIX["Coordinator corrections<br/>fix a field, override a flag"]
+    FIX --> COR[("Kafka topic corrections")]
+    COR --> LQ["Labeling queue<br/>human review · never touches eval sets"]
+    LQ -.->|"export reviewed corrections<br/>as a dataset for separate training"| HFD
+    MR -.->|"approved version pulled on down-sync<br/>laptop keeps previous for rollback"| SW
+    EVS[("Eval sets<br/>public · golden · hard · abstain · sealed holdout")] --> EV
+    EV["Eval runner (batch, per model version)<br/>SLM vs regex vs Opus 5.5 prompt vs generic SLM"] --> ER[("Kafka topic eval-results<br/>keyed by model_version")]
+    ER --> PRJ
+    UI --> P4["Evals panel<br/>urgent misses / 1k · top-20 · field accuracy ·<br/>dedupe · abstain + calibration · consistency · offline"]
+  end
+  HF ==>|"pull new revision"| PULL
+  classDef ext fill:#f0f0f0,stroke:#666,color:#111;
+  class HF,HFD ext
+  classDef field fill:#e8f1ff,stroke:#2f6fd6,color:#111;
+  classDef cloud fill:#eefaf0,stroke:#2e9a4d,color:#111;
+  classDef store fill:#fff5e0,stroke:#c98a00,color:#111;
+  class IN,GW,SLM,DE,SW field
+  class CGW,RP,PRJ,UI,P1,P2,P3,P4,EV,PULL,CAND,FIX,LQ cloud
+  classDef demo fill:#f3e8ff,stroke:#7b3fc4,color:#111;
+  class DF,TOG demo
+  class LDB,OB,K,VIEW,BIN,HB,REG,MR,EVS,ER,COR store
+</pre>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script><script>mermaid.initialize({startOnLoad:true,theme:'default',themeVariables:{fontSize:'18px'},flowchart:{curve:'basis'}});</script></body></html>

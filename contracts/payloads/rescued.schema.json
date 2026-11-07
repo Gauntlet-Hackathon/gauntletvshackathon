@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.rescue.invalid/payloads/rescued.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "rescued_count": {
+      "anyOf": [
+        {
+          "$ref": "../common.schema.json#/$defs/people_count_value"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "note": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "rescued_count",
+    "note"
+  ],
+  "title": "rescued payload"
+}

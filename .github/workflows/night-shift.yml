@@ -44,14 +44,14 @@ jobs:
           # More lanes = more agents in parallel. A person can own several lanes: reuse their token_secret.
           # model = first-try model for the lane (alias like sonnet/opus/haiku or a full model name).
           # Retries and fix-main use ESCALATE_MODEL (default opus); a model:<alias> issue label overrides both.
-          - lane: backend
+          - lane: field
             token_secret: CLAUDE_TOKEN_PAAWAN
             model: sonnet
-          - lane: frontend
-            token_secret: CLAUDE_TOKEN_TYLER
-            model: sonnet
-          - lane: data
+          - lane: cloud
             token_secret: CLAUDE_TOKEN_DEBU
+            model: sonnet
+          - lane: engine
+            token_secret: CLAUDE_TOKEN_TYLER
             model: sonnet
     concurrency:
       group: night-shift-${{ matrix.lane }}

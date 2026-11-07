@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.rescue.invalid/engine_output.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "outcome": {
+      "enum": [
+        "prioritized",
+        "abstain",
+        "not_a_request",
+        "duplicate"
+      ]
+    },
+    "priority_tier": {
+      "anyOf": [
+        {
+          "$ref": "common.schema.json#/$defs/tier"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "rule_id": {
+      "$ref": "common.schema.json#/$defs/rule_id"
+    },
+    "duplicate_of": {
+      "anyOf": [
+        {
+          "$ref": "common.schema.json#/$defs/ulid"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "abstain_reason": {
+      "anyOf": [
+        {
+          "$ref": "common.schema.json#/$defs/abstain_reason"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "follow_up_question": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "rules_version": {
+      "$ref": "common.schema.json#/$defs/rules_version"
+    }
+  },
+  "required": [
+    "outcome",
+    "priority_tier",
+    "rule_id",
+    "duplicate_of",
+    "abstain_reason",
+    "follow_up_question",
+    "rules_version"
+  ],
+  "title": "engine output",
+  "description": "Exactly one outcome per input. priority_tier is kept on duplicate outcomes.",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "prioritized"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "priority_tier": {
+            "$ref": "common.schema.json#/$defs/tier"
+          },
+          "duplicate_of": {
+            "type": "null"
+          },
+          "abstain_reason": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "duplicate"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "priority_tier": {
+            "$ref": "common.schema.json#/$defs/tier"
+          },
+          "duplicate_of": {
+            "$ref": "common.schema.json#/$defs/ulid"
+          },
+          "abstain_reason": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "abstain"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "priority_tier": {
+            "type": "null"
+          },
+          "duplicate_of": {
+            "type": "null"
+          },
+          "abstain_reason": {
+            "$ref": "common.schema.json#/$defs/abstain_reason"
+          },
+          "follow_up_question": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "not_a_request"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "priority_tier": {
+            "type": "null"
+          },
+          "duplicate_of": {
+            "type": "null"
+          },
+          "abstain_reason": {
+            "type": "null"
+          },
+          "follow_up_question": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "rules_version": "rules@a1b2c3d+bin:9f8e7d6c5b4a3f21",
+  "rules_sha": "a1b2c3d",
+  "bin_hash": "9f8e7d6c5b4a3f21",
+  "engine_kind": "python",
+  "entrypoint": "python -m rescue_engine.cli",
+  "built_at": "2026-11-07T09:30:00Z"
+}

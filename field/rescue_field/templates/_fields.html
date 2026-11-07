@@ -1,0 +1,9 @@
+<table class="fields">
+  <tr><th>location</th><td>{{ e.location.text }} ({{ e.location.type }})</td><td>{{ e.location.confidence }}</td></tr>
+  <tr><th>people</th><td>{{ e.people_count.value if e.people_count.value is not none else "unknown" }}</td><td>{{ e.people_count.confidence }}</td></tr>
+  {% for v in e.vulnerable %}<tr><th>vulnerable</th><td>{{ v.kind }}</td><td>{{ v.confidence }}</td></tr>{% endfor %}
+  {% for h in e.hazards %}<tr><th>hazard</th><td>{{ h.kind }}</td><td>{{ h.confidence }}</td></tr>{% endfor %}
+  <tr><th>time</th><td>{{ e.time_ref.text }}{% if e.time_ref.is_stale_post %} (stale){% endif %}</td><td>{{ e.time_ref.confidence }}</td></tr>
+  <tr><th>is request</th><td>{{ e.is_request.value }}</td><td>{{ e.is_request.confidence }}</td></tr>
+  {% for n in e.needs %}<tr><th>need</th><td>{{ n.kind }}{% if n.hours_without is not none %} ({{ n.hours_without }}h){% endif %}</td><td></td></tr>{% endfor %}
+</table>

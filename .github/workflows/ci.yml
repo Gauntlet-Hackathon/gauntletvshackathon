@@ -1,6 +1,13 @@
-# Template CI. Replace the test step with your stack's real commands once Wave 0 picks the stack.
+# CI for every lane. Four jobs:
+#   python  ruff + pytest for shared/ field/ engine/ evals/, plus the night-shift picker tests
+#   cloud   the Phoenix app (format, compile with warnings as errors, mix test) against Postgres 16
+#   test    the one required status check (branch protection requires `test` and `verdict`):
+#           it passes only when `python` and `cloud` both pass
+#   mercury-spike  installs mmc and builds engine/mercury/hello.m (W0-5)
 # The night-shift picker reads this workflow's runs on main to decide whether main is green,
 # so keep the file name (or set the CI_WORKFLOW repo variable to the new name).
+# Tests marked `slow` (real model downloads) are skipped: pyproject.toml sets -m 'not slow'.
+# Keep the install and BEAM setup steps in step with the agent job in night-shift-lane.yml.
 
 name: CI
 
@@ -13,27 +20,90 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  python:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Picker unit tests
-        run: python3 -m unittest discover -s .github/night-shift/tests -v
-      # REHEARSAL stack: plain-Python tests in each lane folder. Replace in Wave 0 with the real stack.
-      - name: Lane tests
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            constraints.txt
+            */requirements.txt
+      - name: Install
         run: |
-          for d in server web data; do
-            if [ -d "$d" ]; then python3 -m unittest discover -s "$d" -p 'test_*.py' -v; fi
-          done
-      # >>> EDIT: add your project's install, lint, unit, contract and e2e-smoke commands, e.g.
-      # - uses: actions/setup-node@v4
-      #   with: { node-version: 22, cache: npm }
-      # - run: npm ci
-      # - run: npm run lint
-      # - run: npm test
+          python -m pip install --upgrade pip
+          pip install -c constraints.txt --group dev \
+            -r shared/requirements.txt -r field/requirements.txt \
+            -r engine/requirements.txt -r evals/requirements.txt
+      - name: Lint (ruff)
+        run: ruff check shared field engine evals
+      - name: Tests (pytest)
+        run: pytest shared field engine evals
+      - name: Night-shift picker tests
+        run: python -m unittest discover -s .github/night-shift/tests -v
 
-  # W0-5 go/no-go (#24). A separate job so its install time does not add to the `test` job.
+  cloud:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MIX_ENV: test
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432
+    defaults:
+      run:
+        working-directory: cloud
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          version-file: cloud/.tool-versions
+          version-type: strict
+      - uses: actions/cache@v4
+        with:
+          path: |
+            cloud/deps
+            cloud/_build
+          key: mix-${{ runner.os }}-${{ hashFiles('cloud/.tool-versions', 'cloud/mix.lock') }}
+          restore-keys: |
+            mix-${{ runner.os }}-
+      - run: mix deps.get
+      - name: Format
+        run: mix format --check-formatted
+      - name: Compile (warnings are errors)
+        run: mix compile --warnings-as-errors
+      - name: Tests
+        run: mix test
+
+  test:
+    if: always()
+    needs: [python, cloud]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: All CI jobs passed
+        env:
+          PYTHON: ${{ needs.python.result }}
+          CLOUD: ${{ needs.cloud.result }}
+        run: |
+          echo "python: $PYTHON, cloud: $CLOUD"
+          [ "$PYTHON" = "success" ] && [ "$CLOUD" = "success" ]
+
+  # W0-5 go/no-go (#24). Not in `test`'s needs, but a failure here still fails the run, which the picker reads as main red.
   mercury-spike:
     runs-on: ubuntu-latest
     timeout-minutes: 15
