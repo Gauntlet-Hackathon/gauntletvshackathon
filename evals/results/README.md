@@ -82,8 +82,9 @@ the tables above are from before the change; every column is re-run on the new s
 
 ### All columns on the current split (2026-11-07, main at d6b1122)
 
-Test splits of B (49), C (58, after the split change) and D (41); same runner and frozen Mercury engine for every
-column. Keyword and gold extraction: `python -m rescue_evals.runner --system regex-baseline|gold-extraction --sets B,C,D`.
+Test splits of B (49), C (58, after the split change) and D (41); same runner for every column. v3 and laya-s13
+decide through the frozen Mercury build (`ENGINE_CMD`); keyword, gold extraction and Opus decide in-process with the
+Python fallback engine the build was made from (their result files show the placeholder `rules_version`). Keyword and gold extraction: `python -m rescue_evals.runner --system regex-baseline|gold-extraction --sets B,C,D`.
 v3 and laya-s13: `HF_REPO=paawandesai/rescue-tagger HF_REVISION=<sha> HF_MODEL_DIR=<snapshot> ENGINE_CMD=engine/dist/<build>/bin/mercury_engine
 python -m rescue_evals.runner --system ours --sets B,C,D` (needs an HF token to download the gated checkpoint; result
 files not committed, both checkpoints report as system `ours`). Opus is the stored `opus__*.json`. Pooled = the
