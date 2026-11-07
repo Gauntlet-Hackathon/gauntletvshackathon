@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from fastapi.testclient import TestClient
 
 from rescue_field.api import create_app
-from rescue_field.shell import connection_line, shell_config
+from rescue_field.shell import connection_line, initials, shell_config
 from rescue_field.store import EventStore
 
 
@@ -24,7 +24,7 @@ def test_shell_renders_without_banner():
     assert r.status_code == 200
     assert "model-banner" not in r.text
     assert "Queue" in r.text and "Respond" in r.text
-    assert "Not connected to the ECC · 0 waiting" in r.text
+    assert "Not connected to the ECC · 0 updates saved on this laptop" in r.text
     assert "ECC 1" in r.text and "Volunteer" in r.text
 
 
@@ -80,6 +80,24 @@ def test_connection_lines():
     online = {"state": "online", "last_sync_at": "2026-11-07T12:00:00Z", "backlog": 0}
     assert connection_line(online, now)["text"] == "Online · last sync 2 min ago"
     offline = connection_line({"state": "offline", "backlog": 3})
-    assert offline["text"] == "No Internet: Local Store, Sync when online · 3 waiting"
+    assert offline["text"] == "No Internet: Local Store, Sync when online · 3 updates waiting"
     nosync = connection_line({"state": "no-sync", "backlog": 1})
-    assert nosync["text"] == "Not connected to the ECC · 1 waiting"
+    assert nosync["text"] == "Not connected to the ECC · 1 update saved on this laptop"
+    busy = {"state": "online", "last_sync_at": "2026-11-07T12:00:00Z", "backlog": 4}
+    assert connection_line(busy, now)["text"] == "Online · last sync 2 min ago · 4 updates to send"
+
+
+def test_initials():
+    assert initials("Sam K.") == "SK"
+    assert initials("Jordan Lee Kim") == "JK"
+    assert initials("riley") == "R"
+    assert shell_config({"VOLUNTEER_NAME": "Pat Q."})["initials"] == "PQ"
+
+
+def test_header_who_block_and_segmented_toggle():
+    html = client().get("/app?mode=respond").text
+    assert '<span class="avatar" aria-hidden="true">' in html
+    assert '<span class="who-sub">Volunteer</span><span class="who-sub">ECC 1</span>' in html
+    assert '<a href="/app?mode=respond" class="selected" aria-current="page">Respond</a>' in html
+    css = client().get("/static/app.css").text
+    assert "#E9EBEF" in css and "#0A3A8C" in css

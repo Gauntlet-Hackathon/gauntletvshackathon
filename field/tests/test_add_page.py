@@ -1,4 +1,5 @@
 import json
+import re
 import shutil
 import subprocess
 import textwrap
@@ -53,6 +54,10 @@ def test_page_served(client):
         "Folded into another card",
     ]
     assert "call_note" in cfg["channels"]
+    for value, words in (("sms", "Text message"), ("social", "Social post"), ("form", "Web form"),
+                         ("call_note", "Call note"), ("csv", "CSV")):
+        if value in cfg["channels"]:
+            assert re.search(rf'<option value="{value}"( selected)?>{words}</option>', html), value
     assert client.get("/static/add.js").status_code == 200
 
 
