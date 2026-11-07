@@ -20,7 +20,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
-from rescue_field.status import current_status
+from rescue_field.status import ORDER, RANK, current_status
 from rescue_field.store import EventStore
 from rescue_shared import logic
 
@@ -87,6 +87,12 @@ def _follow_up_key(r: dict[str, Any]) -> tuple[int, tuple[int, int, str, str]]:
     return rank, logic.within_tier_sort_key(r["extracted"], r["received_at"], r["request_id"])
 
 
+def allowed_statuses(current: str | None) -> list[str]:
+    """Statuses the order accepts next: strictly above `current` (any when it is None)."""
+    floor = RANK.get(current, 0) if current else 0
+    return [s for s in ORDER if RANK[s] > floor]
+
+
 def build_board(store: EventStore) -> dict[str, Any]:
     """{"tiers": [{"tier", "rows"}...], "follow_ups": [...], "counts": {...}}."""
     recs = _requests(store)
@@ -114,7 +120,15 @@ def build_board(store: EventStore) -> dict[str, Any]:
         shown = next(
             (m for m in [rec, *dups] if m["decision"]["priority_tier"] == tier), rec
         )
-        by_tier[tier].append({**rec, "tier": tier, "tier_source": shown, "duplicates": dups})
+        by_tier[tier].append(
+            {
+                **rec,
+                "tier": tier,
+                "tier_source": shown,
+                "duplicates": dups,
+                "allowed": allowed_statuses(rec["status"]),
+            }
+        )
     for rows in by_tier.values():
         rows.sort(
             key=lambda r: logic.within_tier_sort_key(

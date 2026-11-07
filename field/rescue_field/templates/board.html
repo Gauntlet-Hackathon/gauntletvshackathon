@@ -12,7 +12,7 @@ body { font-family: system-ui, sans-serif; margin: 1rem auto; max-width: 60rem; 
 .dups { margin: .3rem 0 0 1rem; font-size: .9rem; }
 table { border-collapse: collapse; } td, th { padding: .1rem .6rem .1rem 0; text-align: left; }
 .badge { display: inline-block; padding: .15rem .6rem; border-radius: 1rem; font-size: .85rem; }
-#intake-error { color: #b00020; } #intake form { margin: .6rem 0; }
+#intake-error, #status-error { color: #b00020; } #intake form { margin: .6rem 0; }
 .badge-online { background: #c8e6c9; } .badge-offline { background: #ffcdd2; } .badge-nosync { background: #eee; }
 </style>
 </head>
@@ -22,6 +22,7 @@ table { border-collapse: collapse; } td, th { padding: .1rem .6rem .1rem 0; text
 {% if demo_mode %}<p><button type="button" id="offline-toggle">Simulate offline</button> <span id="offline-toggle-msg" role="alert"></span></p>
 {% endif %}
 {% include "_intake.html" %}
+<p id="status-error" role="alert"></p>
 <div id="board">{% include "_board.html" %}</div>
 <script>
 async function refreshBadge() {
@@ -104,6 +105,38 @@ async function submitIntake(ev) {
   }
 }
 document.querySelectorAll("#intake form").forEach(f => f.addEventListener("submit", submitIntake));
+async function submitStatus(ev) {
+  const form = ev.target.closest("form.status-form");
+  if (!form) return;
+  ev.preventDefault();
+  const btn = ev.submitter;
+  if (!btn || btn.disabled) return;
+  const err = document.getElementById("status-error");
+  const status = btn.value, body = {status};
+  const field = {assigned: "crew", escalated: "reason", rescued: "rescued_count"}[status];
+  const val = form.elements[field].value.trim();
+  if (field === "rescued_count") { if (val !== "") body[field] = Number(val); } else body[field] = val;
+  err.textContent = "";
+  btn.disabled = true;
+  try {
+    const resp = await fetch("/requests/" + encodeURIComponent(form.dataset.requestId) + "/status",
+      {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+    let data = null;
+    try { data = await resp.json(); } catch (e) {}
+    if (!resp.ok) {
+      err.textContent = (data && (data.detail || data.error)) || ("Request failed (HTTP " + resp.status + ")");
+      btn.disabled = false;  // keep what the user typed; no re-render
+      return;
+    }
+    const r = await fetch("/", {headers: {"HX-Request": "true"}});
+    if (!r.ok) throw new Error("board refresh failed (HTTP " + r.status + ")");
+    document.getElementById("board").innerHTML = await r.text();
+  } catch (e) {
+    err.textContent = "Error: " + e.message;
+    btn.disabled = false;
+  }
+}
+document.getElementById("board").addEventListener("submit", submitStatus);
 refreshBadge(); setInterval(refreshBadge, 2000);
 </script>
 </body>
