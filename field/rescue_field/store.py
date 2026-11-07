@@ -30,9 +30,13 @@ CREATE TABLE IF NOT EXISTS outbox (
 
 
 class EventStore:
-    def __init__(self, path: str | Path = ":memory:") -> None:
+    def __init__(self, path: str | Path = ":memory:", *, check_same_thread: bool = True) -> None:
         # isolation_level=None: we manage transactions explicitly.
-        self._conn = sqlite3.connect(str(path), isolation_level=None)
+        # check_same_thread=False lets a web server use the store from worker threads; the
+        # caller must then serialize access (the field API holds a lock).
+        self._conn = sqlite3.connect(
+            str(path), isolation_level=None, check_same_thread=check_same_thread
+        )
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.executescript(_SCHEMA)
