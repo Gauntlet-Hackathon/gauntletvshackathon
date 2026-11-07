@@ -222,10 +222,10 @@ defmodule RescueCloud.ReplayTest do
       decided("DR", @v1, 3, "P1", "R-P1-ALL")
       |> put_in(["payload", "engine_input", "context", "thresholds", "hazard_firm_min"], 0.5)
 
-    sync!([decided("OK", @v1, 3, "P1", "R-P1-ALL"), drifted])
+    sync!([decided("GD", @v1, 3, "P1", "R-P1-ALL"), drifted])
 
     assert {:ok, %{"match" => 1, "mismatch" => 1}} = Replay.verify(engine_dist: dist)
-    assert statuses() == %{rid("OK") => "match", rid("DR") => "mismatch"}
+    assert statuses() == %{rid("GD") => "match", rid("DR") => "mismatch"}
 
     assert Repo.get_by!(Verification, request_id: rid("DR")).detail ==
              "context.thresholds differ from the build's frozen config"
