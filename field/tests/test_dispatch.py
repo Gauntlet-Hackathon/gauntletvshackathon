@@ -259,7 +259,7 @@ def test_couldnt_get_there_keeps_priority_and_goes_to_top(store, client):
     html = client.get("/").text
     assert next_id(html) == rid
     card = section(html, "next").split("next-item")[1]
-    assert "Couldn&#39;t get there" in card and "second crew" in card
+    assert "Couldn&#39;t get there" in card and "Send another crew" in card
 
 
 def test_outcome_needs_its_fields_and_keeps_typed(store, client):
@@ -318,6 +318,9 @@ def test_second_crew_after_couldnt_get_there(store, client):
     rid = add(store, out("P1", "R-P1-01"), ext(people=4))
     assign(client, rid)
     assert update(client, rid, outcome="noreach", reason="Bridge under water").status_code == 200
+    home = client.get("/").text
+    assert f'href="/requests/{rid}/send">Send another crew</a>' in home
+    assert "cannot be sent from this laptop" not in home
     page = client.get(f"/requests/{rid}/send")
     assert page.status_code == 200
     r = assign(client, rid, crew="Second boat")
