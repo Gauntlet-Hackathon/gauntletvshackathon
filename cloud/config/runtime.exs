@@ -41,6 +41,20 @@ if config_env() == :dev do
 end
 
 if config_env() == :prod do
+  case System.get_env("DEVICE_TOKENS") do
+    nil ->
+      :ok
+
+    raw ->
+      devices =
+        for pair <- String.split(raw, ",", trim: true),
+            [id, token] = String.split(pair, ":", parts: 2),
+            into: %{},
+            do: {id, token}
+
+      config :rescue_cloud, :devices, devices
+  end
+
   database_url =
     System.get_env("DATABASE_URL") ||
       raise """
