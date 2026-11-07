@@ -16,11 +16,14 @@ import time
 from collections.abc import Callable, Mapping
 from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import httpx
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 
 from rescue_field.store import EventStore
 
@@ -250,6 +253,7 @@ def worker_from_env(
 # ---- routes ----------------------------------------------------------------------------
 
 router = APIRouter()
+_templates = Jinja2Templates(directory=str(Path(__file__).with_name("templates")))
 
 
 def _worker(request: Request) -> SyncWorker | None:
@@ -262,6 +266,27 @@ async def sync_status(request: Request) -> Any:
     if worker is None:
         return {"running": False, "paused": False, "online": False}
     return worker.status()
+
+
+def _badge_ctx(request: Request) -> dict[str, Any]:
+    worker = _worker(request)
+    if worker is None:
+        return {"state": "no-sync", "paused": False, "last_sync_at": None, "backlog": 0}
+    st = worker.status()
+    online = st["online"] and not st["paused"]
+    return {
+        "state": "online" if online else "offline",
+        "paused": st["paused"],
+        "last_sync_at": st["last_sync_at"],
+        "backlog": st["outbox_backlog"],
+    }
+
+
+@router.get("/sync/badge", response_class=HTMLResponse)
+async def sync_badge(request: Request) -> HTMLResponse:
+    """Live sync badge fragment (online/offline + outbox backlog) the board polls."""
+    ctx = await run_in_threadpool(_badge_ctx, request)
+    return _templates.TemplateResponse(request, "_sync_badge.html", ctx)
 
 
 @router.post("/sync/offline-toggle")

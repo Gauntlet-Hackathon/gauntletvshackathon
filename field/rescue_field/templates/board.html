@@ -11,10 +11,22 @@ body { font-family: system-ui, sans-serif; margin: 1rem auto; max-width: 60rem; 
 .meta { color: #555; font-size: .85rem; }
 .dups { margin: .3rem 0 0 1rem; font-size: .9rem; }
 table { border-collapse: collapse; } td, th { padding: .1rem .6rem .1rem 0; text-align: left; }
+.badge { display: inline-block; padding: .15rem .6rem; border-radius: 1rem; font-size: .85rem; }
+.badge-online { background: #c8e6c9; } .badge-offline { background: #ffcdd2; } .badge-nosync { background: #eee; }
 </style>
 </head>
 <body>
 <h1>Rescue triage board</h1>
+<div id="sync-badge"></div>
 <div id="board">{% include "_board.html" %}</div>
+<script>
+async function refreshBadge() {
+  try {
+    const r = await fetch("/sync/badge");
+    if (r.ok) document.getElementById("sync-badge").innerHTML = await r.text();
+  } catch (e) {}
+}
+refreshBadge(); setInterval(refreshBadge, 2000);
+</script>
 </body>
 </html>
