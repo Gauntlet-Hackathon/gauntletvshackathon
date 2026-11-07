@@ -1,0 +1,93 @@
+{% extends "app/_shell.html" %}
+{% block title %}Respond · CommunityRescue{% endblock %}
+{% block content %}
+<style>
+.pill { display: inline-block; padding: .2rem .7rem; border-radius: 1rem; font-weight: 700; }
+.pill-P1 { background: #B00020; color: #FFFFFF; }
+.pill-P2 { background: #FFE8B3; color: #4A3200; }
+.pill-P3 { background: #E9EBEF; color: #111418; }
+.incident { display: inline-block; padding: .1rem .5rem; border: 2px solid #111418; border-radius: 6px; font-weight: 700; letter-spacing: .04em; }
+.osm { display: flex; gap: 4px; }
+.osm button { flex: 1 1 0; min-height: 44px; border: 0; border-radius: 8px; font: 700 .75rem "Atkinson Hyperlegible", system-ui, sans-serif; background: #E9EBEF; color: #4A5260; cursor: pointer; }
+.osm button[aria-pressed="true"] { background: #0B57D0; color: #FFFFFF; }
+.radio-line { margin: 0; font-size: 1rem; line-height: 1.45; background: #111418; color: #FFFFFF; border-radius: 12px; padding: .75rem; }
+.respond-form { display: flex; flex-direction: column; gap: .4rem; margin: .5rem 0; }
+.btn-secondary { background: #FFFFFF; color: #0B57D0; border: 2px solid #0B57D0; }
+</style>
+
+<form id="crew-form" method="get" action="/respond" class="card">
+<label for="crew-input"><strong>Your boat</strong></label>
+{% if boats %}
+<div class="respond-form" role="group" aria-label="Pick your boat">
+{% for b in boats %}<a class="chip{% if crew and b|lower == crew|lower %} selected{% endif %}" href="/respond?crew={{ b | urlencode }}">{{ b }}</a>
+{% endfor %}
+</div>
+{% endif %}
+<input id="crew-input" type="text" name="crew" value="{{ crew }}" placeholder="Or type your crew name" maxlength="60">
+<button class="btn btn-secondary" type="submit">Use this name</button>
+</form>
+
+{% if not crew %}
+<h1>Pick your boat</h1>
+<p class="muted">Pick a boat or type your crew name to see the job dispatch sent you.</p>
+{% elif not job %}
+<h1>No job right now</h1>
+<p class="card">Dispatch will send your next job here. Stay near the launch and keep your radio on.</p>
+{% else %}
+<h1 id="respond-headline">Dispatch sent you a rescue</h1>
+<p id="respond-error" class="banner" role="alert" hidden></p>
+<p id="respond-ok" class="card" role="status" hidden></p>
+
+<div>
+<span id="osm-label" class="muted"><strong>Operational Status Messages (OSM)</strong></span>
+<div class="osm" role="group" aria-labelledby="osm-label">
+{% for key, label in osm %}<button type="button" data-step="{{ key }}" aria-pressed="false">{{ label }}</button>{% endfor %}
+</div>
+</div>
+
+<article class="card" id="job" data-request-id="{{ job.request_id }}">
+<p><span class="pill pill-{{ job.tier }}">{{ job.pill }}</span>
+<span class="incident" aria-label="Incident {{ job.incident }}">#{{ job.incident }}</span></p>
+<p class="address"><strong>{{ job.place }}</strong></p>
+{% if job.details %}<ul>
+{% for d in job.details %}<li>{{ d }}</li>
+{% endfor %}</ul>{% endif %}
+{% if job.contact %}<p><strong>Call when close: {{ job.contact }}</strong></p>{% endif %}
+</article>
+{% if job.more %}<p class="muted">{{ job.more }} more job{{ "s" if job.more != 1 }} for {{ crew }} after this one.</p>{% endif %}
+
+<div id="radio" hidden>
+<p class="muted"><strong>Tell dispatch (radio or text)</strong></p>
+<p id="radio-line" class="radio-line"></p>
+<button id="radio-copy" class="btn btn-secondary" type="button">Copy</button>
+</div>
+
+<section id="outcomes" hidden>
+<h2>How did it go?</h2>
+<form class="respond-form card" data-kind="all">
+<label>People brought out <input type="number" name="count" min="0" max="100000" required value="{{ job.people if job.people is not none else '' }}"></label>
+<label>Taken to <select name="shelter">
+{% for s in shelter_names %}<option>{{ s }}</option>
+{% endfor %}</select></label>
+<button class="btn btn-primary" type="submit">Got everyone out</button>
+</form>
+<form class="respond-form card" data-kind="some">
+<label>How many did you get out? <input type="number" name="count" min="0" max="100000" required></label>
+<button class="btn btn-secondary" type="submit">Got some out</button>
+</form>
+<form class="respond-form" data-kind="nobody">
+<button class="btn btn-secondary" type="submit">Nobody there</button>
+</form>
+<form class="respond-form card" data-kind="noreach">
+<label>What stopped you? <input type="text" name="reason" maxlength="200"></label>
+<button class="btn btn-secondary" type="submit">Couldn't get there</button>
+</form>
+</section>
+
+<form class="respond-form" data-kind="decline">
+<button class="btn btn-secondary" type="submit">I can't take this one</button>
+</form>
+{% endif %}
+<script id="respond-config" type="application/json">{{ config_json | safe }}</script>
+<script src="/static/respond.js"></script>
+{% endblock %}
