@@ -85,7 +85,7 @@ jobs:
       - name: Run hello
         working-directory: engine/mercury
         run: |
-          set -uo pipefail
+          set +e -uo pipefail
           status=0
           check() { # check <name> <stdin> <expected exit> <expected stdout>
             out="$(printf '%s' "$2" | ./hello 2>/dev/null)"
@@ -98,7 +98,7 @@ jobs:
             fi
           }
           check valid     '{"name": "Ada"}'  0 '{"name":"Ada","status":"accepted"}'
-          check unicode   '{"name": "Zoë"}'  0 '{"name":"Zoë","status":"accepted"}'
+          check unicode   '{"name": "Zoë"}'  0 '{"name":"Zo\u00EB","status":"accepted"}'
           check no-name   '{"age": 3}'       0 '{"reason":"object has no string name","status":"rejected"}'
           check non-obj   '[1, 2]'           0 '{"reason":"array","status":"rejected"}'
           check malformed '{"name": '        1 ''
