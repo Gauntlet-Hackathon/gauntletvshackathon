@@ -34,6 +34,7 @@ from rescue_field import engine_client, freeze
 from rescue_field import shell as shell_module
 from rescue_field import status as status_module
 from rescue_field import sync as sync_module
+from rescue_field import volunteer as volunteer_module
 from rescue_field.pipeline import (
     BatchDecider,
     EngineInputError,
@@ -503,6 +504,7 @@ def create_app(
     app.include_router(board_module.router)
     app.include_router(status_module.router)
     app.include_router(shell_module.router)
+    app.include_router(volunteer_module.router)
     app.mount("/static", StaticFiles(directory=str(shell_module.STATIC_DIR)), name="static")
     return app
 

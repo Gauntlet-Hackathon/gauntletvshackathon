@@ -1,0 +1,69 @@
+{% extends "app/_shell.html" %}
+{% block title %}Queue · CommunityRescue{% endblock %}
+{% block content %}
+<nav class="queue-tabs" aria-label="Queue">
+<button type="button" class="tab selected" data-tab="next" aria-pressed="true">Next</button>
+<button type="button" class="tab" data-tab="waiting" aria-pressed="false">Waiting (<span id="n-waiting">{{ queue.next|length + queue.check_first|length }}</span>)</button>
+<button type="button" class="tab" data-tab="out" aria-pressed="false">Out now (<span id="n-out">{{ queue.out_now|length }}</span>)</button>
+</nav>
+<div id="queue" aria-live="polite">{% include "app/_queue.html" %}</div>
+<script>
+(function () {
+  // Client-side only: skipping and switching tabs never write anything.
+  const skipped = [];  // request IDs in the order they were skipped
+  let tab = "next";
+  function apply() {
+    const box = document.getElementById("queue");
+    const cards = [...box.querySelectorAll(".next-card")];
+    const ids = cards.map((c) => c.dataset.requestId);
+    const fresh = ids.filter((id) => !skipped.includes(id));
+    const current = fresh[0] || skipped.find((id) => ids.includes(id)) || null;
+    cards.forEach((c) => { c.hidden = c.dataset.requestId !== current; });
+    box.querySelectorAll(".waiting-item").forEach((w) => { w.hidden = w.dataset.requestId === current; });
+    box.querySelectorAll(".screen").forEach((s) => { s.hidden = s.dataset.screen !== tab; });
+    document.querySelectorAll(".queue-tabs .tab").forEach((t) => {
+      const on = t.dataset.tab === tab;
+      t.classList.toggle("selected", on); t.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    const counts = document.getElementById("counts");
+    if (counts) {
+      document.getElementById("n-waiting").textContent = counts.dataset.waiting;
+      document.getElementById("n-out").textContent = counts.dataset.out;
+    }
+    return current;
+  }
+  document.addEventListener("click", async (ev) => {
+    const t = ev.target.closest("button, a");
+    if (!t) return;
+    if (t.id === "skip") {
+      const cur = apply();
+      if (cur) { const i = skipped.indexOf(cur); if (i > -1) skipped.splice(i, 1); skipped.push(cur); }
+      apply();
+    } else if (t.classList.contains("tab")) {
+      tab = t.dataset.tab; apply();
+    } else if (t.classList.contains("copy")) {
+      try { await navigator.clipboard.writeText(t.dataset.copy); t.textContent = "Copied"; }
+      catch (e) { t.textContent = "Copy failed: select the text"; }
+    } else if (t.classList.contains("recheck")) {
+      ev.preventDefault();
+      try { await fetch("/requests/" + t.dataset.requestId + "/recheck", {method: "POST"}); } catch (e) {}
+      refresh();
+    }
+  });
+  async function refresh() {
+    try {
+      const r = await fetch("/", {headers: {"HX-Request": "true"}});
+      if (!r.ok) return;
+      const open = [...document.querySelectorAll("#queue details[open]")].map((d) => d.className + (d.closest("[data-request-id]")?.dataset.requestId || ""));
+      document.getElementById("queue").innerHTML = await r.text();
+      document.querySelectorAll("#queue details").forEach((d) => {
+        if (open.includes(d.className + (d.closest("[data-request-id]")?.dataset.requestId || ""))) d.open = true;
+      });
+      apply();
+    } catch (e) { /* offline or busy: keep the last view */ }
+  }
+  apply();
+  setInterval(refresh, {{ refresh_seconds * 1000 }});
+})();
+</script>
+{% endblock %}

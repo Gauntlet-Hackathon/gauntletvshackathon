@@ -48,3 +48,32 @@ a { color: var(--blue); }
 a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
   outline: 3px solid var(--blue); outline-offset: 2px; }
 img { max-width: 100%; }
+/* Queue mode (UI-2). Pairs: #FFFFFF on urgent red #B00020 7.3:1 (Needs help now), #FFFFFF on #8A4B00 6.8:1
+   (Needs help soon), ink on #E7F3E8 16.2:1 (Can wait), #5C3300 on #FFF4E5 10.0:1 (Check first, maybe pill),
+   ink on #FFFFFF 18.5:1 (Set aside, incident badge), #FFFFFF on ink 18.5:1 (Couldn't get there). */
+.queue-tabs { display: flex; gap: .4rem; margin: .6rem 0; }
+.queue-tabs .tab { flex: 1; min-height: 48px; border-radius: 12px; border: 2px solid var(--line); background: var(--white);
+  color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; }
+.queue-tabs .tab.selected { border-color: var(--blue); color: var(--blue); }
+.card-top { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin: 0 0 .4rem; }
+.pill { display: inline-block; border-radius: 1rem; padding: .1rem .6rem; font-weight: 700; font-size: .9rem;
+  border: 2px solid transparent; }
+.pill-P1 { background: var(--red); color: var(--white); }
+.pill-P2 { background: #8A4B00; color: var(--white); }
+.pill-P3 { background: var(--green); color: var(--ink); }
+.pill-check { background: var(--amber-bg); color: var(--amber-ink); }
+.pill-provisional { background: var(--white); color: var(--amber-ink); border: 2px dashed var(--amber-ink); }
+.pill-aside { background: var(--white); color: var(--ink); border-color: var(--line); }
+.pill-escalated { background: var(--ink); color: var(--white); }
+.incident { margin-left: auto; font-weight: 700; color: var(--ink); }
+.other-posts { font-size: .9rem; color: var(--muted); }
+.headline { margin: .2rem 0 .5rem; font-size: 1.2rem; }
+.details { margin: .5rem 0; padding-left: 1.2rem; }
+.contact { margin: .3rem 0; font-size: .9rem; }
+.ask { background: var(--amber-bg); color: var(--amber-ink); border-radius: 8px; padding: .5rem .75rem; margin: .5rem 0; }
+.ask p { margin: .2rem 0; } .ask-label { font-weight: 700; } .question-es { font-style: italic; }
+.ask .btn { min-height: 48px; margin-top: .3rem; }
+.why summary, .original summary, .set-aside summary { min-height: 44px; display: flex; align-items: center; cursor: pointer;
+  color: var(--blue); font-weight: 700; }
+.skip { margin-top: .5rem; }
+.empty { color: var(--muted); text-align: center; padding: 2rem 0; }

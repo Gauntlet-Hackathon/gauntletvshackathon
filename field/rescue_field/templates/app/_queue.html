@@ -1,0 +1,22 @@
+{# Queue fragment: GET / with HX-Request returns only this. The page script picks Next with its skip cursor. #}
+{% set q = queue %}
+<section id="screen-next" class="screen" data-screen="next" aria-label="Next">
+{% for c in q.next %}<div class="next-card" data-request-id="{{ c.id }}"{% if not loop.first %} hidden{% endif %}>{% include "app/_card.html" %}</div>
+{% else %}<p class="empty">Nobody is waiting right now.</p>{% endfor %}
+{% if q.next %}<button type="button" class="btn skip" id="skip">Skip for now, show the next person</button>{% endif %}
+</section>
+<section id="screen-waiting" class="screen" data-screen="waiting" aria-label="Waiting" hidden>
+<h2>Waiting for help</h2>
+{% for c in q.next %}<div class="waiting-item" data-request-id="{{ c.id }}"{% if loop.first %} hidden{% endif %}>{% include "app/_card.html" %}</div>{% endfor %}
+{% if q.check_first %}<h2>Check first</h2>
+{% for c in q.check_first %}{% include "app/_card.html" %}{% endfor %}{% endif %}
+{% if q.set_aside %}<details class="set-aside"><summary>Set aside ({{ q.set_aside|length }})</summary>
+{% for c in q.set_aside %}{% include "app/_card.html" %}{% endfor %}
+</details>{% endif %}
+{% if not (q.next|length > 1 or q.check_first or q.set_aside) %}<p class="empty">Nothing else is waiting.</p>{% endif %}
+</section>
+<section id="screen-out" class="screen" data-screen="out" aria-label="Out now" hidden>
+<h2>Out now</h2>
+{% for c in q.out_now %}{% include "app/_card.html" %}{% else %}<p class="empty">Nobody is out right now.</p>{% endfor %}
+</section>
+<span id="counts" hidden data-waiting="{{ q.next|length + q.check_first|length }}" data-out="{{ q.out_now|length }}"></span>

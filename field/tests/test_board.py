@@ -68,7 +68,7 @@ def store(tmp_path):
 
 def get(store, **kw):
     with TestClient(create_app(store=store)) as client:
-        r = client.get("/", **kw)
+        r = client.get("/board", **kw)
     assert r.status_code == 200, r.text
     return r
 
@@ -235,7 +235,7 @@ from rescue_field import status as status_mod  # noqa: E402
 def post_status(store, rid, body):
     with TestClient(create_app(store=store)) as client:
         r = client.post(f"/requests/{rid}/status", json=body)
-        page = client.get("/")
+        page = client.get("/board")
     assert page.status_code == 200
     return r, page.text
 
@@ -431,7 +431,7 @@ def test_duplicate_that_sets_the_tier_shows_its_question(store):
             r = client.post("/requests", json=body)
             assert r.status_code == 200, r.text
         d = r.json()["decision"]
-        page = client.get("/").text
+        page = client.get("/board").text
     assert (d["outcome"], d["priority_tier"]) == ("duplicate", "P1"), d
     assert d["follow_up_question"]
     p1 = page[page.index('id="tier-P1"') : page.index('id="tier-P2"')]
@@ -469,7 +469,7 @@ def test_offline_button_says_go_back_online_while_paused(store, monkeypatch):
     monkeypatch.setenv("CLOUD_URL", "http://cloud:4000")
     monkeypatch.setenv("DEMO_MODE", "1")
     with TestClient(create_app(store=store, sync_worker_factory=PausedWorker)) as client:
-        page = client.get("/").text
+        page = client.get("/board").text
     assert '<button type="button" id="offline-toggle">Go back online</button>' in page
 
 

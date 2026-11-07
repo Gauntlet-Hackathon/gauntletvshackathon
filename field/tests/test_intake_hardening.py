@@ -69,7 +69,7 @@ def test_single_json_strips_nul_and_lone_surrogates(client, store, body, field, 
     assert r.status_code == 200, r.text
     [payload] = received(store)
     assert payload[field] == expected
-    assert client.get("/").status_code == 200  # the board was a 500 for good (H-02)
+    assert client.get("/board").status_code == 200  # the board was a 500 for good (H-02)
     assert_sendable(store)
 
 
@@ -114,7 +114,7 @@ def test_bulk_paths_strip_nul_and_lone_surrogates(client, store, kwargs):
     for payload in received(store):
         for value in (payload["raw_text"], payload["contact"] or ""):
             assert "\x00" not in value and SURROGATE not in value
-    assert client.get("/").status_code == 200
+    assert client.get("/board").status_code == 200
     assert_sendable(store)
 
 

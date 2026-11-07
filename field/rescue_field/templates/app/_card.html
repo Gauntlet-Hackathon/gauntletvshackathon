@@ -1,0 +1,26 @@
+{# One volunteer card. `c` is a card from volunteer.build_queue. No rule IDs, versions or confidences here. #}
+<article class="card card-{{ c.kind }}" data-request-id="{{ c.id }}"{% if c.tier %} data-tier="{{ c.tier }}"{% endif %}>
+<p class="card-top">
+{% if c.escalated %}<span class="pill pill-escalated">Couldn't get there</span>{% endif %}
+<span class="pill pill-{{ c.kind }}{% if c.tier %} pill-{{ c.tier }}{% endif %}">{{ c.pill }}</span>
+{% if c.provisional %}<span class="pill pill-provisional">{{ c.provisional }}</span>{% endif %}
+{% for q in c.questions %}{% if q.label %}<span class="pill pill-check">{{ q.label }}</span>{% endif %}{% endfor %}
+<span class="incident" aria-label="Incident {{ c.incident }}">#{{ c.incident }}</span>
+{% if c.other_posts %}<span class="other-posts">{{ c.other_posts }}</span>{% endif %}
+</p>
+<h3 class="headline">{{ c.headline }}</h3>
+<p class="address">{% if c.address %}{{ c.address }}{% else %}<span class="muted">No address yet</span>{% endif %}</p>
+<ul class="details">{% for d in c.details %}<li>{{ d }}</li>{% endfor %}</ul>
+<p class="contact muted">{{ c.contact }}</p>
+{% for q in c.questions %}
+<div class="ask">
+<p class="ask-label">Ask them:</p>
+<p class="question" lang="en">{{ q.text }}</p>
+{% if q.es %}<p class="question-es" lang="es">{{ q.es }}</p>{% endif %}
+<button type="button" class="btn copy" data-copy="{{ q.text }}">Copy question</button>
+</div>
+{% endfor %}
+<details class="why"><summary>Why is this one first?</summary><p>{{ c.why }}</p></details>
+{% if c.raw_text %}<details class="original"><summary>Original post</summary><p>{{ c.raw_text }}</p></details>{% endif %}
+{% if recheck %}<p><a href="#" class="recheck" data-request-id="{{ c.id }}">Check again</a></p>{% endif %}
+</article>

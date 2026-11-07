@@ -76,7 +76,7 @@ async function toggleOffline() {
     }
     btn.textContent = body.paused ? "Go back online" : "Simulate offline";
     await refreshBadge();
-    const b = await fetch("/", {headers: {"HX-Request": "true"}});
+    const b = await fetch("/board", {headers: {"HX-Request": "true"}});
     if (b.ok) document.getElementById("board").innerHTML = await b.text();
   } catch (e) {
     msg.textContent = "Error: " + e.message;
@@ -121,7 +121,7 @@ async function submitIntake(ev) {
     const added = body && body.count != null ? body.count : 1;
     status.textContent = "Added " + added + " request" + (added === 1 ? "" : "s");
     form.reset();
-    const r = await fetch("/", {headers: {"HX-Request": "true"}});
+    const r = await fetch("/board", {headers: {"HX-Request": "true"}});
     if (!r.ok) throw new Error("board refresh failed (HTTP " + r.status + ")");
     document.getElementById("board").innerHTML = await r.text();
   } catch (e) {
@@ -155,7 +155,7 @@ async function submitStatus(ev) {
       btn.disabled = false;  // keep what the user typed; no re-render
       return;
     }
-    const r = await fetch("/", {headers: {"HX-Request": "true"}});
+    const r = await fetch("/board", {headers: {"HX-Request": "true"}});
     if (!r.ok) throw new Error("board refresh failed (HTTP " + r.status + ")");
     document.getElementById("board").innerHTML = await r.text();
   } catch (e) {

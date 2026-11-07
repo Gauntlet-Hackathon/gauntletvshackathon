@@ -1,4 +1,5 @@
-"""Coordinator board: GET / ranks requests P1, P2, P3 and lists abstains in a follow-up queue.
+"""Coordinator board (technical view): GET /board ranks requests P1, P2, P3 and lists abstains
+in a follow-up queue.
 
 Everything is derived from the event store. Within a tier the order is
 `rescue_shared.logic.within_tier_sort_key` (04). Requests the engine marked `duplicate` are
@@ -8,8 +9,9 @@ The follow-up queue is sorted by the engine's
 `provisional_tier` (P1 first; DECISIONS R1), then by the same within-tier key; an abstain
 without one (older engine output) sorts after P3. An abstain whose group a later prioritized
 duplicate lifted onto a tier (review O-08) shows its question on that tier row and keeps its
-follow-up entry, marked with the group's tier (`grouped_tier`). `GET /` returns the full page, or
-just the board fragment for an HTMX request (`HX-Request` header), so a page can swap it in place.
+follow-up entry, marked with the group's tier (`grouped_tier`). `GET /board` returns the full
+page, or just the board fragment for an HTMX request (`HX-Request` header), so a page can swap
+it in place.
 
 Cost (review M-04): the event log is read once under the intake lock (one SELECT); the board is
 built from that snapshot in one pass and rendered in a worker thread, both outside the lock, so a
@@ -51,6 +53,8 @@ def _requests(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
             rec["received_at"] = ev["occurred_at"]
             rec["raw_text"] = ev["payload"].get("raw_text")
             rec["channel"] = ev["payload"].get("channel")
+            rec["contact"] = ev["payload"].get("contact")
+            rec["lang_hint"] = ev["payload"].get("lang_hint")
         elif kind == "extracted":
             rec["extracted"] = ev["payload"]
             rec["model_version"] = ev["model_version"]
@@ -204,7 +208,7 @@ def build_board_from_events(events: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-@router.get("/", response_class=HTMLResponse)
+@router.get("/board", response_class=HTMLResponse)
 async def board(request: Request) -> HTMLResponse:
     store = request.app.state.store
     if store is None:

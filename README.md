@@ -37,7 +37,7 @@ cp .env.example .env        # then set SECRET_KEY_BASE (e.g. openssl rand -base6
 docker compose up --build   # services: db, cloud, field
 ```
 
-- Field app: <http://localhost:8000>
+- Field app: <http://localhost:8000> (volunteer queue); technical board: <http://localhost:8000/board>
 - Cloud dashboard: <http://localhost:4000>
 - The field app is registered as the dev device `laptop-dev-01` (token `dev-token-laptop-dev-01`).
 
@@ -64,7 +64,7 @@ pip install -c constraints.txt --group dev -r shared/requirements.txt -r field/r
 From `docs/plan/07-demo-script.md`:
 
 1. **The line.** "Every AI demo assumes you have internet. Disasters are exactly when you don't." The user is a volunteer coordinator at a command post with no signal.
-2. **Board intake.** Open the field app (<http://localhost:8000>). Go offline (with `DEMO_MODE=1` set on the field app, `POST /sync/offline-toggle` pauses sync; the sync badge shows "Offline (simulated)"), then paste a batch of messy requests (or upload a CSV) in the intake panel. The board ranks them: P1s on top, duplicates merged, and a follow-up queue for anything without a location, each with the exact question to text back.
+2. **Board intake.** Open the field board (<http://localhost:8000/board>). Go offline (with `DEMO_MODE=1` set on the field app, `POST /sync/offline-toggle` pauses sync; the sync badge shows "Offline (simulated)"), then paste a batch of messy requests (or upload a CSV) in the intake panel. The board ranks them: P1s on top, duplicates merged, and a follow-up queue for anything without a location, each with the exact question to text back.
 3. **Trust boundary.** Click **Details** on one decision: the extracted fields with confidence, the rule that fired, rules and model versions. The model only reads; readable rules decide.
 4. **Cloud fleet.** Open <http://localhost:4000/fleet>: the device shows as stale with the outbox backlog climbing. Back in the field app toggle offline again to go back online and watch the outbox drain and records appear live under `/records`.
 5. **Replay.** On the cloud dashboard (<http://localhost:4000/>) the replay verifier shows decisions re-run with the same rules version: 0 mismatches.
