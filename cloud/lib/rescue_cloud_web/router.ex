@@ -19,6 +19,7 @@ defmodule RescueCloudWeb.Router do
     pipe_through :api
 
     get "/health", HealthController, :show
+    get "/healthz", HealthController, :healthz
   end
 
   pipeline :device_api do
