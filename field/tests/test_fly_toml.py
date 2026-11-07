@@ -42,7 +42,7 @@ def test_dockerfile_exists_from_repo_root():
 
 def test_vm_has_enough_memory_for_baked_model():
     vm = CFG["vm"][0]
-    assert vm["memory"] == "2gb"
+    assert vm["memory"] == "4gb"
     assert vm["cpus"] == 2
 
 
