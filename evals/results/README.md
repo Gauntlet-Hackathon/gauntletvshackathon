@@ -2,17 +2,37 @@
 
 Baselines are run ahead of time and stored here, never called live (docs/plan/05-evals.md).
 
-## Opus with the rubric (`opus/claude-opus-5-5.jsonl`, `opus__C.json`, `opus__D.json`)
+## Opus with the rubric (`opus/claude-opus-5-5.jsonl`, `opus__B.json`, `opus__C.json`, `opus__D.json`)
 
 - Model `claude-opus-5-5`, run 2026-11-07 on the test splits of the reviewed sets C (61) and D (41), main at 05c16bc.
 - Prompt (`rescue_evals.baselines.llm.build_prompt`): the extraction task, the full decision rubric
   (`docs/plan/04-decision-rubric.md`) and the `extracted` JSON Schema. Opus only extracts; the decision is
   made by the same fallback engine as every other system, so the columns are comparable.
-- 102/102 outputs schema-valid. 281k input / 78k output tokens in total; median 6.5 s per request.
+- Set B (49 test cases, main at 130f9d8) was run separately with `--sets B` into a scratch dir and its rows appended to the same JSONL, so C/D rows were not overwritten; all 49 valid (135k in / 36k out tokens).
+- C/D: 102/102 outputs schema-valid. 281k input / 78k output tokens in total; median 6.5 s per request.
 - Rerun (needs an Anthropic key; Set E is refused):
-  `ANTHROPIC_API_KEY=... PYTHONPATH=shared:field:engine:evals python -m rescue_evals.baselines --system opus --split test --sets C,D`
+  `ANTHROPIC_API_KEY=... PYTHONPATH=shared:field:engine:evals python -m rescue_evals.baselines --system opus --split test --sets B,C,D`
+  (it rewrites the whole `opus/<model>.jsonl` with only the sets you pass)
 - Re-score the stored outputs without the network:
-  `STORED_OUTPUTS=evals/results/opus/claude-opus-5-5.jsonl PYTHONPATH=shared:field:engine:evals python -m rescue_evals.runner --system stored --sets C,D --results-dir /tmp/x`
+  `STORED_OUTPUTS=evals/results/opus/claude-opus-5-5.jsonl PYTHONPATH=shared:field:engine:evals python -m rescue_evals.runner --system stored --sets B,C,D --results-dir /tmp/x`
+
+### Set B (golden, n=49)
+
+| metric | keyword | Opus + rubric | gold extraction |
+|---|---|---|---|
+| outcome accuracy | 0.27 | 0.92 (CI 0.81-0.97) | 0.96 |
+| tier accuracy | 0.19 | 0.89 | 1 |
+| P1 misses /1000 | 327 | 0 | 0 |
+| is_request accuracy | 0.35 | 0.98 | 1 |
+| location exact / partial | 0.88 / 0.92 | 0.88 / 0.98 | 1 / 1 |
+| people count exact | 0.53 | 0.92 | 1 |
+| hazard F1 / vulnerable F1 | 0.77 / 0.74 | 0.90 / 0.84 | 1 / 1 |
+| ECE | 0.20 | 0.11 | 0.15 |
+
+Gold tops out at 47/49 on outcome: B-078 and B-082 are duplicates the single-post runner cannot see.
+The trained models have not been run on Set B yet.
+
+### Sets C and D
 
 | metric | keyword | v3 (pinned) | laya-s13 | Opus + rubric | gold extraction |
 |---|---|---|---|---|---|
