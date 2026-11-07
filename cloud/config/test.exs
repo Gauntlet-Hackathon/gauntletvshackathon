@@ -57,6 +57,7 @@ config :phoenix,
   sort_verified_routes_query_params: true
 
 config :rescue_cloud, :devices, %{
+  "laptop-dev-01" => "dev-token-laptop-dev-01",
   "demo-field-01" => "test-token-field-01",
   "field-03" => "test-token-field-03"
 }
