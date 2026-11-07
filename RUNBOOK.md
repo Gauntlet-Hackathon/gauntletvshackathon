@@ -7,13 +7,13 @@ cron */20 ─► night-shift.yml ─► night-shift-lane.yml, once per lane (one
    job pick     (AGENT_PAT)       .github/night-shift/agent_pick.py: kill switch → lane busy? → main red? → next unblocked issue
                                   writes task.md from the issue + member comments only, records the attempt
    job agent    (Claude token)    claude -p on its own runner, no GitHub write access → result.json + git bundle
-   job publish  (AGENT_PAT)       clean runner: rejects changes to protected paths, pushes, opens PR, auto-merge
+   job publish  (AGENT_PAT)       clean runner: pushes, opens PR, auto-merge
 PR ─► ci.yml (test) + agent-review.yml (verdict, prompt and CLAUDE.md taken from main) ─► auto-merge into main
       failed / conflicted / stale PR ─► picker closes it, issue returns to the queue (max 3 attempts → blocked)
       run that never started (expired token, usage limit, setup failure) ─► refunded, capped at 6 per issue
 ```
 
-**Who holds which secret.** Each lane run gets exactly two secrets (its Claude token and `AGENT_PAT`), and the agent's machine gets only the Claude token. **Protected paths** that agent PRs may never change: `.github/` (workflows, picker, prompts, these tests), any `.claude/` folder, any `CLAUDE.md` or `AGENTS.md`, `.mcp.json`. They control the picker, the review gate and every agent's instructions, so only humans edit them.
+**Who holds which secret.** Each lane run gets exactly two secrets (its Claude token and `AGENT_PAT`), and the agent's machine gets only the Claude token. **There is no protected-path guard** (removed on request): agent PRs may change any file. One limit remains: `AGENT_PAT` has no Workflows permission, so GitHub still rejects an agent push that edits `.github/workflows/`.
 
 ## Setup (about 45 minutes; do it on a throwaway repo first)
 
@@ -63,7 +63,7 @@ PR ─► ci.yml (test) + agent-review.yml (verdict, prompt and CLAUDE.md taken 
 | Every lane skips with "main is red" | Expected: `FIX_LANE` is fixing it. After 3 tries on the same failing commit it stops ("fix-main gave up"); fix main by hand |
 | Every lane skips with "cannot read CI status" | `AGENT_PAT` is missing Actions: read |
 | Night log shows "infra-error" | Lane token expired or plan usage ran out. The attempt wasn't counted; refresh the token or wait for the usage window |
-| "rejected: agent changed a protected path" | Working as intended; make that change yourself |
+| Publish fails when pushing a branch | The agent edited `.github/workflows/`, which `AGENT_PAT` may not push (no Workflows permission); make that change yourself |
 | PR closed with `review-error` label | The review token expired or ran out of usage; the attempt was not counted. Refresh `CLAUDE_TOKEN_REVIEW` |
 | Issue `blocked` after "runs that never started" | That lane's Claude token is expired or out of usage |
 | Branch protection step fails | Private repos on free plans can't use it. Make the repo public for the hackathon |
