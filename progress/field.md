@@ -19,3 +19,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 field #129 F14: tests/test_sync_integration.py: contract-faithful in-process fake cloud (auth, schema validation, dedupe); offline queueing, full drain, 500 retry/lost-ack idempotency, 401 keeps rows, ordering
 2026-11-07 field #152 F15: field/Dockerfile (python:3.12-slim, constraints, PYTHONPATH, uvicorn on $PORT, fallback engine) + root .dockerignore; verified image builds, GET / 200, POST /requests returns fallback-engine decision
 2026-11-07 field #152 F15 re-verify: image rebuilt, GET / 200, POST /requests got fallback-engine decision; added tests/test_dockerfile.py static checks for the Dockerfile/.dockerignore contract
+2026-11-07 field step3-R1: board sorts the follow-up queue by provisional_tier (P1 first, missing last; group takes its highest) then logic.within_tier_sort_key; follow-up card shows the provisional tier; tests in test_board.py
