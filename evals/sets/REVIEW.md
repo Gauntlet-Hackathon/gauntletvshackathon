@@ -35,7 +35,7 @@ tier. Splits: 49 test, 17 train, 16 dev (duplicate groups share a split). Paawan
 | --- | --- | --- | --- |
 | B-023 | prioritized P2 | prioritized P1 | Paawan: immediate medical emergency (her water broke) and the water is rising. The extraction now carries hazard `injury` (the rubric's acute-medical convention), so the engine reaches P1 under R-P1-02. |
 | B-063 | abstain (low_confidence_request) | not a request | Paawan: an explicit test post. The extraction now has `is_request` false at 0.9, so the engine says not a request (R-NAR-01). |
-| B-066 | prioritized P1 | prioritized P1, follow-up `hazard` | Paawan: possible smoke is P1, and confirm the hazard. The engine already does both (R-P1-05 plus its confirm question). |
+| B-066 | prioritized P1 | prioritized P1 (unchanged) | Paawan: possible smoke is P1, and confirm the hazard. The engine already does both (R-P1-05 plus its confirm question). `follow_up_field` stays null because it is scored only on abstain rows (DECISIONS A7). |
 
 Paawan's calls the frozen engine does not make (kept at the engine's P2, as with Sets C and D):
 
