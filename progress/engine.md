@@ -50,3 +50,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 field UI-10 (#303): Spanish line ("En español: …") under each engine follow-up question on the board for Spanish requests; field/rescue_field/words_es.py, English unchanged
 2026-11-07 engine field: boat roster kept on the laptop (UI-4, #295): boats table + /boats screen and JSON routes, seat_warning; never synced
 2026-11-07 field UI-9 (#302): "Check again" button and POST /requests/{id}/recheck re-run the engine on the stored engine_input and report same / differences / rules-version mismatch; writes no event
+2026-11-07 engine field: Add messages screen (UI-6, #299): GET /add (add_page.py, add.html, add.js) sends pasted lines to /requests/bulk in chunks of 10 with 'Sorted N of M', CSV as one upload, single message via /requests; per-group summary (group_of/summarize), failing row shown with its paste line number; tests in field/tests/test_add_page.py (node-driven JS tests skip without node)

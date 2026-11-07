@@ -8,9 +8,17 @@ Tests check the models and the schemas against the same files in contracts/examp
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, ClassVar, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SerializerFunctionWrapHandler,
+    StringConstraints,
+    model_serializer,
+    model_validator,
+)
 
 ULID = Annotated[str, StringConstraints(pattern=r"^[0-9A-HJKMNP-TV-Z]{26}$")]
 Timestamp = Annotated[str, StringConstraints(pattern=r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")]
@@ -51,6 +59,18 @@ EventType = Literal[
 
 class Contract(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
+
+    # Optional properties (not in the schema's `required`, added later for backward
+    # compatibility). They default to None and are left out of model_dump when the input did not
+    # set them, so an old payload still round-trips unchanged.
+    _optional: ClassVar[frozenset[str]] = frozenset()
+
+    @model_serializer(mode="wrap")
+    def _omit_unset_optional(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        data = handler(self)
+        for name in self._optional - self.model_fields_set:
+            data.pop(name, None)
+        return data
 
 
 # ---- extracted payload (SLM output contract) ----
@@ -202,6 +222,11 @@ class Received(Contract):
     raw_text: NonEmpty
     lang_hint: Annotated[str, StringConstraints(pattern=r"^[a-z]{2}$")] | None
     contact: NonEmpty | None
+    # Optional (#305): per-laptop incident number, and the grader-mode sample flag.
+    incident: Annotated[str, StringConstraints(pattern=r"^[A-Z0-9]{1,4}-[0-9]{4,6}$")] | None = None
+    sample: bool | None = None
+
+    _optional: ClassVar[frozenset[str]] = frozenset({"incident", "sample"})
 
 
 class Decided(Contract):

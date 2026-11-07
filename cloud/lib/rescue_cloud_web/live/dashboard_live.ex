@@ -73,6 +73,9 @@ defmodule RescueCloudWeb.DashboardLive do
           · <span id="requests-p2">{@requests.p2} P2</span>
           · <span id="requests-p3">{@requests.p3} P3</span>
           · <span id="requests-follow-up">{@requests.follow_up} follow-up</span>
+          <span :if={@requests.samples > 0} id="requests-samples">
+            · samples hidden: {@requests.samples}
+          </span>
         </p>
         <p id="last-event">
           Last event received: {(@last_event_at &&
