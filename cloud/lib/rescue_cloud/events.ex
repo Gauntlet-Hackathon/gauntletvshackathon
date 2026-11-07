@@ -69,6 +69,9 @@ defmodule RescueCloud.Events do
      }}
   end
 
+  # Down-sync types (contracts/sync_api.md); responder_status added by #307.
+  @down_types ~w(assigned rescued responder_status)
+
   @doc "Events with sequence number greater than `since` (default 0), in insert order."
   @spec read_since(non_neg_integer(), keyword()) :: [struct()]
   def read_since(since \\ 0, opts \\ []) when is_integer(since) do
@@ -78,7 +81,7 @@ defmodule RescueCloud.Events do
   end
 
   @doc """
-  Down-sync feed: `assigned`/`rescued` events from devices other than `device_id` with
+  Down-sync feed: `assigned`/`rescued`/`responder_status` events from devices other than `device_id` with
   sequence number greater than `since`, oldest first. Returns `{events, next_since}`;
   `next_since` is the last returned sequence number, or `since` when nothing is new.
   """
@@ -89,8 +92,7 @@ defmodule RescueCloud.Events do
     events =
       Repo.all(
         from e in Event,
-          where:
-            e.id > ^since and e.type in ["assigned", "rescued"] and e.device_id != ^device_id,
+          where: e.id > ^since and e.type in @down_types and e.device_id != ^device_id,
           order_by: [asc: e.id],
           limit: ^limit
       )

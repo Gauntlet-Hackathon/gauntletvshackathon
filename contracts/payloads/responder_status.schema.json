@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.rescue.invalid/payloads/responder_status.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "crew": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "status": {
+      "enum": [
+        "sent",
+        "on_the_way",
+        "there",
+        "done"
+      ]
+    },
+    "note": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "crew",
+    "status",
+    "note"
+  ],
+  "title": "responder_status payload",
+  "description": "Latest status a dispatched boat reports (#307). Never changes the request's status rank. The envelope copies rules_version / model_version from the request's decision, as the status events do."
+}

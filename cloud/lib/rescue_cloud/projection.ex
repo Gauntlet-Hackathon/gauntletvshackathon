@@ -10,7 +10,7 @@ defmodule RescueCloud.Projection do
     * status only moves forward: received → extracted → decided → assigned → escalated →
       rescued / closed_duplicate (`contracts/logic.md`, "Request status order"), with one
       exception: `assigned` after `escalated` moves the request back to `assigned` (a second
-      boat, #306). Events that are not statuses (`corrected`) never move it, and any other
+      boat, #306). Events that are not statuses (`corrected`, `responder_status`) never move it, and any other
       event whose rank is not above the current status is ignored.
     * `extracted` is the latest extraction with every `corrected` event applied on top, in order
       (`field` is a dotted path into the extracted payload, e.g. `people_count.value`).
@@ -44,7 +44,7 @@ defmodule RescueCloud.Projection do
   @engine_fields ~w(outcome priority_tier provisional_tier rule_id abstain_reason
                      follow_up_question duplicate_of)
 
-  @doc "Status rank, or nil for event types that are not statuses (`corrected`)."
+  @doc "Status rank, or nil for event types that are not statuses (`corrected`, `responder_status`)."
   def status_rank(type), do: Map.get(@status_rank, type)
 
   @doc """

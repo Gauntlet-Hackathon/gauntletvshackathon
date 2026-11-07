@@ -14,7 +14,8 @@ defmodule RescueCloud.Events.Event do
 
   alias RescueCloud.Events.Payload
 
-  @types ~w(received extracted decided assigned rescued corrected escalated closed_duplicate)
+  @types ~w(received extracted decided assigned rescued corrected escalated closed_duplicate
+              responder_status)
   @ulid ~r/^[0-9A-HJKMNP-TV-Z]{26}$/
   @device_id ~r/^[a-z0-9][a-z0-9_-]{1,63}$/
   @timestamp ~r/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/
