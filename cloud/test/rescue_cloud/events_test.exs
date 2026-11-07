@@ -58,6 +58,19 @@ defmodule RescueCloud.EventsTest do
       assert Event.changeset(event(%{"rules_version" => nil, "model_version" => nil})).valid?
     end
 
+    test "duplicate candidate people_count is capped at the contract maximum" do
+      decided = example("payload-decided.valid")
+      path = ["engine_input", "context", "duplicate_candidates", Access.at(0), "people_count"]
+
+      assert Event.changeset(
+               event(%{"type" => "decided", "payload" => put_in(decided, path, 100_000)})
+             ).valid?
+
+      refute Event.changeset(
+               event(%{"type" => "decided", "payload" => put_in(decided, path, 100_001)})
+             ).valid?
+    end
+
     test "engine_output outcome consistency is enforced in decided payloads" do
       decided = example("payload-decided.valid")
       bad = put_in(decided, ["engine_output", "outcome"], "abstain")
