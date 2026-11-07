@@ -64,3 +64,52 @@ def test_duplicate_event_id_ignored(store):
     store.ack(["E001"])
     store.append_events([ev(1)])  # already synced: not re-queued
     assert store.pending_outbox() == []
+
+
+def test_rejected_leave_pending_and_persist(tmp_path):
+    path = tmp_path / "r.db"
+    s = EventStore(path)
+    s.append_events([ev(1), ev(2), ev(3)])
+    at = "2026-11-07T14:00:00Z"
+    assert s.mark_rejected([("E002", "invalid_payload"), ("nope", "x")], at) == 1
+    assert s.mark_rejected([("E002", "again")], "2026-11-07T15:00:00Z") == 0  # first one kept
+    assert [e["event_id"] for e in s.pending_outbox()] == ["E001", "E003"]
+    assert s.outbox_count() == 2 and s.rejected_count() == 1
+    s.close()
+    s = EventStore(path)
+    assert [e["event_id"] for e in s.pending_outbox()] == ["E001", "E003"]
+    assert s.rejected() == [{"event_id": "E002", "error": "invalid_payload", "rejected_at": at}]
+    assert len(s.all_events()) == 3  # the event itself stays
+    s.close()
+
+
+OLD_SCHEMA = """
+CREATE TABLE events (seq INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id TEXT NOT NULL UNIQUE, request_id TEXT NOT NULL, type TEXT NOT NULL,
+    occurred_at TEXT NOT NULL, body TEXT NOT NULL);
+CREATE TABLE outbox (seq INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id TEXT NOT NULL UNIQUE REFERENCES events(event_id));
+"""
+
+
+def test_opens_and_migrates_a_store_without_rejection_columns(tmp_path):
+    import sqlite3
+
+    path = tmp_path / "old.db"
+    old = sqlite3.connect(path)
+    old.executescript(OLD_SCHEMA)
+    old.execute(
+        "INSERT INTO events(event_id, request_id, type, occurred_at, body) VALUES (?,?,?,?,?)",
+        ("E001", "R1", "received", "2026-11-07T14:02:11Z", '{"event_id":"E001"}'),
+    )
+    old.execute("INSERT INTO outbox(event_id) VALUES ('E001')")
+    old.commit()
+    old.close()
+    s = EventStore(path)
+    assert [e["event_id"] for e in s.pending_outbox()] == ["E001"]
+    assert s.mark_rejected([("E001", "invalid_payload")], "2026-11-07T14:00:00Z") == 1
+    assert s.pending_outbox() == [] and s.rejected_count() == 1
+    s.close()
+    s = EventStore(path)  # migrating again is a no-op
+    assert s.rejected_count() == 1
+    s.close()

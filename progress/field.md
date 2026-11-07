@@ -20,3 +20,5 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 field #152 F15: field/Dockerfile (python:3.12-slim, constraints, PYTHONPATH, uvicorn on $PORT, fallback engine) + root .dockerignore; verified image builds, GET / 200, POST /requests returns fallback-engine decision
 2026-11-07 field #152 F15 re-verify: image rebuilt, GET / 200, POST /requests got fallback-engine decision; added tests/test_dockerfile.py static checks for the Dockerfile/.dockerignore contract
 2026-11-07 field step3-R1: board sorts the follow-up queue by provisional_tier (P1 first, missing last; group takes its highest) then logic.within_tier_sort_key; follow-up card shows the provisional tier; tests in test_board.py
+2026-11-07 field step3-A4: store persists rejected events (outbox rejected_at/reject_error, added to existing SQLite files on open), pending_outbox and backlog skip them, sync worker marks them and never resends, /sync/status shows "rejected"; tests in test_store.py, test_sync.py
+2026-11-07 field step3-A5: one DEFAULT_DEVICE_ID = "laptop-dev-01" in pipeline.py, used by PipelineConfig and sync.worker_from_env; test in test_sync.py

@@ -1,7 +1,9 @@
 """SQLite event store with a transactional outbox.
 
 Events and their outbox rows are written in one transaction, so an event is never
-stored without being queued for sync (and vice versa).
+stored without being queued for sync (and vice versa). An outbox row the cloud rejected is
+kept with `rejected_at`/`reject_error` set and is never sent again (events never change, so a
+resend would be "unchanged", which contracts/sync_api.md forbids).
 """
 
 from __future__ import annotations
@@ -24,13 +26,20 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX IF NOT EXISTS events_request ON events(request_id);
 CREATE TABLE IF NOT EXISTS outbox (
     seq INTEGER PRIMARY KEY AUTOINCREMENT,
-    event_id TEXT NOT NULL UNIQUE REFERENCES events(event_id)
+    event_id TEXT NOT NULL UNIQUE REFERENCES events(event_id),
+    rejected_at TEXT,
+    reject_error TEXT
 );
 CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
 """
+# Columns added after the first release: (table, column, type). Added on open to older files.
+_MIGRATIONS = (
+    ("outbox", "rejected_at", "TEXT"),
+    ("outbox", "reject_error", "TEXT"),
+)
 
 
 class EventStore:
@@ -44,6 +53,13 @@ class EventStore:
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.executescript(_SCHEMA)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        for table, column, kind in _MIGRATIONS:
+            cols = {r[1] for r in self._conn.execute(f"PRAGMA table_info({table})")}
+            if column not in cols:
+                self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
 
     def close(self) -> None:
         self._conn.close()
@@ -83,16 +99,50 @@ class EventStore:
         return stored
 
     def pending_outbox(self, limit: int = 100) -> list[dict[str, Any]]:
-        """Unsynced events, oldest first."""
+        """Unsynced events the cloud has not rejected, oldest first."""
         rows = self._conn.execute(
             "SELECT e.body FROM outbox o JOIN events e ON e.event_id = o.event_id"
-            " ORDER BY o.seq LIMIT ?",
+            " WHERE o.rejected_at IS NULL ORDER BY o.seq LIMIT ?",
             (limit,),
         ).fetchall()
         return [json.loads(r[0]) for r in rows]
 
     def outbox_count(self) -> int:
-        return self._conn.execute("SELECT COUNT(*) FROM outbox").fetchone()[0]
+        """Events still to send (rejected events are not counted: they will not be sent)."""
+        return self._conn.execute(
+            "SELECT COUNT(*) FROM outbox WHERE rejected_at IS NULL"
+        ).fetchone()[0]
+
+    def rejected_count(self) -> int:
+        return self._conn.execute(
+            "SELECT COUNT(*) FROM outbox WHERE rejected_at IS NOT NULL"
+        ).fetchone()[0]
+
+    def rejected(self) -> list[dict[str, str]]:
+        """[{"event_id", "error", "rejected_at"}] for rejected events, oldest first."""
+        rows = self._conn.execute(
+            "SELECT event_id, reject_error, rejected_at FROM outbox"
+            " WHERE rejected_at IS NOT NULL ORDER BY seq"
+        ).fetchall()
+        return [{"event_id": i, "error": e, "rejected_at": t} for i, e, t in rows]
+
+    def mark_rejected(self, rejections: Iterable[tuple[str, str]], at: str) -> int:
+        """Record (event_id, error) pairs as rejected at `at`; they leave pending_outbox for
+        good. Ids not in the outbox (or already rejected) are ignored. Returns rows marked."""
+        self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            marked = 0
+            for event_id, error in rejections:
+                marked += self._conn.execute(
+                    "UPDATE outbox SET rejected_at = ?, reject_error = ?"
+                    " WHERE event_id = ? AND rejected_at IS NULL",
+                    (at, error, event_id),
+                ).rowcount
+            self._conn.execute("COMMIT")
+        except BaseException:
+            self._conn.execute("ROLLBACK")
+            raise
+        return marked
 
     def ack(self, event_ids: Iterable[str]) -> int:
         """Remove the given ids from the outbox (events stay). Returns rows removed."""
