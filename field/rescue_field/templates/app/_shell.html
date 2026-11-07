@@ -9,13 +9,18 @@
 <link rel="icon" type="image/svg+xml" href="/static/icons/communityrescue-icon.svg">
 <link rel="apple-touch-icon" href="/static/icons/communityrescue-icon-180.png">
 <link rel="stylesheet" href="/static/app.css">
+{% if grader_mode %}<link rel="stylesheet" href="/static/grader.css">
+<script src="/static/grader.js" defer></script>
+{% endif %}
 </head>
 <body>
 <div class="app">
 <header class="app-header">
 <div class="app-top">
 <a class="brand" href="/"><img src="/static/icons/communityrescue-icon-64.png" width="40" height="40" alt=""><span>CommunityRescue</span></a>
-<p class="who"><strong>{{ volunteer_name }}</strong> · {{ volunteer_role }}<br><span class="muted">{{ ecc_name }}</span></p>
+{% if grader_mode %}<span id="grader-badge" class="grader-badge">Grader mode</span>
+<button id="grader-help" class="grader-help" type="button" aria-haspopup="dialog" aria-controls="grader-panel" aria-label="Grader hints">?</button>
+{% endif %}<p class="who"><strong>{{ volunteer_name }}</strong> · {{ volunteer_role }}<br><span class="muted">{{ ecc_name }}</span></p>
 </div>
 <nav class="mode-toggle" aria-label="Mode">
 <a href="/"{% if mode == "queue" %} class="selected" aria-current="page"{% endif %}>Queue</a>

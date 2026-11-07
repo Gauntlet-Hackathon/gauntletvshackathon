@@ -1,0 +1,23 @@
+/* Grader mode (UI-8). Badge: ink #111418 on yellow #FFD60A 13.9:1. Panel: ink on #FFFFFF 18.5:1. */
+.grader-badge { display: inline-flex; align-items: center; min-height: 32px; padding: 0 .6rem; border-radius: 1rem;
+  background: #FFD60A; color: var(--ink); font-weight: 700; font-size: .85rem; white-space: nowrap; }
+.grader-help { flex: none; width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--ink); background: #FFD60A;
+  color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; }
+.grader-panel { position: fixed; inset: 0 0 0 auto; width: min(28rem, 100vw); overflow-y: auto; z-index: 50;
+  background: var(--white); color: var(--ink); border-left: 4px solid #FFD60A; padding: .75rem 1rem 2rem;
+  box-shadow: -4px 0 16px rgba(0, 0, 0, .2); }
+.grader-panel[hidden] { display: none; }
+.grader-head { display: flex; justify-content: space-between; align-items: center; }
+.grader-head h2 { margin: 0; font-size: 1.2rem; }
+.grader-close { width: 44px; height: 44px; border: 0; background: none; font: inherit; font-size: 1.6rem; cursor: pointer; }
+.grader-note { color: var(--muted); font-size: .9rem; }
+.grader-cases { list-style: none; margin: 0; padding: 0; }
+.grader-case { border-top: 1px solid var(--line); padding: .4rem 0; }
+.grader-case summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 700; }
+.grader-hints { padding-left: 0; list-style: none; }
+.grader-hints li { margin: .4rem 0; }
+.grader-more, .grader-sample { min-height: 44px; margin: .3rem 0; padding: 0 .9rem; border-radius: 22px; border: 2px solid var(--blue);
+  background: var(--white); color: var(--blue); font: inherit; font-weight: 700; cursor: pointer; }
+.grader-sample { background: var(--blue); color: var(--white); }
+.grader-status { margin: .3rem 0; font-size: .9rem; }
+.grader-off { display: inline-block; margin-top: 1rem; }
