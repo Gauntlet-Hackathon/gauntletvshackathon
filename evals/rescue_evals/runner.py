@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from rescue_evals import metrics as M
+from rescue_evals import stats as S
 from rescue_evals.loaders import EvalCase, EvalSetError, load_cases
 from rescue_shared.models import Extracted
 
@@ -225,8 +226,54 @@ def _latency(rows: list[dict[str, Any]]) -> dict[str, float]:
     }
 
 
-def run_set(system: System, cases: Sequence[EvalCase], set_name: str) -> dict[str, Any]:
+SEALED_SET = "E"
+# metrics that are plain per-case pass rates (the rest are F1 / per-1000 rates: no Wilson interval)
+PASS_RATE_METRICS = (
+    "extraction.location_exact",
+    "extraction.location_partial",
+    "extraction.people_count_exact",
+    "extraction.is_request_accuracy",
+    "decision.outcome_accuracy",
+    "decision.tier_accuracy",
+)
+
+
+def _intervals(
+    rows: list[dict[str, Any]], failures: dict[str, list[str]]
+) -> dict[str, dict[str, Any]]:
+    denoms = {
+        "extraction": sum(1 for r in rows if r["gold_ex"] is not None),
+        "decision": len(rows),
+    }
+    denoms["decision.tier_accuracy"] = sum(1 for r in rows if r["gold"].outcome == "prioritized")
+    out = {}
+    for m in PASS_RATE_METRICS:
+        n = denoms.get(m, denoms[m.split(".")[0]])
+        out[m] = S.pass_rate_summary(n - len(failures.get(m, [])), n)
+    return out
+
+
+def refuse_sealed(cases: Sequence[EvalCase], set_name: str, open_sealed: bool = False) -> None:
+    """Guard: the sealed holdout (set E) is never scored without an explicit, logged opt-in."""
+    if open_sealed:
+        return
+    if set_name.upper() == SEALED_SET or any(c.set == SEALED_SET for c in cases):
+        from rescue_evals.loaders import SealedHoldoutError
+
+        raise SealedHoldoutError("set E is the sealed holdout; pass open_sealed=True")
+
+
+def run_set(
+    system: System,
+    cases: Sequence[EvalCase],
+    set_name: str,
+    *,
+    open_sealed: bool = False,
+    judge_id: str | None = None,
+    judge_version: str | None = None,
+) -> dict[str, Any]:
     """Score ``system`` on the test-split cases. Returns the result document (not yet written)."""
+    refuse_sealed(cases, set_name, open_sealed)
     rows: list[dict[str, Any]] = []
     errors: dict[str, str] = {}
     rules_version = None
@@ -276,7 +323,11 @@ def run_set(system: System, cases: Sequence[EvalCase], set_name: str) -> dict[st
         "n": len(rows),
         "model_version": system.model_version,
         "rules_version": rules_version,
+        "judge_id": judge_id,
+        "judge_version": judge_version,
         "metrics": metrics,
+        "intervals": _intervals(rows, {k: v for k, v in failures.items()}),
+        "case_ids": [r["id"] for r in rows],
         "failures": failures,
         "latency": _latency(rows),
         "errors": errors,
@@ -323,7 +374,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 for c in load_cases(f, open_sealed=args.open_sealed, split="test")
                 if c.set == set_name
             ]
-            result = run_set(SYSTEMS[args.system](cases), cases, set_name)
+            result = run_set(
+                SYSTEMS[args.system](cases), cases, set_name, open_sealed=args.open_sealed
+            )
             print(f"wrote {write_result(result, args.results_dir)} (n={result['n']})")
     except EvalSetError as e:
         print(f"error: {e}", file=sys.stderr)
