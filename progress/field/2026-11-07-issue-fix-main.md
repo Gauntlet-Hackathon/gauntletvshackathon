@@ -1,0 +1,1 @@
+Fix-main check: test_recheck::test_board_shows_check_again_button failure (board moved from / to /board by UI-2) was already fixed on main by #331; full ruff + pytest suite verified green, no code change needed.
