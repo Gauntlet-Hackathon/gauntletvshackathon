@@ -22,7 +22,10 @@ Baselines are run ahead of time and stored here, never called live (docs/plan/05
 | C is_request accuracy | 0.46 | 0.75 | 0.85 | 0.98 | 1 |
 | C ECE | 0.28 | 0.19 | 0.13 | 0.08 | 0.17 |
 | D outcome accuracy | 0.24 | 0.41 | 0.49 | 0.83 (CI 0.69-0.91) | 0.88 |
+| D is_request accuracy | 0.49 | 0.51 | 0.61 | 0.90 | 1 |
 | D abstain recall | 0.24 | | | 0.82 | |
+| D tier accuracy (n=3) | 0.33 | | | 0.33 | |
+| D ECE | 0.28 | | | 0.18 | |
 
-Keyword and Opus are from this run; v3, laya-s13 and gold come from the 2026-11-07 model validation on the same sets.
+Opus is from the stored files here. Keyword is `python -m rescue_evals.runner --system regex-baseline --sets C,D` on the same commit (not committed: it is deterministic and reruns in seconds). v3, laya-s13 and gold come from the 2026-11-07 model validation on the same sets (not in the repo; the trained-model runs need an HF token).
 Offline: Opus does not work offline; keyword and the trained model do.

@@ -63,7 +63,9 @@ def build_prompt() -> str:
     decision is made by the same engine as every other system.
     """
     schema = SCHEMA_PATH.read_text(encoding="utf-8") if SCHEMA_PATH.exists() else "{}"
-    rubric = RUBRIC_PATH.read_text(encoding="utf-8") if RUBRIC_PATH.exists() else ""
+    if not RUBRIC_PATH.exists():  # a baseline without the rubric is not the planned comparison
+        raise ConfigError(f"decision rubric not found at {RUBRIC_PATH}")
+    rubric = RUBRIC_PATH.read_text(encoding="utf-8")
     parts = [
         "You read one messy rescue request and extract structured facts. Reply with ONE JSON "
         "object and nothing else, matching the JSON Schema below exactly (no extra keys). Use "
@@ -72,8 +74,7 @@ def build_prompt() -> str:
         "the rubric depends on (request or not, location and its type, people, vulnerable "
         "people, hazards, needs) and set confidences honestly.",
     ]
-    if rubric:
-        parts.append("<decision_rubric>\n" + rubric.strip() + "\n</decision_rubric>")
+    parts.append("<decision_rubric>\n" + rubric.strip() + "\n</decision_rubric>")
     parts.append("<json_schema>\n" + schema.strip() + "\n</json_schema>")
     return "\n\n".join(parts)
 
