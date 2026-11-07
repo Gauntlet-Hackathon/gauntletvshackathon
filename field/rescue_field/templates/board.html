@@ -38,6 +38,7 @@ textarea:focus-visible, [tabindex]:focus-visible { outline: 3px solid #0b57d0; o
 <a class="skip-link" href="#board">Skip to board</a>
 <header>
 <h1>Rescue triage board</h1>
+<p id="model-version">Model: {{ model_version }}</p>
 <div id="sync-badge" role="status" aria-live="polite"></div>
 {% if demo_mode %}<p><button type="button" id="offline-toggle">{{ "Go back online" if sync_paused else "Simulate offline" }}</button> <span id="offline-toggle-msg" role="alert"></span></p>
 {% endif %}

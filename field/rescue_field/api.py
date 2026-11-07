@@ -12,6 +12,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import logging
 import os
 import re
 import sys
@@ -44,6 +45,7 @@ DEFAULT_DATA_DIR = "./data"
 DB_FILENAME = "field.db"
 _LANG_RE = re.compile(r"^[a-z]{2}$")
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+log = logging.getLogger(__name__)
 
 
 class SyncWorkerLike(Protocol):
@@ -74,6 +76,26 @@ def open_store(env: Mapping[str, str] | None = None) -> EventStore:
     directory = data_dir(env)
     directory.mkdir(parents=True, exist_ok=True)
     return EventStore(directory / DB_FILENAME, check_same_thread=False)
+
+
+def select_extractor(env: Mapping[str, str] | None = None) -> Extractor:
+    """HFExtractor when HF_REPO and HF_REVISION are both set and it loads; else the fixture
+    extractor. Never raises: the app must start whatever the model does. Logs one line."""
+    env = os.environ if env is None else env
+    if not (env.get("HF_REPO") and env.get("HF_REVISION")):
+        log.info("extractor: FixtureExtractor (HF_REPO/HF_REVISION not both set)")
+        return FixtureExtractor()
+    try:
+        from rescue_field.slm_hf import HFExtractor
+
+        chosen = HFExtractor()
+    except Exception as exc:  # incl. ImportError when torch is not installed
+        log.warning(
+            "extractor: FixtureExtractor (HFExtractor failed: %s: %s)", type(exc).__name__, exc
+        )
+        return FixtureExtractor()
+    log.info("extractor: HFExtractor %s", chosen.model_version)
+    return chosen
 
 
 def default_decide_batch(env: Mapping[str, str] | None = None) -> BatchDecider:
@@ -314,6 +336,8 @@ def create_app(
         opened = None
         if app.state.store is None:
             opened = app.state.store = open_store()
+        if extractor is None:  # none passed: pick at startup, never at import
+            app.state.extractor = await run_in_threadpool(select_extractor)
         cloud_url = os.environ.get("CLOUD_URL")
         worker = None
         if cloud_url:
@@ -340,7 +364,7 @@ def create_app(
 
     app = FastAPI(title="Rescue triage field app", lifespan=lifespan)
     app.state.store = store
-    app.state.extractor = extractor or FixtureExtractor()
+    app.state.extractor = extractor or FixtureExtractor()  # replaced in the lifespan if none passed
     app.state.decide_batch = decide_batch or default_decide_batch()
     app.state.config = config or PipelineConfig.from_env()
     app.state.intake_lock = threading.Lock()

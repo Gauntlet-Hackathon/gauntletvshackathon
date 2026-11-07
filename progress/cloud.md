@@ -35,3 +35,4 @@ One line per merged change: date, lane, issue, what changed.
 - cloud #206 C25: RescueCloud.Release.reset_demo/1 (guarded TRUNCATE of all public tables except schema_migrations and models), README section, release_test
 cloud #207 C26a: cloud/Dockerfile builds from repo root and ships the frozen Mercury engine build with ENGINE_DIST; .dockerignore trimmed
 2026-11-07 cloud R15: replay marks events whose thresholds differ from the build's config/thresholds.json as mismatch; Dockerfile ENGINE_BUILD → +bin:2a2fac7006832dd7
+cloud #208 C26b: fly.toml, compose and RUNBOOK deploy build cloud/Dockerfile from repo root; fly_toml_test resolves path from repo root

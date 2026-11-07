@@ -10,6 +10,10 @@ kill_signal = "SIGTERM"
 
 [build]
   dockerfile = "field/Dockerfile"
+  # Bake in the pinned model (gated repo; pass the token with --build-secret HF_TOKEN=..., see RUNBOOK.md):
+  # [build.args]
+  #   HF_REPO = "<org>/<model>"
+  #   HF_REVISION = "<40-hex commit sha>"
 
 [env]
   PORT = "8080"

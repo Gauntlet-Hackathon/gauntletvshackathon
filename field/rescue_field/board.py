@@ -176,6 +176,7 @@ async def board(request: Request) -> HTMLResponse:
             return build_board(store)
 
     ctx = await run_in_threadpool(read)
+    ctx["model_version"] = getattr(request.app.state.extractor, "model_version", None) or "unknown"
     ctx["demo_mode"] = os.environ.get("DEMO_MODE") == "1"
     # The state /sync/offline-toggle flips, so the button label survives a reload.
     worker = getattr(request.app.state, "sync_worker", None)

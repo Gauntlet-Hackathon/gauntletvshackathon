@@ -15,7 +15,9 @@ services:
       retries: 20
 
   cloud:
-    build: ./cloud
+    build:
+      context: .
+      dockerfile: cloud/Dockerfile
     command: ["sh", "-c", "/app/bin/migrate && exec /app/bin/server"]
     environment:
       DATABASE_URL: ecto://postgres:postgres@db/rescue_cloud

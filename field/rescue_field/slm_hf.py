@@ -1,14 +1,14 @@
-"""HFExtractor: the real SLM adapter (F11).
+"""HFExtractor: the real SLM adapter (F25a).
 
-Loads HF_REPO@HF_REVISION (a pinned commit SHA, never a branch) from a local path or the local
-HF cache only: no network at runtime. Assumption (H1a is still a template in docs/DECISIONS.md):
-the model is generative and emits JSON shaped like contracts/payloads/extracted.schema.json;
-`_map_output` is the single place to change once the real output format is known.
+The model is an encoder with classification heads and BIO span tags (H11, docs/DECISIONS.md
+"Model output format (H1a)"). The trainer's inference code is vendored in `rescue_field.tagger`;
+this module resolves the pinned checkpoint folder (no network at runtime) and wraps
+`infer.Extractor`.
+torch is imported lazily, only when the real model is loaded.
 """
 
 from __future__ import annotations
 
-import json
 import os
 import re
 from collections.abc import Callable
@@ -17,7 +17,7 @@ from typing import Any
 from rescue_field.slm import Extraction, validate_extracted
 
 _SHA = re.compile(r"^[0-9a-f]{40}$")
-Generate = Callable[[str], str]
+ExtractorFactory = Callable[[str], Any]  # folder -> object with .extract(text) -> dict
 
 
 def _check_revision(revision: str | None) -> str:
@@ -26,35 +26,22 @@ def _check_revision(revision: str | None) -> str:
     return revision
 
 
-def _map_output(text: str) -> dict[str, Any]:
-    """Parse the model's raw output into an `extracted` payload (schema-validated by caller)."""
-    start, end = text.find("{"), text.rfind("}")
-    if start < 0 or end < start:
-        raise ValueError("model output contains no JSON object")
-    data = json.loads(text[start : end + 1])
-    if not isinstance(data, dict):
-        raise ValueError("model output is not a JSON object")
-    return data
+def _snapshot_download(repo: str, revision: str) -> str:
+    """Local-cache-only snapshot lookup. Module-level so tests can monkeypatch it."""
+    from huggingface_hub import snapshot_download  # lazy: not installed in CI
+
+    return snapshot_download(repo, revision=revision, local_files_only=True)
 
 
-def _load_generate(repo: str, revision: str, local_path: str | None) -> Generate:
-    os.environ.setdefault("HF_HUB_OFFLINE", "1")
-    os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
-    from transformers import AutoModelForCausalLM, AutoTokenizer  # lazy: heavy, optional
+def _resolve_folder(repo: str, revision: str, local_path: str | None) -> str:
+    folder = local_path or os.environ.get("HF_MODEL_DIR")
+    return folder or _snapshot_download(repo, revision)
 
-    src = local_path or repo
-    kwargs: dict[str, Any] = {"local_files_only": True}
-    if not local_path:
-        kwargs["revision"] = revision
-    tok = AutoTokenizer.from_pretrained(src, **kwargs)
-    model = AutoModelForCausalLM.from_pretrained(src, **kwargs)
 
-    def generate(raw_text: str) -> str:
-        inputs = tok(raw_text, return_tensors="pt")
-        out = model.generate(**inputs, max_new_tokens=512, do_sample=False)
-        return tok.decode(out[0][inputs["input_ids"].shape[1] :], skip_special_tokens=True)
+def _load_vendored(folder: str, model_version: str) -> Any:
+    from rescue_field.tagger.infer import Extractor  # lazy: imports torch
 
-    return generate
+    return Extractor.load(folder, model_version, threads=4)
 
 
 class HFExtractor:
@@ -63,18 +50,22 @@ class HFExtractor:
         repo: str | None = None,
         revision: str | None = None,
         local_path: str | None = None,
-        generate: Generate | None = None,
+        extractor_factory: ExtractorFactory | None = None,
     ) -> None:
+        os.environ.setdefault("HF_HUB_OFFLINE", "1")
         self.repo = repo or os.environ.get("HF_REPO") or ""
         if not self.repo:
             raise ValueError("HF_REPO is not set")
         self.revision = _check_revision(revision or os.environ.get("HF_REVISION"))
         self.model_version = f"hf:{self.repo}@{self.revision}"
-        self._generate = generate or _load_generate(
-            self.repo, self.revision, local_path or os.environ.get("HF_LOCAL_PATH")
+        folder = _resolve_folder(self.repo, self.revision, local_path)
+        self._extractor = (
+            extractor_factory(folder)
+            if extractor_factory
+            else _load_vendored(folder, self.model_version)
         )
 
     def extract(self, raw_text: str) -> Extraction:
-        payload = _map_output(self._generate(raw_text))
+        payload = self._extractor.extract(raw_text)
         validate_extracted(payload)
         return Extraction(payload, self.model_version)

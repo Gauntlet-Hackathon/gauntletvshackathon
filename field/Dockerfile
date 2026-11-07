@@ -25,6 +25,21 @@ COPY engine/requirements.txt engine/requirements.txt
 RUN pip install --no-cache-dir -c constraints.txt \
     -r shared/requirements.txt -r field/requirements.txt -r engine/requirements.txt
 
+# Optional trained model (F32). Only when BOTH args are set: CPU torch + model deps, weights downloaded at build time.
+# HF_TOKEN comes from a build secret (never an ARG/ENV), so it is not written into any layer.
+ARG HF_REPO=""
+ARG HF_REVISION=""
+COPY field/requirements-model.txt field/requirements-model.txt
+RUN --mount=type=secret,id=HF_TOKEN \
+    if [ -n "$HF_REPO" ] && [ -n "$HF_REVISION" ]; then \
+      echo "$HF_REVISION" | grep -Eq '^[0-9a-f]{40}$' || { echo "HF_REVISION must be a 40-hex commit SHA" >&2; exit 1; }; \
+      pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu -c constraints.txt torch \
+      && pip install --no-cache-dir -c constraints.txt -r field/requirements-model.txt \
+      && if [ -f /run/secrets/HF_TOKEN ]; then export HF_TOKEN="$(cat /run/secrets/HF_TOKEN)"; fi \
+      && python -c "from huggingface_hub import snapshot_download; snapshot_download('$HF_REPO', revision='$HF_REVISION', local_dir='/models/current')"; \
+    fi
+ENV HF_REPO=$HF_REPO HF_REVISION=$HF_REVISION HF_MODEL_DIR=/models/current HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
+
 COPY contracts contracts
 COPY shared shared
 # Only the frozen build ships; the engine source is not needed once ENGINE_CMD is the binary.
