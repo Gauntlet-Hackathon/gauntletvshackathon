@@ -9,10 +9,10 @@
     rules <span class="rules-version">{{ s.rules_version }}</span> ·
     model <span class="model-version">{{ s.model_version }}</span> · {{ r.received_at }}
   </div>
-  {% if r.question %}
-  <div class="needs-confirmation"><strong class="confirm-label">{{ r.question.label }}</strong>:
-    <span class="question">{{ r.question.text }}</span></div>
-  {% endif %}
+  {% for q in r.questions %}
+  <div class="needs-confirmation"><strong class="confirm-label">{{ q.label }}</strong>:
+    <span class="question">{{ q.text }}</span></div>
+  {% endfor %}
   {% set loc = r.extracted.location.text %}
   <form class="status-form" data-request-id="{{ r.request_id }}">
     <label>Crew <input type="text" name="crew" aria-label="Crew for {{ loc }}" aria-required="true"{% if 'assigned' not in r.allowed %} disabled{% endif %}></label>

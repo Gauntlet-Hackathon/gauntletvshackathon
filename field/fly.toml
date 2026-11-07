@@ -43,9 +43,11 @@ kill_signal = "SIGTERM"
   auto_start_machines = true
   min_machines_running = 1
 
+  # /healthz answers without the intake lock or the database (review M-04, O-02): a large board
+  # render or a bulk upload must not fail the check. /sync/status still reports sync state.
   [[http_service.checks]]
     grace_period = "60s"
     interval = "15s"
     timeout = "5s"
     method = "GET"
-    path = "/sync/status"
+    path = "/healthz"

@@ -35,8 +35,10 @@ from rescue_field import sync as sync_module
 from rescue_field.pipeline import (
     BatchDecider,
     EngineInputError,
+    FairLock,
     IntakeItem,
     PipelineConfig,
+    extract_items,
     process_batch,
 )
 from rescue_field.sanitize import clean_text
@@ -354,6 +356,10 @@ async def _run(request: Request, items: list[IntakeItem]) -> list[list[dict[str,
     def work() -> list[list[dict[str, Any]]]:
         if state.store is None:
             raise RuntimeError("event store is not open (app lifespan not running)")
+        # The model needs no store access, so it runs before the intake lock (review O-02),
+        # one row at a time under its own lock: the board, status changes, the sync worker and
+        # /sync/status are not held up for a whole bulk upload.
+        extractions = extract_items(items, state.extractor, lock=state.extract_lock)
         # One intake at a time: each request must see the previous ones as duplicates.
         with state.intake_lock:
             return process_batch(
@@ -362,6 +368,7 @@ async def _run(request: Request, items: list[IntakeItem]) -> list[list[dict[str,
                 extractor=state.extractor,
                 decide_batch=state.decide_batch,
                 config=state.config,
+                extractions=extractions,
             )
 
     return await run_in_threadpool(work)
@@ -387,6 +394,16 @@ async def _intake(request: Request, items: list[IntakeItem]) -> list[dict[str, A
 
 
 router = APIRouter()
+
+
+@router.get("/healthz")
+async def healthz(request: Request) -> Any:
+    """Liveness for the Fly health check: answered on the event loop, without the intake lock
+    or the database, so a long board render or bulk upload never makes it time out (review
+    M-04, O-02). 503 while the event store is not open."""
+    if request.app.state.store is None:
+        return JSONResponse({"status": "starting"}, status_code=503)
+    return {"status": "ok"}
 
 
 @router.post("/requests")
@@ -476,6 +493,7 @@ def create_app(
     app.state.decide_batch = decide_batch or default_decide_batch()
     app.state.config = config or PipelineConfig.from_env()
     app.state.intake_lock = threading.Lock()
+    app.state.extract_lock = FairLock()  # one model call at a time, outside intake_lock
     app.state.sync_worker = None
     app.add_middleware(BodySizeLimit)
     app.include_router(router)
