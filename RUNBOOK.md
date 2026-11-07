@@ -114,3 +114,12 @@ fly logs --app <app>                   # if the release_command or the check fai
 
 Then point each field laptop at it: `CLOUD_URL=https://<app>.fly.dev`, `DEVICE_ID`/`DEVICE_TOKEN` matching a `DEVICE_TOKENS` pair.
 If the deploy fails at `release_command` with a connection error, check `fly secrets list --app <app>` shows `DATABASE_URL` (re-run `fly postgres attach`) and that `ECTO_IPV6` is still in `[env]`.
+
+## Run locally
+Whole stack (Postgres, cloud, field) with Docker:
+1. `cp .env.example .env` and set `SECRET_KEY_BASE` (`openssl rand -base64 48` or `mix phx.gen.secret`).
+2. `docker compose up --build`. The cloud waits for a healthy db, runs `bin/migrate`, then serves on http://localhost:4000; the field app is on http://localhost:8000.
+3. Try it: `curl -XPOST localhost:8000/requests -H 'content-type: application/json' -d '{"raw_text":"3 people on a roof at Elm St"}'`, then check `curl localhost:8000/sync/status` (`outbox_backlog` 0) and the cloud dashboard.
+4. `docker compose down -v` stops it and wipes the db and field data.
+
+The field app uses the dev device `laptop-dev-01` / `dev-token-laptop-dev-01`; the cloud is given the same pair via `DEVICE_TOKENS`.
