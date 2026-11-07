@@ -17,6 +17,8 @@
     <details><summary>Details</summary>
       <p>{{ r.raw_text }}</p>
       {% set e = r.extracted %}{% include "_fields.html" %}
+      <div class="recheck"><button type="button" class="recheck-btn" data-request-id="{{ r.request_id }}">Check again</button>
+        <span class="recheck-result" role="status"></span></div>
     </details>
     {% for d in r.duplicates %}<div class="dups">duplicate: {{ d.request_id }}</div>{% endfor %}
   </div>
