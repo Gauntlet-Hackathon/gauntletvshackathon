@@ -10,6 +10,8 @@ defmodule RescueCloudWeb.RecordsLive do
 
   @impl true
   def mount(_params, _session, socket) do
+    if connected?(socket), do: Phoenix.PubSub.subscribe(RescueCloud.PubSub, "events")
+
     {:ok, assign(socket, :page_title, "Records")}
   end
 
@@ -17,19 +19,25 @@ defmodule RescueCloudWeb.RecordsLive do
   def handle_params(params, _uri, socket) do
     filters = Map.take(params, ~w(q tier status))
 
-    record =
-      case params["request_id"] do
-        nil -> nil
-        id -> Records.get_record(id)
-      end
-
     {:noreply,
      socket
      |> assign(:filters, filters)
      |> assign(:form, to_form(Map.merge(%{"q" => "", "tier" => "", "status" => ""}, filters)))
-     |> assign(:requests, Records.search_requests(filters))
      |> assign(:selected_id, params["request_id"])
-     |> assign(:record, record)}
+     |> load()}
+  end
+
+  @impl true
+  def handle_info({:event, _event}, socket), do: {:noreply, load(socket)}
+  def handle_info(_, socket), do: {:noreply, socket}
+
+  # Re-query the list and the open detail panel; runs on navigation and on every new event.
+  defp load(socket) do
+    %{filters: filters, selected_id: id} = socket.assigns
+
+    socket
+    |> assign(:requests, Records.search_requests(filters))
+    |> assign(:record, id && Records.get_record(id))
   end
 
   @impl true
