@@ -160,6 +160,7 @@ async def board(request: Request) -> HTMLResponse:
             return build_board(store)
 
     ctx = await run_in_threadpool(read)
+    ctx["model_version"] = getattr(request.app.state.extractor, "model_version", None) or "unknown"
     ctx["demo_mode"] = os.environ.get("DEMO_MODE") == "1"
     name = "_board.html" if request.headers.get("HX-Request") else "board.html"
     return templates.TemplateResponse(request, name, ctx)
