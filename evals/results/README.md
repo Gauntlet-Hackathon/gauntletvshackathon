@@ -97,7 +97,7 @@ The trained models have not been run on Set B yet.
 
 ### Sets C and D
 
-| metric | keyword | v3 (pinned) | laya-s13 | Opus + rubric | gold extraction |
+| metric | keyword | v3 | laya-s13 | Opus + rubric | gold extraction |
 |---|---|---|---|---|---|
 | C outcome accuracy | 0.26 | 0.44 | 0.61 | 0.89 (CI 0.78-0.94) | 0.92 |
 | C tier accuracy | 0.04 | 0.26 | 0.35 | 0.85 | 0.91 |
@@ -131,26 +131,36 @@ python -m rescue_evals.runner --system ours --sets B,C,D` (needs an HF token to 
 files not committed, both checkpoints report as system `ours`). Opus is the stored `opus__*.json`; generic SLM is the stored `slm__*.json` (offline, see its section above). Pooled = the
 promotion-gate pooling (`rescue_evals.report.pool_metrics`) over B+C+D, n=148.
 
-| metric | keyword | generic SLM (Qwen2.5-1.5B) | v3 (pinned) | laya-s13 | Opus + rubric | gold extraction |
-|---|---|---|---|---|---|---|
-| **pooled outcome accuracy** | 0.26 | 0.51 | 0.53 | 0.66 | 0.91 | 0.95 |
-| pooled urgent missed per 1,000 urgent (headline) | 896 | 188 | 563 | 542 | 42 | 21 |
-| pooled same, not counting P1-flagged follow-ups | 813 | 188 | 354 | 438 | 0 | 21 |
-| pooled Top-20 accuracy | 0.21 | 0.60 | 0.53 | 0.70 | 0.95 | 0.98 |
-| pooled is_request accuracy | 0.42 | 0.80 | 0.70 | 0.80 | 0.96 | 1 |
-| pooled ECE | 0.26 | 0.35 | 0.19 | 0.14 | 0.12 | 0.23 |
-| B outcome accuracy | 0.27 | 0.63 | 0.71 (CI 0.58-0.82) | 0.84 (CI 0.71-0.91) | 0.94 | 0.98 |
-| B urgent missed per 1,000 urgent | 762 | 95 | 333 | 333 | 0 | 0 |
-| B Top-20 / duplicate F1 | 0.25 / 0.00 | 0.70 / 0.00 | 0.70 / 0.67 | 0.80 / 0.67 | 1.00 / 0.67 | 1.00 / 0.67 |
-| C outcome accuracy | 0.26 | 0.72 | 0.47 (CI 0.34-0.59) | 0.64 (CI 0.51-0.75) | 0.93 | 0.97 |
-| C urgent missed per 1,000 urgent | 1000 | 259 | 741 | 704 | 74 | 37 |
-| C same, not counting P1-flagged follow-ups | 889 | 259 | 444 | 556 | 0 | 37 |
-| C Top-20 accuracy | 0.15 | 0.55 | 0.40 | 0.65 | 0.90 | 0.95 |
-| C is_request accuracy | 0.43 | 0.76 | 0.76 | 0.86 | 0.98 | 1 |
-| D outcome accuracy | 0.24 | 0.07 | 0.41 (CI 0.28-0.57) | 0.49 (CI 0.34-0.64) | 0.83 | 0.88 |
-| D abstain recall | 0.24 | 0.03 | 0.42 | 0.50 | 0.82 | 0.87 |
+| metric | keyword | generic SLM (Qwen2.5-1.5B) | v3 | laya-s13 | soup (pinned) | Opus + rubric | gold extraction |
+|---|---|---|---|---|---|---|---|
+| **pooled outcome accuracy** | 0.26 | 0.51 | 0.53 | 0.66 | 0.73 | 0.91 | 0.95 |
+| pooled urgent missed per 1,000 urgent (headline) | 896 | 188 | 563 | 542 | 250 | 42 | 21 |
+| pooled same, not counting P1-flagged follow-ups | 813 | 188 | 354 | 438 | 125 | 0 | 21 |
+| pooled Top-20 accuracy | 0.21 | 0.60 | 0.53 | 0.70 | 0.72 | 0.95 | 0.98 |
+| pooled is_request accuracy | 0.42 | 0.80 | 0.70 | 0.80 | 0.89 | 0.96 | 1 |
+| pooled ECE | 0.26 | 0.35 | 0.19 | 0.14 | 0.12 | 0.12 | 0.23 |
+| B outcome accuracy | 0.27 | 0.63 | 0.71 (CI 0.58-0.82) | 0.84 (CI 0.71-0.91) | 0.86 (CI 0.73-0.93) | 0.94 | 0.98 |
+| B urgent missed per 1,000 urgent | 762 | 95 | 333 | 333 | 143 | 0 | 0 |
+| B Top-20 / duplicate F1 | 0.25 / 0.00 | 0.70 / 0.00 | 0.70 / 0.67 | 0.80 / 0.67 | 0.85 / 0.67 | 1.00 / 0.67 | 1.00 / 0.67 |
+| C outcome accuracy | 0.26 | 0.72 | 0.47 (CI 0.34-0.59) | 0.64 (CI 0.51-0.75) | 0.79 (CI 0.67-0.88) | 0.93 | 0.97 |
+| C urgent missed per 1,000 urgent | 1000 | 259 | 741 | 704 | 333 | 74 | 37 |
+| C same, not counting P1-flagged follow-ups | 889 | 259 | 444 | 556 | 148 | 0 | 37 |
+| C Top-20 accuracy | 0.15 | 0.55 | 0.40 | 0.65 | 0.60 | 0.90 | 0.95 |
+| C is_request accuracy | 0.43 | 0.76 | 0.76 | 0.86 | 0.91 | 0.98 | 1 |
+| D outcome accuracy | 0.24 | 0.07 | 0.41 (CI 0.28-0.57) | 0.49 (CI 0.34-0.64) | 0.49 (CI 0.34-0.64) | 0.83 | 0.88 |
+| D abstain recall | 0.24 | 0.03 | 0.42 | 0.50 | 0.47 | 0.82 | 0.87 |
 
-Reading: laya-s13 beats the pinned v3 on accuracy, ranking (Top-20) and calibration; v3 misses fewer hard P1s (urgent
+Soup column (added 2026-11-07 22:00Z): `hf:paawandesai/rescue-tagger@8f932d7487fbcb47acbf9faf4b18be4db6820e5e`, the uniform weight
+average of v8 (`ce14cb0`), v9 (`47f10e6`) and v10 (`546aa1e`), re-calibrated on dev; pinned in `field/fly.toml` since #351.
+Same runner and Mercury build, run on main bca9de8; v3 was re-run on the same commit and reproduced its column above
+exactly, so the columns are comparable. The soup is the best trained checkpoint on every pooled row and on B; it is behind laya-s13 on
+C Top-20 (0.60 vs 0.65) and D abstain recall (0.47 vs 0.50) and ties it on D outcome (0.49). It misses about a third as many hard P1s as v3 (125 vs 354 per 1,000 gold P1s). Caveat from
+its model card: data v10 relabelled 2,500 Munro/HumAID train tweets with Claude Opus and the product rubric, so its
+scores against the Opus column, and on the Claude-drafted cases in these sets, are not fully independent of its
+training data. CPU timing (4 cores, no GPU, `HFExtractor` on 200 B/C/D texts after 5 warm-up calls): load 5.8 s,
+38 ms per message p50, 52 ms p95, peak RSS about 1.5 GB.
+
+Reading (before the soup): laya-s13 beats v3 on accuracy, ranking (Top-20) and calibration; v3 misses fewer hard P1s (urgent
 requests that do not even reach the follow-up queue as "P1?"). Both trained models are far above keyword and work
 offline; Opus is close to the gold ceiling but needs the network.
 The generic SLM (offline, not fine-tuned) misses far fewer urgent requests than either trained checkpoint (188 vs
