@@ -43,13 +43,31 @@ defmodule RescueCloudWeb.Endpoint do
   plug Plug.RequestId
   plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
 
-  plug Plug.Parsers,
-    parsers: [:urlencoded, :multipart, :json],
-    pass: ["*/*"],
-    json_decoder: Phoenix.json_library()
+  @parsers Plug.Parsers.init(
+             parsers: [:urlencoded, :multipart, :json],
+             pass: ["*/*"],
+             json_decoder: Phoenix.json_library()
+           )
+
+  # On the sync API a body that is not valid JSON is `400 {"error": "bad_request"}`
+  # (contracts/sync_api.md), whatever the client's Accept header; elsewhere the
+  # parse error propagates to the default error views.
+  plug :parse_body
 
   plug Plug.MethodOverride
   plug Plug.Head
   plug Plug.Session, @session_options
   plug RescueCloudWeb.Router
+
+  defp parse_body(%Plug.Conn{path_info: ["sync" | _]} = conn, _opts) do
+    Plug.Parsers.call(conn, @parsers)
+  rescue
+    Plug.Parsers.ParseError ->
+      conn
+      |> put_resp_content_type("application/json")
+      |> send_resp(400, ~s({"error":"bad_request"}))
+      |> halt()
+  end
+
+  defp parse_body(conn, _opts), do: Plug.Parsers.call(conn, @parsers)
 end
