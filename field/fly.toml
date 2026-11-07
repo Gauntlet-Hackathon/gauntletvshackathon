@@ -9,7 +9,9 @@ primary_region = "iad"
 kill_signal = "SIGTERM"
 
 [build]
-  dockerfile = "field/Dockerfile"
+# flyctl resolves this path relative to THIS file's folder (the build context is still the repo root
+# passed as `fly deploy .`), so it is just "Dockerfile". With "field/Dockerfile" current flyctl looks for field/field/Dockerfile.
+  dockerfile = "Dockerfile"
 
 # Bake in the pinned model (gated repo; pass the token with --build-secret HF_TOKEN=..., see RUNBOOK.md).
 # Interim pin (#104, 2026-11-07 16:07Z): v3, pinned at Paawan's request (scores below laya-s13 on the draft

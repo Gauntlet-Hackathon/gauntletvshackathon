@@ -36,8 +36,10 @@ def test_no_secrets_in_env():
         assert "TOKEN" not in key.upper() and "SECRET" not in key.upper()
 
 
-def test_dockerfile_exists_from_repo_root():
-    assert (ROOT / CFG["build"]["dockerfile"]).is_file()
+def test_dockerfile_is_relative_to_fly_toml():
+    # flyctl resolves build.dockerfile relative to the fly.toml folder, not the repo root.
+    assert CFG["build"]["dockerfile"] == "Dockerfile"
+    assert (ROOT / "field" / CFG["build"]["dockerfile"]).is_file()
 
 
 def test_vm_has_enough_memory_for_baked_model():

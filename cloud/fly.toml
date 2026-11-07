@@ -8,7 +8,9 @@ primary_region = "iad"
 kill_signal = "SIGTERM"
 
 [build]
-  dockerfile = "cloud/Dockerfile"
+# flyctl resolves this path relative to THIS file's folder (the build context is still the repo root
+# passed as `fly deploy .`), so it is just "Dockerfile". With "cloud/Dockerfile" current flyctl looks for cloud/cloud/Dockerfile.
+  dockerfile = "Dockerfile"
 
 [deploy]
   # Runs once per deploy in a temporary machine before the new release starts.

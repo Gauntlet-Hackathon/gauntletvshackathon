@@ -102,13 +102,16 @@ fly secrets set --app <app> \
   DEVICE_TOKENS="laptop-dev-01:<long-random-token>,demo-field-01:<long-random-token>,laptop-02:<long-random-token>"
 
 # 4. Deploy (builds the image, runs bin/migrate, starts the machine once /healthz passes).
-fly deploy . --config cloud/fly.toml --dockerfile cloud/Dockerfile --app <app>
+fly deploy . --config cloud/fly.toml --app <app>
 
 # 5. Check it.
 fly status --app <app>                 # machine "started", check "passing"
 curl -i https://<app>.fly.dev/healthz  # HTTP 200 {"status":"ok"...}; 503 means the DB is unreachable
 fly logs --app <app>                   # if the release_command or the check fails
 ```
+
+Each `fly.toml` names its Dockerfile relative to its own folder (`dockerfile = "Dockerfile"`), which is how flyctl resolves it; the `.` argument keeps the build context at the repo root. Do not add `--dockerfile cloud/Dockerfile`: flyctl then looks for `cloud/cloud/Dockerfile`.
+If the build hangs at "Waiting for depot builder" or fails TLS behind a corporate or sandbox proxy, add `--depot=false` to use Fly's own remote builder.
 
 Prod loads none of the committed dev tokens (`config/devices.exs`), so `DEVICE_TOKENS` must list every device that syncs and must include `demo-field-01:<token>` for the demo (the prod cloud accepts only `DEVICE_TOKENS`); a device left out gets 401.
 Then point each field laptop at it: `CLOUD_URL=https://<app>.fly.dev`, `DEVICE_ID`/`DEVICE_TOKEN` matching a `DEVICE_TOKENS` pair.
@@ -131,7 +134,7 @@ fly volumes create field_data --size 1 --region iad --app <app>
 fly secrets set --app <app> DEVICE_TOKEN=<long-random-token> CLOUD_URL=https://<cloud-app>.fly.dev
 
 # 4. Deploy. fly.toml pins the trained model (gated repo), so the build needs a read-only HF token.
-fly deploy . --config field/fly.toml --dockerfile field/Dockerfile --app <app> --build-secret HF_TOKEN=<hf-token>
+fly deploy . --config field/fly.toml --app <app> --build-secret HF_TOKEN=<hf-token>
 
 # 5. Check it.
 curl https://<app>.fly.dev/sync/status
@@ -143,7 +146,7 @@ Without build args the image has no torch and uses the keyword extractor. With b
 The HF repo is **gated** (CC BY-NC-SA, research-only, #213). Pass the token as a build secret only, never as an arg or env:
 ```bash
 # override the fly.toml pin with another revision:
-fly deploy . --config field/fly.toml --dockerfile field/Dockerfile --app <app> \
+fly deploy . --config field/fly.toml --app <app> \
   --build-arg HF_REPO=<org>/<model> --build-arg HF_REVISION=<40-hex-sha> --build-secret HF_TOKEN=<hf-token>
 # local / compose-style build:
 HF_TOKEN=<hf-token> docker build -f field/Dockerfile --secret id=HF_TOKEN,env=HF_TOKEN \
