@@ -120,6 +120,10 @@ class PickTests(unittest.TestCase):
         self.use(FakeGH(issues=[issue(1, labels=["blocked"]), issue(2, labels=["needs-human"]), issue(3)]))
         self.assertEqual(ap.decide(cfg())["issue"], "3")
 
+    def test_skips_human_and_integrator_even_if_night_safe(self):
+        self.use(FakeGH(issues=[issue(1, labels=["human"]), issue(2, labels=["integrator"]), issue(3)]))
+        self.assertEqual(ap.decide(cfg())["issue"], "3")
+
     def test_parse_deps_variants(self):
         self.assertEqual(ap.parse_deps("Blocked by: #3 and #4\nDepends on #5"), [3, 4, 5])
         self.assertEqual(ap.parse_deps("Parallel with #8"), [])
