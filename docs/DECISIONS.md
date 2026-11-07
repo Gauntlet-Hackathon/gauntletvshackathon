@@ -58,3 +58,10 @@ Made by the integrator while turning the plan into contracts. Reverse any of the
 - W0-5 (Mercury toolchain spike, Tyler) is separate and not part of the Wave 0 PR; E7 stays gated on it.
 - After the Wave 0 PR merges: `gh variable set FIX_LANE --body field` (it is still set to `backend`), then `gh variable set AGENTS_ENABLED --body true` once main is green.
 - H1 (HF repo and output format) before F11 gets `night-safe`.
+
+## Model output format (H1a)
+- Model type: <encoder tagger + heads | generative constrained JSON>
+- Span tags: <e.g. LOCATION, COUNT, CONTACT, TIME>
+- Heads and labels: <is_request; request_kind: rescue/evacuation/welfare_check/supply/other; vulnerable: ...; hazards: ...; needs: ...>
+- Sample raw output for "trapped on roof, 3 kids, water rising, near the Shell on 5th": <paste>
+- Repo and revision come from env HF_REPO / HF_REVISION (pinned commit SHA, never main); filled in by H1b. Until then tests mock the model.
