@@ -434,12 +434,12 @@
   "judge_id": null,
   "judge_version": null,
   "latency": {
-    "decide_ms_per_request": 0.16107870735096386,
-    "extract_ms_per_request": 0.005956487734138358,
-    "median_ms_per_request": 0.1579689997015521,
-    "p95_ms_per_request": 0.20395799992911634,
-    "seconds_per_1000_requests": 0.1670351950851022,
-    "total_ms_per_request": 0.1670351950851022
+    "decide_ms_per_request": 0.16602358531289188,
+    "extract_ms_per_request": 0.007548243923715412,
+    "median_ms_per_request": 0.16144400024131755,
+    "p95_ms_per_request": 0.2372090002609184,
+    "seconds_per_1000_requests": 0.1735718292366073,
+    "total_ms_per_request": 0.1735718292366073
   },
   "metric_counts": {
     "extraction.hazard_f1": {
@@ -490,7 +490,7 @@
   "model_version": "qwen2.5-1.5b-instruct-q4_k_m",
   "n": 41,
   "rules_version": "rules@0000000+bin:00000000",
-  "run_at": "2026-11-07T20:29:08Z",
+  "run_at": "2026-11-07T20:30:32Z",
   "set": "D",
   "stored": {
     "malformed": 0,
