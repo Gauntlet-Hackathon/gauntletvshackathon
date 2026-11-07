@@ -2,7 +2,8 @@
 
 The model is an encoder with classification heads and BIO span tags (H11, docs/DECISIONS.md
 "Model output format (H1a)"). The trainer's inference code is vendored in `rescue_field.tagger`;
-this module resolves the pinned checkpoint folder (no network at runtime) and wraps `infer.Extractor`.
+this module resolves the pinned checkpoint folder (no network at runtime) and wraps
+`infer.Extractor`.
 torch is imported lazily, only when the real model is loaded.
 """
 
