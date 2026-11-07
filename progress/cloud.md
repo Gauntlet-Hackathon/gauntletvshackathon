@@ -30,3 +30,4 @@ One line per merged change: date, lane, issue, what changed.
 - 2026-11-07 cloud #168 C19: projector-readable dashboard: layout max-w-7xl/text-lg/py-8, table-lg + wrapping ids, status_badge component (word + icon/border for stale/offline/P1/mismatch/ours loses; base-content text 16.7:1 light, 12.5:1 dark) on fleet/records/activity/evals, tests
 - 2026-11-07 cloud #169 C20a: skip link + main#main, focus-visible CSS, aria-live on replay/fleet/activity, sr-only captions + scope=col on all tables, tests
 - cloud #170 C20b: phx-disable-with on verify/correction/search buttons, Loading… until LiveView connects (phx-loading CSS), EvalResults.summary_status/0, evals page distinguishes missing vs unreadable summary, tests
+- cloud #204 C23: dashboard home re-ages fleet summary on FleetLive.tick_ms timer using FleetLive.now clock (both made public), test in dashboard_fleet_tick_test
