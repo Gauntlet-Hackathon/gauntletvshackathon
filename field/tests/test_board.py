@@ -299,3 +299,113 @@ def test_refused_move_is_409(store):
         assert client.post(f"/requests/{RID}/status", json={"status": "rescued"}).status_code == 200
         r = client.post(f"/requests/{RID}/status", json={"status": "assigned", "crew": "A"})
     assert r.status_code == 409 and r.json()["detail"]
+
+
+# --- F22: projector, keyboard and screen-reader basics ---------------------------------------
+from html.parser import HTMLParser  # noqa: E402
+
+
+class _A11yParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.tags = []  # (tag, attrs dict, inside_label)
+        self.label_for = set()
+        self.label_depth = 0
+        self.ids = set()
+
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        if "id" in a:
+            self.ids.add(a["id"])
+        if tag == "label":
+            self.label_depth += 1
+            if a.get("for"):
+                self.label_for.add(a["for"])
+        self.tags.append((tag, a, self.label_depth > 0))
+
+    def handle_endtag(self, tag):
+        if tag == "label":
+            self.label_depth -= 1
+
+
+def parse(html):
+    p = _A11yParser()
+    p.feed(html)
+    return p
+
+
+def test_page_has_landmarks_and_skip_link_first(store):
+    add(store, "R1", output("P1"), extracted(location="Elm St"))
+    p = parse(get(store).text)
+    names = [t for t, _, _ in p.tags]
+    assert "main" in names and "header" in names
+    kinds = ("a", "button", "input", "select", "textarea", "summary")
+    focusable = [(t, a) for t, a, _ in p.tags if t in kinds]
+    first_tag, first = focusable[0]
+    assert first_tag == "a" and first.get("href") == "#board"
+    page = get(store).text
+    assert "Skip to board</a>" in page and 'id="board"' in page
+    assert names.index("header") < names.index("main")
+
+
+def test_each_tier_section_is_labelled_by_its_heading(store):
+    p = parse(get(store).text)
+    tiers = [a for t, a, _ in p.tags if t == "section" and "tier" in a.get("class", "").split()]
+    assert [a["id"] for a in tiers] == ["tier-P1", "tier-P2", "tier-P3"]
+    headings = {a.get("id") for t, a, _ in p.tags if t == "h2"}
+    for a in tiers:
+        assert a["aria-labelledby"] in headings
+
+
+def test_every_form_control_has_a_label(store):
+    add(store, "R1", output("P1"), extracted(location="Elm St"))
+    p = parse(get(store).text)
+    controls = [(t, a, inside) for t, a, inside in p.tags if t in ("input", "select", "textarea")]
+    assert len(controls) >= 7  # 4 intake (single text, contact, channel; paste; csv) + 3 per row
+    for t, a, inside in controls:
+        assert inside or a.get("aria-label") or a.get("id") in p.label_for, (t, a)
+    for fid in ("single-raw-text", "single-contact", "single-channel", "paste-text", "csv-file"):
+        assert fid in p.label_for and fid in p.ids
+
+
+def test_tier_and_sync_state_are_written_as_text(store):
+    add(store, "R1", output("P2"), extracted(location="Elm St"))
+    page = get(store).text
+    assert '<span class="tier-label tier-P2">P2</span>' in page
+    assert '<span class="status">[new]</span>' in page
+    with TestClient(create_app(store=store)) as client:
+        badge = client.get("/sync/badge").text
+    assert any(word in badge for word in ("Online", "Offline", "Sync not configured"))
+
+
+def test_css_is_projector_sized_with_focus_outline(store):
+    page = get(store).text
+    assert "html { font-size: 18px; }" in page
+    assert "max-width: 90rem" in page
+    assert ".meta { color: #4a4a4a; font-size: 1rem; }" in page
+    assert "font-size: .85rem" not in page
+    for el in ("a", "button", "summary", "input", "select", "textarea"):
+        assert f"{el}:focus-visible" in page
+
+
+def _luminance(hex_colour):
+    c = [int(hex_colour[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+
+def _contrast(a, b):
+    hi, lo = sorted((_luminance(a), _luminance(b)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def test_colour_pairs_meet_aa_contrast(store):
+    page = get(store).text
+    pairs = [
+        ("#1a1a1a", "#ffffff"), ("#4a4a4a", "#ffffff"), ("#b00020", "#ffffff"),
+        ("#8a4b00", "#ffffff"), ("#1b5e20", "#ffffff"), ("#1a1a1a", "#c8e6c9"),
+        ("#1a1a1a", "#ffcdd2"), ("#1a1a1a", "#eeeeee"), ("#0b57d0", "#ffffff"),
+    ]
+    for fg, bg in pairs:
+        assert fg in page and bg in page
+        assert _contrast(fg, bg) >= 4.5, (fg, bg)
