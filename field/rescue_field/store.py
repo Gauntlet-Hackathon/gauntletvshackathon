@@ -8,11 +8,27 @@ resend would be "unchanged", which contracts/sync_api.md forbids).
 
 from __future__ import annotations
 
+import functools
 import json
 import sqlite3
-from collections.abc import Iterable
+import threading
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
+
+
+def _locked[F: Callable[..., Any]](method: F) -> F:
+    """Run `method` holding the store's own lock: one sqlite3 connection shared across
+    threads must never run two statements (or interleave a transaction) at once, even when a
+    caller forgets its outer lock (a cursor raced by another thread returns None rows)."""
+
+    @functools.wraps(method)
+    def wrapper(self: EventStore, *args: Any, **kwargs: Any) -> Any:
+        with self._lock:
+            return method(self, *args, **kwargs)
+
+    return wrapper  # type: ignore[return-value]
+
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS events (
@@ -44,6 +60,7 @@ _MIGRATIONS = (
 
 class EventStore:
     def __init__(self, path: str | Path = ":memory:", *, check_same_thread: bool = True) -> None:
+        self._lock = threading.RLock()
         # isolation_level=None: we manage transactions explicitly.
         # check_same_thread=False lets a web server use the store from worker threads; the
         # caller must then serialize access (the field API holds a lock).
@@ -61,12 +78,15 @@ class EventStore:
             if column not in cols:
                 self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
 
+    @_locked
     def close(self) -> None:
         self._conn.close()
 
+    @_locked
     def journal_mode(self) -> str:
         return self._conn.execute("PRAGMA journal_mode").fetchone()[0]
 
+    @_locked
     def append_events(self, events: Iterable[dict[str, Any]]) -> list[str]:
         """Store events and queue them in the outbox atomically.
 
@@ -98,6 +118,7 @@ class EventStore:
             raise
         return stored
 
+    @_locked
     def pending_outbox(self, limit: int = 100) -> list[dict[str, Any]]:
         """Unsynced events the cloud has not rejected, oldest first."""
         rows = self._conn.execute(
@@ -107,17 +128,20 @@ class EventStore:
         ).fetchall()
         return [json.loads(r[0]) for r in rows]
 
+    @_locked
     def outbox_count(self) -> int:
         """Events still to send (rejected events are not counted: they will not be sent)."""
         return self._conn.execute(
             "SELECT COUNT(*) FROM outbox WHERE rejected_at IS NULL"
         ).fetchone()[0]
 
+    @_locked
     def rejected_count(self) -> int:
         return self._conn.execute(
             "SELECT COUNT(*) FROM outbox WHERE rejected_at IS NOT NULL"
         ).fetchone()[0]
 
+    @_locked
     def rejected(self) -> list[dict[str, str]]:
         """[{"event_id", "error", "rejected_at"}] for rejected events, oldest first."""
         rows = self._conn.execute(
@@ -126,6 +150,7 @@ class EventStore:
         ).fetchall()
         return [{"event_id": i, "error": e, "rejected_at": t} for i, e, t in rows]
 
+    @_locked
     def mark_rejected(self, rejections: Iterable[tuple[str, str]], at: str) -> int:
         """Record (event_id, error) pairs as rejected at `at`; they leave pending_outbox for
         good. Ids not in the outbox (or already rejected) are ignored. Returns rows marked."""
@@ -144,6 +169,7 @@ class EventStore:
             raise
         return marked
 
+    @_locked
     def ack(self, event_ids: Iterable[str]) -> int:
         """Remove the given ids from the outbox (events stay). Returns rows removed."""
         ids = [(i,) for i in event_ids]
@@ -160,10 +186,12 @@ class EventStore:
             raise
         return removed
 
+    @_locked
     def all_events(self) -> list[dict[str, Any]]:
         rows = self._conn.execute("SELECT body FROM events ORDER BY seq").fetchall()
         return [json.loads(r[0]) for r in rows]
 
+    @_locked
     def latest_rules_version(self, device_id: str | None = None) -> str | None:
         """rules_version of the newest `decided` event (from `device_id` when given), i.e. the
         engine build that made the most recent decision; None before any decision."""
@@ -175,10 +203,12 @@ class EventStore:
         row = self._conn.execute(sql + " ORDER BY seq DESC LIMIT 1", args).fetchone()
         return json.loads(row[0]).get("rules_version") if row else None
 
+    @_locked
     def get_meta(self, key: str) -> str | None:
         row = self._conn.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
         return row[0] if row else None
 
+    @_locked
     def set_meta(self, values: dict[str, str]) -> None:
         self._conn.execute("BEGIN IMMEDIATE")
         try:
@@ -196,6 +226,7 @@ class EventStore:
                 (key, value),
             )
 
+    @_locked
     def append_remote_events(
         self, events: Iterable[dict[str, Any]], meta: dict[str, str] | None = None
     ) -> list[str]:
@@ -226,6 +257,7 @@ class EventStore:
             raise
         return stored
 
+    @_locked
     def request_events(self, request_id: str) -> list[dict[str, Any]]:
         rows = self._conn.execute(
             "SELECT body FROM events WHERE request_id = ? ORDER BY seq", (request_id,)
