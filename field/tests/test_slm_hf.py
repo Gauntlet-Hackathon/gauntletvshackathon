@@ -122,3 +122,26 @@ def test_real_model():
         pytest.skip("HF_REPO/HF_REVISION not set")
     r = HFExtractor().extract("trapped on roof, 3 kids, water rising, near the Shell on 5th")
     assert r.model_version.startswith("hf:")
+
+
+def test_repo_without_org_fails_in_constructor(monkeypatch):
+    _no_download(monkeypatch)
+
+    def factory(folder):
+        raise AssertionError("factory should not be called")
+
+    with pytest.raises(ValueError, match="invalid Hugging Face repo"):
+        HFExtractor("mymodel", SHA, local_path="/x", extractor_factory=factory)
+
+
+def test_select_extractor_falls_back_on_repo_without_org(monkeypatch):
+    from rescue_field import api
+    from rescue_field.slm import FixtureExtractor
+
+    monkeypatch.setenv("HF_REPO", "mymodel")
+    monkeypatch.setenv("HF_REVISION", SHA)
+    _no_download(monkeypatch)
+    ex, info = api.select_extractor_with_info({"HF_REPO": "mymodel", "HF_REVISION": SHA})
+    assert isinstance(ex, FixtureExtractor)
+    assert "invalid Hugging Face repo" in info["fallback_reason"]
+    assert "HF_REPO is not set" not in info["fallback_reason"]
