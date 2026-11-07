@@ -37,6 +37,7 @@ defmodule RescueCloudWeb.Router do
     pipe_through :browser
 
     live "/", DashboardLive
+    live "/fleet", FleetLive
   end
 
   # The sync API (/sync/*) goes in an :api scope behind the device-auth plug (ticket C2).
