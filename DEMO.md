@@ -17,7 +17,7 @@ deploy details are in [RUNBOOK.md](RUNBOOK.md). Placeholders `<cloud-app>` and `
       The first request after a deploy or restart took about 25 s on Fly while the model and engine warmed up; later ones take about 0.3 s.
       Do this after any reset (section 2): a machine restart undoes the warm-up. The request stays on the board and
       syncs to the cloud, so use realistic text you are happy to show.
-- [ ] Open three tabs: the field board (`https://<field-app>.fly.dev/board`; `/` is now the volunteer Queue view, `/intake` the messages screen), the cloud fleet page (`/fleet`) and `/evals`.
+- [ ] Open three tabs: the field board (`https://<field-app>.fly.dev/board`; `/` is the volunteer Queue view, `/intake` the messages screen), the cloud fleet page (`/fleet`) and `/evals`.
 - [ ] Have the backup video ready to play offline.
 
 ## 2. Reset between rehearsals
