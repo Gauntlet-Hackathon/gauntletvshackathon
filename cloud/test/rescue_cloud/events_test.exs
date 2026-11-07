@@ -82,6 +82,23 @@ defmodule RescueCloud.EventsTest do
       assert Repo.aggregate(Event, :count) == 3
     end
 
+    test "stamps synced_at with the sync time; a retry keeps the first sync time" do
+      t1 = ~U[2026-11-07 10:00:00Z]
+      t2 = ~U[2026-11-07 14:00:00Z]
+      {:ok, %{inserted: [e1]}} = Events.append_batch([event_n(1)], synced_at: t1)
+      assert e1.synced_at == t1
+
+      {:ok, _} = Events.append_batch([event_n(1), event_n(2)], synced_at: t2)
+      assert Enum.map(Events.read_since(), & &1.synced_at) == [t1, t2]
+    end
+
+    test "synced_at defaults to now and is never taken from the device" do
+      before = DateTime.utc_now() |> DateTime.truncate(:second)
+      e = Map.put(event_n(1), "synced_at", "2000-01-01T00:00:00Z")
+      {:ok, %{inserted: [stored]}} = Events.append_batch([e])
+      assert DateTime.compare(stored.synced_at, before) != :lt
+    end
+
     test "duplicate ids inside one batch are stored once" do
       assert {:ok, %{acked: [_, _]}} = Events.append_batch([event_n(1), event_n(1)])
       assert Repo.aggregate(Event, :count) == 1

@@ -1,6 +1,8 @@
 defmodule RescueCloud.Events.Event do
   @moduledoc """
   Append-only event row. `id` (bigserial) is the cloud sequence number and defines insert order.
+  `synced_at` is the server time of the sync that first delivered the event (set by
+  `RescueCloud.Events.append_batch/2`, not part of the wire envelope).
   Validation mirrors `contracts/event.schema.json` plus the payload schema for the event type.
   """
   use Ecto.Schema
@@ -26,6 +28,8 @@ defmodule RescueCloud.Events.Event do
     field :rules_version, :string
     field :model_version, :string
     field :payload, :map
+    # Server-side: when the cloud stored the event. Never cast from device input.
+    field :synced_at, :utc_datetime
   end
 
   def types, do: @types
