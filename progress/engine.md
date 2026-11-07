@@ -22,3 +22,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 engine #135 EV11: evals/rescue_evals/error_analysis.py writes evals/reports/error_analysis.md (dev split only, failures grouped by differing field, counts + 3 examples); tests in evals/tests/test_error_analysis.py
 2026-11-07 engine #24 W0-5: Mercury spike GO; engine/mercury/hello.m and mercury-spike CI job (pinned 22.01.8 .debs, mercury_json), decision in docs/DECISIONS.md
 2026-11-07 engine #66 Mercury install moved to .github/actions/install-mercury (this repo's release mirror), added to the engine agent job
+2026-11-07 engine #66 Mercury install added to the python CI job so pytest engine can use mmc
