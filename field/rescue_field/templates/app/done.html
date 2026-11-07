@@ -1,0 +1,9 @@
+{% extends "app/_shell.html" %}
+{% block title %}Saved · CommunityRescue{% endblock %}
+{% block content %}
+<section id="confirmation" class="card" role="status">
+{% for line in lines %}<p>{{ line }}</p>
+{% endfor %}
+</section>
+<p><a class="btn btn-primary" href="/">Back to the queue</a></p>
+{% endblock %}

@@ -1,0 +1,12 @@
+{# Short card summary at the top of the Send someone and Update screens. #}
+<article class="card queue-card" data-request-id="{{ c.request_id }}" aria-label="Incident {{ c.incident }}">
+<p class="card-top">
+{% if c.escalated %}<span class="pill pill-blocked">{{ couldnt }}</span>{% endif %}
+<span class="pill {{ c.pill.cls }}">{{ c.pill.text }}</span>
+<span class="incident">{{ c.incident }}</span>
+{% if c.other_posts %}<span class="other-posts">{{ c.other_posts }}</span>{% endif %}
+</p>
+<h2 class="headline">{{ c.headline }}</h2>
+{% if c.address %}<p class="address">{{ c.address }}</p>{% else %}<p class="address address-missing">No address yet</p>{% endif %}
+<p class="contact muted">{{ c.contact }}</p>
+</article>
