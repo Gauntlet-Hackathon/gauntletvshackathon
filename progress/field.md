@@ -29,3 +29,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 field #154 F16: root docker-compose.yml (db+cloud+field), .env.example, RUNBOOK 'Run locally'; verified POST /requests syncs to the cloud db; cloud prod.exs force_ssl now excludes host 'cloud'
 2026-11-07 field #155 F17: scripts/smoke.sh (health, 3 synced, cloud stop, 5 queued in outbox, restart, 5 arrive <=90s no dupes; --no-docker); verified PASS on every step against the compose stack
 2026-11-07 field #175 F26: field/fly.toml (placeholder app rescue-field-demo, /data volume, /sync/status check), RUNBOOK 'Deploy hosted field demo to Fly', tests/test_fly_toml.py
+2026-11-07 field #176 F28: root README (what it is, mermaid architecture, run it, tests, demo walkthrough, eval placeholder)
