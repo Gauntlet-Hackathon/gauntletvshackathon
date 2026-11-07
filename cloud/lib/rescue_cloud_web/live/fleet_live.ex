@@ -118,13 +118,17 @@ defmodule RescueCloudWeb.FleetLive do
     assign(socket, :devices, devices)
   end
 
+  defp status_kind(:active), do: :ok
+  defp status_kind(:stale), do: :warn
+  defp status_kind(:offline), do: :alarm
+
   @impl true
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current="/fleet">
-      <h1 id="fleet-title" class="text-2xl font-semibold">Fleet</h1>
+      <h1 id="fleet-title" class="text-3xl font-semibold">Fleet</h1>
       <p :if={@devices == []} id="fleet-empty">No devices have synced yet.</p>
-      <table :if={@devices != []} id="fleet-table" class="table">
+      <table :if={@devices != []} id="fleet-table" class="table table-lg">
         <thead>
           <tr>
             <th>Device</th>
@@ -137,19 +141,11 @@ defmodule RescueCloudWeb.FleetLive do
         </thead>
         <tbody>
           <tr :for={d <- @devices} id={"device-#{d.hb.device_id}"}>
-            <td>{d.hb.device_id}</td>
+            <td class="break-all">{d.hb.device_id}</td>
             <td>
-              <span
-                data-role="status"
-                class={[
-                  "badge",
-                  d.status == :active && "badge-success",
-                  d.status == :stale && "badge-warning",
-                  d.status == :offline && "badge-error"
-                ]}
-              >
+              <.status_badge kind={status_kind(d.status)} data-role="status">
                 {d.status}
-              </span>
+              </.status_badge>
             </td>
             <td data-role="last-seen">
               {Calendar.strftime(d.hb.last_seen, "%Y-%m-%d %H:%M:%S UTC")}

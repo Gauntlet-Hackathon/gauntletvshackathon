@@ -46,6 +46,17 @@ defmodule RescueCloudWeb.RecordsLiveTest do
     assert has_element?(view, "#record-#{rid("A1")} [data-role=status]", "escalated")
   end
 
+  test "P1 badge shows its word and an alarm icon", %{conn: conn} do
+    {:ok, view, _} = live(conn, ~p"/records")
+
+    assert has_element?(view, "#record-#{rid("A1")} [data-role=tier]", "P1")
+
+    assert has_element?(
+             view,
+             "#record-#{rid("A1")} [data-role=tier] .hero-exclamation-triangle-solid"
+           )
+  end
+
   test "searches by text (case-insensitive, LIKE wildcards are literal)", %{conn: conn} do
     {:ok, view, _} = live(conn, ~p"/records")
 

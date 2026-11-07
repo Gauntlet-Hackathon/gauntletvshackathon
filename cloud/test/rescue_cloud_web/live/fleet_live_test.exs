@@ -49,6 +49,20 @@ defmodule RescueCloudWeb.FleetLiveTest do
     end
   end
 
+  test "alarm states carry an icon, not only a colour; layout is wide", %{conn: conn} do
+    beat("dev-a", DateTime.add(@t0, -10 * 60))
+    beat("dev-b", DateTime.add(@t0, -40 * 60))
+    beat("dev-c", DateTime.add(@t0, -60))
+    {:ok, view, html} = live(conn, ~p"/fleet")
+
+    assert has_element?(view, "#device-dev-a [data-role=status] .hero-clock-solid")
+    assert has_element?(view, "#device-dev-b [data-role=status] .hero-exclamation-triangle-solid")
+    assert has_element?(view, "#device-dev-b [data-role=status]", "offline")
+    refute has_element?(view, "#device-dev-c [data-role=status] .hero-exclamation-triangle-solid")
+    refute html =~ "max-w-2xl"
+    assert html =~ "max-w-7xl"
+  end
+
   test "shows status, last connection, backlog and versions", %{conn: conn} do
     beat("dev-a", DateTime.add(@t0, -10 * 60), 7)
     beat("dev-b", DateTime.add(@t0, -40 * 60))
