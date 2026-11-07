@@ -180,6 +180,28 @@ defmodule RescueCloud.ProjectionTest do
       assert %{status: "rescued", event_count: 6} = Projection.get_request(r)
     end
 
+    test "responder_status never changes status (#307)" do
+      r = rid("0F")
+      status = %{"crew" => "Boat 3", "status" => "on_the_way", "note" => nil}
+      push([received(r, 1, "2026-11-07T14:00:00Z")])
+      push([event(r, 2, "assigned", "2026-11-07T14:10:00Z")])
+      push([event(r, 3, "responder_status", "2026-11-07T14:12:00Z", %{payload: status})])
+
+      push([
+        event(r, 4, "responder_status", "2026-11-07T14:20:00Z", %{
+          payload: %{status | "status" => "done"}
+        })
+      ])
+
+      assert %{status: "assigned", event_count: 4} = Projection.get_request(r)
+      assert Projection.status_rank("responder_status") == nil
+
+      # Even as a request's first stored event, it does not become the status.
+      s = rid("0G")
+      push([event(s, 1, "responder_status", "2026-11-07T14:12:00Z", %{payload: status})])
+      assert Projection.get_request(s).status == "received"
+    end
+
     test "rescued and closed_duplicate stay terminal; repeats do not move status (#306)" do
       r = rid("0C")
       push([received(r, 1, "2026-11-07T14:00:00Z")])

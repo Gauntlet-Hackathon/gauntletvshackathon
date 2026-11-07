@@ -282,3 +282,9 @@ Decisions taken while fixing the three-model review (reviews 01-03; PRs #264, #2
   `destination`, upgrade all laptops together: an older field build drops a down-synced `rescued` with unknown keys. `rescued` gains optional
   `outcome` (`all` / `some` / `nobody`) and `destination` (up to 200 characters); the record page shows both and a
   details column on the event history.
+- **responder_status event (#307):** a new event type for a dispatched boat's latest status (`sent`, `on_the_way`,
+  `there`, `done`, with `crew` and `note`). It is not a status: it never changes a request's status or rank. The cloud
+  stores it, shows it on the record timeline, and returns other devices' ones from `GET /sync/down` with
+  `assigned`/`rescued`. The field build deployed today skips unknown down-sync types (`downsync.py` `DOWN_TYPES`), so
+  it is unaffected; the field half (#310) is deferred until after the freeze.
+  Down-sync returns them in cloud insert order, so a laptop building "latest status per boat" sorts by `occurred_at`.

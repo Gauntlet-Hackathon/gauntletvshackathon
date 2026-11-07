@@ -65,6 +65,28 @@ defmodule RescueCloudWeb.DownsyncTest do
     refute id1 in Enum.map(body["events"], & &1["event_id"])
   end
 
+  test "returns other devices' responder_status events alongside assigned/rescued (#307)", %{
+    conn: conn
+  } do
+    status = fn crew, st -> %{"crew" => crew, "status" => st, "note" => nil} end
+
+    {:ok, %{rejected: []}} =
+      Events.append_batch([
+        ev("B1", "responder_status", "field-07", status.("boat-1", "on_the_way")),
+        ev("B2", "responder_status", "field-03", status.("mine", "there"))
+      ])
+
+    body = conn |> auth() |> get(~p"/sync/down") |> json_response(200)
+
+    assert [
+             %{"type" => "assigned"},
+             %{"type" => "rescued"},
+             %{"type" => "responder_status", "device_id" => "field-07", "payload" => p}
+           ] = body["events"]
+
+    assert p == status.("boat-1", "on_the_way")
+  end
+
   test "own events are never echoed", %{conn: conn} do
     body = conn |> auth() |> get(~p"/sync/down") |> json_response(200)
     refute Enum.any?(body["events"], &(&1["device_id"] == "field-03"))

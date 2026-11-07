@@ -64,5 +64,6 @@ API adopts it with #309.) Exact rule: a status event moves the
 status when its rank is above the current status's rank, or when the current status is `escalated` and the event is
 `assigned`. Any other status event (a repeat of the current status, a lower rank, anything after `rescued` or
 `closed_duplicate`) does not change it, so `rescued` and `closed_duplicate` stay terminal. Skipping ahead
-(e.g. `decided → rescued`) is allowed. The field status API covers only the operator statuses (`assigned < escalated < rescued`,
+(e.g. `decided → rescued`) is allowed. `responder_status` events (a boat's "On the way" / "There" / "Done", #307) are not statuses: they never change
+the request's status or rank, like `corrected`. The field status API covers only the operator statuses (`assigned < escalated < rescued`,
 `field/rescue_field/status.py`); the cloud projection (`cloud/lib/rescue_cloud/projection.ex`) folds the full order.
