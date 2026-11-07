@@ -24,6 +24,7 @@ PR ─► ci.yml (test) + agent-review.yml (verdict, prompt and CLAUDE.md taken 
    - `AGENT_PAT`: fine-grained token limited to this repo. Contents, Issues and Pull requests: read and write. Actions: read (without it the picker can't see CI and every lane waits). **Do not grant Workflows**: that is what stops an agent's PR from editing CI or the review gate. A token is needed instead of the built-in one because pushes and PRs made with the built-in token don't start CI.
    - `CLAUDE_TOKEN_<PERSON>`: each person runs `claude setup-token` and sets their own secret (`gh secret set CLAUDE_TOKEN_<PERSON> -R <owner/repo>`, paste). Each lane's `token_secret` points at its owner's secret, so a person's lanes all spend their plan.
    - `CLAUDE_TOKEN_REVIEW`: from someone else, for the review gate.
+   - Optional `AGENT_PAT_<PERSON>`: a lane owner's own token with exactly the `AGENT_PAT` permissions (still no Workflows). Lanes mapped to it in `night-shift.yml` open their PRs as that person, so GitHub credits the squash commits to them instead of the `AGENT_PAT` owner. Today the `cloud` lane uses `AGENT_PAT_DEBU` and falls back to `AGENT_PAT` while it is unset. The pick job logs which account a lane publishes as. Switching a lane's token resets its issues' attempt counts, because the picker only counts markers posted by the lane's own token account.
 5. **Replace the CI test step** in `ci.yml` with the real stack commands once Wave 0 picks the stack.
 6. **Turn it on:** set the variable `AGENTS_ENABLED=true`.
 
