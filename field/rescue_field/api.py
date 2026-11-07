@@ -30,6 +30,7 @@ from starlette.datastructures import UploadFile
 
 from rescue_field import board as board_module
 from rescue_field import engine_client
+from rescue_field import status as status_module
 from rescue_field import sync as sync_module
 from rescue_field.pipeline import BatchDecider, IntakeItem, PipelineConfig, process_batch
 from rescue_field.slm import Extractor, FixtureExtractor
@@ -345,6 +346,7 @@ def create_app(
     app.include_router(router)
     app.include_router(sync_module.router)
     app.include_router(board_module.router)
+    app.include_router(status_module.router)
     return app
 
 

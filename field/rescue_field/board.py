@@ -17,6 +17,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
+from rescue_field.status import current_status
 from rescue_field.store import EventStore
 from rescue_shared import logic
 
@@ -28,7 +29,8 @@ router = APIRouter()
 def _requests(store: EventStore) -> dict[str, dict[str, Any]]:
     """One record per request, in arrival order, from its received/extracted/decided events."""
     recs: dict[str, dict[str, Any]] = {}
-    for ev in store.all_events():
+    evs = store.all_events()
+    for ev in evs:
         rec = recs.setdefault(ev["request_id"], {"request_id": ev["request_id"]})
         if ev["type"] == "received":
             rec["received_at"] = ev["occurred_at"]
@@ -40,6 +42,8 @@ def _requests(store: EventStore) -> dict[str, dict[str, Any]]:
         elif ev["type"] == "decided":
             rec["decision"] = ev["payload"]["engine_output"]
             rec["rules_version"] = ev["rules_version"]
+    for rid, rec in recs.items():
+        rec["status"] = current_status([e for e in evs if e["request_id"] == rid])
     return {
         rid: r for rid, r in recs.items() if {"received_at", "extracted", "decision"} <= r.keys()
     }
