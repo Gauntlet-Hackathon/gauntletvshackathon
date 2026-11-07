@@ -4,7 +4,7 @@ defmodule RescueCloudWeb.DownsyncController do
   rules/model versions (see `contracts/sync_api.md`).
 
   Approved versions come from `config :rescue_cloud, :approved_versions` (a map with optional
-  `:rules_version` / `:model_version`) until the model registry and promotion gate (C10) exist.
+  `:rules_version` / `:model_version`) as a fallback; an approved model in the registry (`RescueCloud.Models`) wins for `model_version`.
   """
   use RescueCloudWeb, :controller
 
@@ -21,7 +21,7 @@ defmodule RescueCloudWeb.DownsyncController do
           events: Enum.map(events, &envelope/1),
           approved: %{
             rules_version: approved[:rules_version],
-            model_version: approved[:model_version]
+            model_version: RescueCloud.Models.approved_model_version() || approved[:model_version]
           }
         })
 
