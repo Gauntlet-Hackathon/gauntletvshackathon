@@ -164,6 +164,17 @@ class EventStore:
         rows = self._conn.execute("SELECT body FROM events ORDER BY seq").fetchall()
         return [json.loads(r[0]) for r in rows]
 
+    def latest_rules_version(self, device_id: str | None = None) -> str | None:
+        """rules_version of the newest `decided` event (from `device_id` when given), i.e. the
+        engine build that made the most recent decision; None before any decision."""
+        sql = "SELECT body FROM events WHERE type = 'decided'"
+        args: tuple[str, ...] = ()
+        if device_id is not None:
+            sql += " AND json_extract(body, '$.device_id') = ?"
+            args = (device_id,)
+        row = self._conn.execute(sql + " ORDER BY seq DESC LIMIT 1", args).fetchone()
+        return json.loads(row[0]).get("rules_version") if row else None
+
     def get_meta(self, key: str) -> str | None:
         row = self._conn.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
         return row[0] if row else None

@@ -37,7 +37,7 @@ BACKOFF_CAP_S = 300.0
 JITTER = 0.2  # +/- fraction of the delay
 IDLE_INTERVAL_S = 10.0  # wait between cycles while online
 REQUEST_TIMEOUT_S = 10.0
-# placeholder until an engine artifact is loaded
+# placeholder until the first decision (or RULES_VERSION) names the engine build
 DEFAULT_RULES_VERSION = "rules@0000000+bin:00000000"
 
 
@@ -256,14 +256,25 @@ def worker_from_env(
     env: Mapping[str, str] | None = None,
     transport: httpx.BaseTransport | None = None,
 ) -> SyncWorker:
+    """Worker configured from the runtime env. The heartbeat reports the rules_version of the
+    engine that made this device's most recent decision (the real build stamp, DECISIONS A2),
+    falling back to `RULES_VERSION` (then a placeholder) before the first decision."""
     env = os.environ if env is None else env
-    rules = env.get("RULES_VERSION") or DEFAULT_RULES_VERSION
+    fallback_rules = env.get("RULES_VERSION") or DEFAULT_RULES_VERSION
+    device_id = env.get("DEVICE_ID") or DEFAULT_DEVICE_ID
+    store_lock = lock if lock is not None else nullcontext()
+
+    def versions() -> tuple[str, str]:
+        with store_lock:
+            rules = store.latest_rules_version(device_id)
+        return (rules or fallback_rules, model_version)
+
     return SyncWorker(
         store,
         cloud_url,
-        device_id=env.get("DEVICE_ID") or DEFAULT_DEVICE_ID,
+        device_id=device_id,
         token=env.get("DEVICE_TOKEN") or "dev-token-laptop-dev-01",
-        versions=lambda: (rules, model_version),
+        versions=versions,
         lock=lock,
         transport=transport,
         down_sync=True,

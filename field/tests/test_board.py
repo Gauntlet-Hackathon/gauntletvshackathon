@@ -31,6 +31,7 @@ def output(tier, rule="R-P2-01", outcome="prioritized", duplicate_of=None, quest
         "rule_id": rule,
         "duplicate_of": duplicate_of,
         "abstain_reason": "low_confidence_request" if outcome == "abstain" else None,
+        "provisional_tier": None,
         "follow_up_question": question,
         "rules_version": RULES,
     }

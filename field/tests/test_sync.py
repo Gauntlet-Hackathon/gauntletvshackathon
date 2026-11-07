@@ -330,3 +330,60 @@ def test_status_without_worker(tmp_path, monkeypatch):
     monkeypatch.setenv("FIELD_DATA_DIR", str(tmp_path))
     with TestClient(create_app(decide_batch=fake_engine())) as client:
         assert client.get("/sync/status").json()["running"] is False
+
+
+def decided_ev(event_id, rules, device_id="laptop-dev-01"):
+    return {
+        "event_id": event_id,
+        "request_id": f"req-{event_id}",
+        "type": "decided",
+        "device_id": device_id,
+        "occurred_at": "2026-11-07T10:00:00Z",
+        "rules_version": rules,
+        "model_version": "stub:x",
+    }
+
+
+def heartbeat_rules(store, env):
+    cloud = FakeCloud()
+    w = sync.worker_from_env(
+        store, "http://cloud", model_version="stub:x",
+        env={"DEVICE_TOKEN": "tok", **env}, transport=httpx.MockTransport(cloud),
+    )
+    w.down_sync = False  # FakeCloud only speaks the up-sync routes
+    try:
+        w.sync_once()
+    finally:
+        w.client.close()
+    return cloud.heartbeats[-1]["rules_version"]
+
+
+def test_heartbeat_rules_version_falls_back_to_env_then_placeholder(store):
+    assert heartbeat_rules(store, {}) == sync.DEFAULT_RULES_VERSION
+    assert heartbeat_rules(store, {"RULES_VERSION": "rules@1111111+bin:11111111"}) == (
+        "rules@1111111+bin:11111111"
+    )
+
+
+def test_heartbeat_reports_rules_version_of_latest_decision(store):
+    # DECISIONS A2: the build stamp from the engine beats the env value
+    env = {"RULES_VERSION": "rules@1111111+bin:11111111"}
+    store.append_events([decided_ev("d1", "rules@aaaaaaa+bin:aaaaaaaa")])
+    assert heartbeat_rules(store, env) == "rules@aaaaaaa+bin:aaaaaaaa"
+    store.append_events([decided_ev("d2", "rules@bbbbbbb+bin:bbbbbbbb")])
+    assert heartbeat_rules(store, env) == "rules@bbbbbbb+bin:bbbbbbbb"
+    # a decision down-synced from another device does not count as ours
+    store.append_remote_events([decided_ev("d3", "rules@ccccccc+bin:cccccccc", "other-dev")])
+    assert heartbeat_rules(store, env) == "rules@bbbbbbb+bin:bbbbbbbb"
+
+
+def test_heartbeat_rules_version_follows_pipeline_decisions(tmp_path, monkeypatch):
+    for name in ("RULES_VERSION", "DEVICE_ID", "CLOUD_URL"):
+        monkeypatch.delenv(name, raising=False)
+    s = EventStore(tmp_path / "f.db", check_same_thread=False)
+    app = create_app(store=s, decide_batch=fake_engine())
+    with TestClient(app) as client:
+        assert client.post("/requests", json={"raw_text": "help, flooding"}).status_code == 200
+    decided = [e for e in s.all_events() if e["type"] == "decided"]
+    assert heartbeat_rules(s, {}) == decided[-1]["rules_version"]
+    s.close()

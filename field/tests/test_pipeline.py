@@ -45,6 +45,7 @@ class FakeDecider:
             "rule_id": "R-P1-01",
             "duplicate_of": None,
             "abstain_reason": None,
+            "provisional_tier": None,
             "follow_up_question": None,
             "rules_version": RULES,
         }
