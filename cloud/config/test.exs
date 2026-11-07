@@ -55,3 +55,8 @@ config :phoenix_live_view,
 # Sort query params output of verified routes for robust url comparisons
 config :phoenix,
   sort_verified_routes_query_params: true
+
+config :rescue_cloud, :devices, %{
+  "demo-field-01" => "test-token-field-01",
+  "field-03" => "test-token-field-03"
+}

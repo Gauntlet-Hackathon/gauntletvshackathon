@@ -21,6 +21,17 @@ defmodule RescueCloudWeb.Router do
     get "/health", HealthController, :show
   end
 
+  pipeline :device_api do
+    plug :accepts, ["json"]
+    plug RescueCloudWeb.Plugs.DeviceAuth
+  end
+
+  scope "/sync", RescueCloudWeb do
+    pipe_through :device_api
+
+    post "/heartbeat", SyncController, :heartbeat
+  end
+
   scope "/", RescueCloudWeb do
     pipe_through :browser
 
