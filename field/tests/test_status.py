@@ -71,9 +71,9 @@ def test_form_input(client):
 
 
 def test_board_reflects_status(client):
-    assert 'data-status="new"' in client.get("/").text
+    assert 'data-status="new"' in client.get("/board").text
     post(client, "assigned")
-    assert 'data-status="assigned"' in client.get("/").text
+    assert 'data-status="assigned"' in client.get("/board").text
     post(client, "rescued")
-    html = client.get("/").text
+    html = client.get("/board").text
     assert 'data-status="rescued"' in html and "[rescued]" in html

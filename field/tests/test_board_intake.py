@@ -26,7 +26,7 @@ def rows(html):
 
 
 def test_page_has_three_labelled_intake_forms(client):
-    html = client.get("/").text
+    html = client.get("/board").text
     forms = re.findall(r"<form\b[^>]*>", html)
     assert len(forms) == 3
     assert any('action="/requests"' in f for f in forms)
@@ -47,14 +47,14 @@ def test_page_has_three_labelled_intake_forms(client):
 
 
 def test_fragment_after_bulk_post_has_new_rows(client):
-    before = rows(client.get("/", headers={"HX-Request": "true"}).text)
+    before = rows(client.get("/board", headers={"HX-Request": "true"}).text)
     r = client.post(
         "/requests/bulk",
         content=b"help at Elm\nwater at Main\nattic at Oak\n",
         headers={"content-type": "text/plain"},
     )
     assert r.status_code == 200 and r.json()["count"] == 3
-    frag = client.get("/", headers={"HX-Request": "true"})
+    frag = client.get("/board", headers={"HX-Request": "true"})
     assert "<html" not in frag.text
     assert rows(frag.text) > before
 

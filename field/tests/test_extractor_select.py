@@ -76,14 +76,14 @@ def test_env_set_uses_hf_everywhere(env, monkeypatch):
             events = app.state.store.all_events()
         versions = {e["model_version"] for e in events if "model_version" in e}
         assert HF_VERSION in versions
-        assert HF_VERSION in client.get("/").text
+        assert HF_VERSION in client.get("/board").text
 
 
 def test_env_unset_uses_fixture(env):
     app = api.create_app(decide_batch=fake_engine())
     with TestClient(app) as client:
         assert isinstance(app.state.extractor, FixtureExtractor)
-        assert "Model: " in client.get("/").text
+        assert "Model: " in client.get("/board").text
 
 
 def test_partial_env_uses_fixture(env, monkeypatch):
@@ -149,7 +149,7 @@ def test_fallback_is_visible_in_status_and_board(env, monkeypatch, caplog):
     with caplog.at_level(logging.ERROR, logger="rescue_field.api"):
         with TestClient(app) as client:
             ex = client.get("/sync/status").json()["extractor"]
-            html = client.get("/").text
+            html = client.get("/board").text
     assert ex["extractor"] == "fixture"
     assert ex["expected_model"] == HF_VERSION
     assert ex["fallback_reason"] == "RuntimeError: no weights"
@@ -162,7 +162,7 @@ def test_no_env_no_banner(env):
     app = api.create_app(decide_batch=fake_engine())
     with TestClient(app) as client:
         ex = client.get("/sync/status").json()["extractor"]
-        assert BANNER not in client.get("/").text
+        assert BANNER not in client.get("/board").text
     assert ex["extractor"] == "fixture" and ex["expected_model"] is None
     assert ex["fallback_reason"] is None
 
@@ -173,7 +173,7 @@ def test_load_success_no_banner(env, monkeypatch):
     app = api.create_app(decide_batch=fake_engine())
     with TestClient(app) as client:
         ex = client.get("/sync/status").json()["extractor"]
-        assert BANNER not in client.get("/").text
+        assert BANNER not in client.get("/board").text
     assert ex == {
         "extractor": "hf",
         "model_version": HF_VERSION,

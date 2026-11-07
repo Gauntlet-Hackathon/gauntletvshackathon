@@ -1,0 +1,36 @@
+{# Queue mode fragment: GET / with HX-Request returns only this, so the page swaps it in place. #}
+<nav class="queue-nav" aria-label="Queue">
+<a href="#next">Next</a>
+<a href="#waiting">Waiting ({{ waiting|length + check_first|length }})</a>
+<a href="#out-now">Out now ({{ out_now|length }})</a>
+</nav>
+<section id="next" aria-labelledby="next-heading">
+<h1 id="next-heading">Next</h1>
+{% if queue %}
+<div id="next-stack" data-count="{{ queue|length }}">
+{% for c in queue %}<div class="next-item" data-request-id="{{ c.request_id }}"{% if not loop.first %} hidden{% endif %}>{% include "app/_card.html" %}</div>
+{% endfor %}
+</div>
+<p id="all-skipped" class="muted" hidden>You skipped everyone. <button type="button" class="link" id="skip-reset">Start again from the top</button></p>
+<button type="button" class="link skip" id="skip">Skip for now, show the next person</button>
+{% else %}
+<p class="muted" id="next-empty">Nobody is waiting for a crew right now.</p>
+{% endif %}
+</section>
+<section id="waiting" aria-labelledby="waiting-heading">
+<h1 id="waiting-heading">Waiting for help</h1>
+{% if waiting %}<ul class="queue-lines">{% for c in waiting %}{% include "app/_line.html" %}{% endfor %}</ul>
+{% else %}<p class="muted">No one else is waiting.</p>{% endif %}
+<h2 id="check-first-heading">Check first ({{ check_first|length }})</h2>
+{% for c in check_first %}{% include "app/_card.html" %}{% else %}<p class="muted">Nothing to check.</p>{% endfor %}
+<details id="set-aside" class="set-aside" data-key="set-aside">
+<summary>Set aside ({{ set_aside|length }})</summary>
+{% if set_aside %}<ul class="queue-lines">{% for c in set_aside %}{% include "app/_line.html" %}{% endfor %}</ul>
+{% else %}<p class="muted">Nothing set aside.</p>{% endif %}
+</details>
+</section>
+<section id="out-now" aria-labelledby="out-now-heading">
+<h1 id="out-now-heading">Out now</h1>
+{% if out_now %}<ul class="queue-lines">{% for c in out_now %}{% include "app/_line.html" %}{% endfor %}</ul>
+{% else %}<p class="muted">No crews out.</p>{% endif %}
+</section>
