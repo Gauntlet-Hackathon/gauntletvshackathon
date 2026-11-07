@@ -13,11 +13,11 @@ deploy details are in [RUNBOOK.md](RUNBOOK.md). Placeholders `<cloud-app>` and `
 - [ ] Check the demo fleet thresholds `FLEET_STALE_AFTER_S` / `FLEET_OFFLINE_AFTER_S` (defaults 300 s / 1800 s, see
       [cloud/README.md](cloud/README.md)). For a 3-minute demo, set the stale threshold well below 3 minutes so the
       row turns stale while the laptop is offline.
-- [ ] Warm up the field app: paste one throwaway request on the board (or `curl -X POST https://<field-app>.fly.dev/requests -d raw_text=warmup`).
+- [ ] Warm up the field app: paste one throwaway request on the board at `/board` (or `curl -X POST https://<field-app>.fly.dev/requests -d raw_text=warmup`).
       The first request after a deploy or restart took about 25 s on Fly while the model and engine warmed up; later ones take about 0.3 s.
       Do this after any reset (section 2): a machine restart undoes the warm-up. The request stays on the board and
       syncs to the cloud, so use realistic text you are happy to show.
-- [ ] Open three tabs: the field board (`https://<field-app>.fly.dev/`), the cloud fleet page (`/fleet`) and `/evals`.
+- [ ] Open three tabs: the field board (`https://<field-app>.fly.dev/board`; `/` is the volunteer Queue view, `/intake` the messages screen), the cloud fleet page (`/fleet`) and `/evals`.
 - [ ] Have the backup video ready to play offline.
 
 ## 2. Reset between rehearsals
@@ -34,7 +34,7 @@ Always reset the field app and the cloud **together**: the field app's down-sync
 ## 3. Script notes
 
 - Click-by-click: [README demo walkthrough](README.md#demo-walkthrough-about-3-minutes).
-- Paste [field/demo/seed_requests.txt](field/demo/seed_requests.txt) (200 requests; a CSV copy is next to it).
+- Paste [field/demo/seed_requests.txt](field/demo/seed_requests.txt) into the intake panel on `/board` (200 requests; a CSV copy is next to it).
 - While the laptop is offline the cloud cannot see the backlog climb. Point at the field badge's backlog, and at the
   cloud fleet row turning stale.
 - Abstains with a raised `provisional_tier` show as "P1?" on the board and in the cloud records.
