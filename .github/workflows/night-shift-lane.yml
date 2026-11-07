@@ -63,6 +63,11 @@ jobs:
         run: |
           if [ -z "$LANE_TOKEN" ]; then echo "::error::Secret $TOKEN_NAME is empty or missing"; exit 1; fi
 
+      - name: Show the account this lane publishes as
+        env:
+          GH_TOKEN: ${{ secrets.agent_pat }}
+        run: echo "Lane $LANE picks and publishes as $(gh api user --jq .login)"
+
       - name: Pick next issue
         id: pick
         env:
