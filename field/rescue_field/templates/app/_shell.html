@@ -24,7 +24,7 @@
 </div>
 <nav class="mode-toggle" aria-label="Mode">
 <a href="/"{% if mode == "queue" %} class="selected" aria-current="page"{% endif %}>Queue</a>
-<a href="/app?mode=respond"{% if mode == "respond" %} class="selected" aria-current="page"{% endif %}>Respond</a>
+<a href="/respond"{% if mode == "respond" %} class="selected" aria-current="page"{% endif %}>Respond</a>
 </nav>
 <p id="connection" class="connection connection-{{ connection.state }}" role="status" aria-live="polite" data-state="{{ connection.state }}"><span class="dot" aria-hidden="true"></span>{{ connection.text }}</p>
 </header>
