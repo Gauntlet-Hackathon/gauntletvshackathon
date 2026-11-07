@@ -12,6 +12,7 @@ defmodule RescueCloud.Deploy.FlyTomlTest do
 
   test "is valid TOML with an app name and a Dockerfile build", %{fly: fly} do
     assert is_binary(fly["app"]) and fly["app"] != ""
+
     # flyctl resolves `build.dockerfile` relative to the fly.toml folder (cloud/), not the repo root.
     assert fly["build"]["dockerfile"] == "Dockerfile"
     assert File.exists?(Path.join(@root, fly["build"]["dockerfile"]))
