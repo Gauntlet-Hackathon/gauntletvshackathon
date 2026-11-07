@@ -202,3 +202,9 @@ Findings R1–R13 (engine rules) and A1–A12 (agent assumptions) are in the ste
 - The rules_version itself is unchanged everywhere it is data: manifest.json, the stamped binary, events, contracts. The committed build was renamed, not rebuilt, so its bytes and hashes are the same.
 - The field image now takes two build args: `RULES_VERSION` (reported) and `ENGINE_BUILD` (the folder); `field/tests/test_dockerfile.py` checks they agree.
 - `shared/tests/test_portable_paths.py` fails if any tracked path contains a character Windows cannot store.
+
+## Model delivery to laptops (2026-11-07)
+The plan (02 "Model registry", 06 hours 12-15) has laptops pull approved models from the cloud registry on down-sync. For the hackathon the field app gets its model differently:
+- The field image bakes the pinned revision in at build time (`HF_REPO` / `HF_REVISION` build args, F32 #233). At runtime the app never reaches Hugging Face (`HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`) and loads only `/models/current`.
+- The cloud keeps the registry and the gate (`RescueCloud.Models.pull/3`, `evaluate/2`, `promote/2`; cloud/README.md). The order for #104 is: run the evals on the candidate, `promote` it on the cloud, and only an `approved` revision is pinned in the field image build.
+- Not built: `GET /models/{version}` and a laptop pulling a model bundle on down-sync, with rollback to the previous version. A model change ships as a new field image. That is fine for one hosted demo device and is the next step for a real fleet.
