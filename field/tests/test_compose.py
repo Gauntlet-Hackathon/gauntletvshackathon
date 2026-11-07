@@ -16,3 +16,10 @@ def test_field_service_enables_demo_mode():
     assert 'DEMO_MODE: "1"' in block
     assert "DEVICE_ID: laptop-dev-01" in block
     assert "CLOUD_URL: http://cloud:4000" in block
+
+
+def test_field_build_passes_hf_args():
+    block = _field_block()
+    assert "HF_REPO: ${HF_REPO:-}" in block
+    assert "HF_REVISION: ${HF_REVISION:-}" in block
+    assert "HF_TOKEN" not in block

@@ -35,6 +35,9 @@ services:
     build:
       context: .
       dockerfile: field/Dockerfile
+      args:
+        HF_REPO: ${HF_REPO:-}
+        HF_REVISION: ${HF_REVISION:-}
     environment:
       CLOUD_URL: http://cloud:4000
       DEVICE_ID: laptop-dev-01

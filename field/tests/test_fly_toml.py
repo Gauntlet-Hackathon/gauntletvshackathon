@@ -38,3 +38,14 @@ def test_no_secrets_in_env():
 
 def test_dockerfile_exists_from_repo_root():
     assert (ROOT / CFG["build"]["dockerfile"]).is_file()
+
+
+def test_vm_has_enough_memory_for_baked_model():
+    vm = CFG["vm"][0]
+    assert vm["memory"] == "2gb"
+    assert vm["cpus"] == 2
+
+
+def test_health_check_grace_covers_model_load():
+    for check in CFG["http_service"]["checks"]:
+        assert int(check["grace_period"].rstrip("s")) >= 60

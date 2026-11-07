@@ -147,6 +147,8 @@ HF_TOKEN=<hf-token> docker build -f field/Dockerfile --secret id=HF_TOKEN,env=HF
   --build-arg HF_REPO=<org>/<model> --build-arg HF_REVISION=<40-hex-sha> .
 ```
 
+The model build needs the 2 GB VM that `field/fly.toml` sets (`[[vm]]`, with a 60 s health-check grace period for model load); Fly's 256 MB default is too small. To bake the model for a local compose rehearsal (token still only as a build secret, see above): `HF_REPO=<org>/<model> HF_REVISION=<40-hex-sha> docker compose build field`.
+
 ## Run locally
 Whole stack (Postgres, cloud, field) with Docker:
 1. `cp .env.example .env` and set `SECRET_KEY_BASE` (`openssl rand -base64 48` or `mix phx.gen.secret`).
