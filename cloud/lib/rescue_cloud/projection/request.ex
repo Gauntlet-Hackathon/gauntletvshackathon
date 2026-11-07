@@ -19,6 +19,7 @@ defmodule RescueCloud.Projection.Request do
     field :people_count, :integer
     field :outcome, :string
     field :priority_tier, :string
+    field :provisional_tier, :string
     field :rule_id, :string
     field :abstain_reason, :string
     field :follow_up_question, :string
@@ -33,8 +34,8 @@ defmodule RescueCloud.Projection.Request do
   end
 
   @fields ~w(request_id status received_at device_id channel raw_text contact extracted
-             location_text people_count outcome priority_tier rule_id abstain_reason
-             follow_up_question duplicate_of rules_version model_version duplicate_group
+             location_text people_count outcome priority_tier provisional_tier rule_id
+             abstain_reason follow_up_question duplicate_of rules_version model_version duplicate_group
              correction_count event_count last_event_seq last_event_at)a
 
   def fields, do: @fields

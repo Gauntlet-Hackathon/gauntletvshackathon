@@ -106,6 +106,7 @@ defmodule RescueCloud.ProjectionTest do
       req = Projection.get_request(r)
       assert req.status == "decided"
       assert req.priority_tier == "P1"
+      assert req.provisional_tier == nil
       assert req.rule_id == "R-P1-ROOF"
       assert req.outcome == payload("decided")["engine_output"]["outcome"]
       assert req.rules_version == @rules

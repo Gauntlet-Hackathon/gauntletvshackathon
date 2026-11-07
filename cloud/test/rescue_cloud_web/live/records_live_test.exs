@@ -46,6 +46,36 @@ defmodule RescueCloudWeb.RecordsLiveTest do
     assert has_element?(view, "#record-#{rid("A1")} [data-role=status]", "escalated")
   end
 
+  test "abstain follow-ups sort by provisional_tier after tiered rows and show it (R1)", %{
+    conn: conn
+  } do
+    sync!(
+      [
+        event("D4", 1, "received", "2026-11-07T14:07:00Z"),
+        event("D4", 2, "decided", "2026-11-07T14:07:05Z",
+          outcome: "abstain",
+          provisional_tier: "P1"
+        ),
+        event("E5", 1, "received", "2026-11-07T14:08:00Z"),
+        event("E5", 2, "decided", "2026-11-07T14:08:05Z",
+          outcome: "abstain",
+          provisional_tier: "P3"
+        )
+      ],
+      @t
+    )
+
+    {:ok, view, _} = live(conn, ~p"/records")
+
+    # tiered first (P1, P3), then abstains P1?, P2? (C3, the fixture default), P3?; the newest
+    # abstain (E5) does not jump ahead of an older but more urgent one
+    assert rows(view) ==
+             Enum.map(~w(A1 B2 D4 C3 E5), &("record-" <> rid(&1)))
+
+    assert has_element?(view, "#record-#{rid("D4")} [data-role=tier]", "P1?")
+    assert has_element?(view, "#record-#{rid("E5")} [data-role=tier]", "P3?")
+  end
+
   test "searches by text (case-insensitive, LIKE wildcards are literal)", %{conn: conn} do
     {:ok, view, _} = live(conn, ~p"/records")
 

@@ -36,7 +36,8 @@ defmodule RescueCloud.Projection do
     "closed_duplicate" => 6
   }
 
-  @engine_fields ~w(outcome priority_tier rule_id abstain_reason follow_up_question duplicate_of)
+  @engine_fields ~w(outcome priority_tier provisional_tier rule_id abstain_reason
+                     follow_up_question duplicate_of)
 
   @doc "Status rank, or nil for event types that are not statuses (`corrected`)."
   def status_rank(type), do: Map.get(@status_rank, type)
@@ -123,6 +124,7 @@ defmodule RescueCloud.Projection do
       extracted: nil,
       outcome: nil,
       priority_tier: nil,
+      provisional_tier: nil,
       rule_id: nil,
       abstain_reason: nil,
       follow_up_question: nil,

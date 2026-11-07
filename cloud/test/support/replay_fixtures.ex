@@ -46,6 +46,7 @@ defmodule RescueCloud.ReplayFixtures do
     out = %{
       "outcome" => "prioritized",
       "priority_tier" => tier,
+      "provisional_tier" => nil,
       "rule_id" => rule,
       "duplicate_of" => nil,
       "abstain_reason" => nil,

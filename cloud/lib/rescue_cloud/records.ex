@@ -35,7 +35,8 @@ defmodule RescueCloud.Records do
     * `"q"`: case-insensitive substring of raw text, location, contact or request id
     * `"tier"`: `P1` | `P2` | `P3`
     * `"status"`: a request status
-  Ordered by tier (P1 first, untiered last), then newest first. At most `limit` rows.
+  Ordered by tier (P1 first, untiered last); untiered abstain follow-ups by their
+  `provisional_tier` (P1 first, DECISIONS R1), then newest first. At most `limit` rows.
   """
   @spec search_requests(map(), keyword()) :: [%Request{}]
   def search_requests(filters \\ %{}, opts \\ []) do
@@ -44,6 +45,7 @@ defmodule RescueCloud.Records do
     from(r in Request,
       order_by: [
         asc_nulls_last: r.priority_tier,
+        asc_nulls_last: r.provisional_tier,
         desc: r.received_at,
         asc: r.request_id
       ],

@@ -137,6 +137,7 @@ defmodule RescueCloud.Events.Payload do
     obj(%{
       "outcome" => enum(~w(prioritized abstain not_a_request duplicate)),
       "priority_tier" => nullable(enum(@tiers)),
+      "provisional_tier" => nullable(enum(@tiers)),
       "rule_id" => {:pattern, @rule_id},
       "duplicate_of" => nullable({:pattern, @ulid}),
       "abstain_reason" => nullable(enum(@abstain)),
@@ -148,6 +149,7 @@ defmodule RescueCloud.Events.Payload do
   # Outcome-dependent rules from engine_output.schema.json.
   defp outcome_rules(%{"outcome" => outcome} = out, path) do
     tier = out["priority_tier"]
+    provisional = out["provisional_tier"]
     dup = out["duplicate_of"]
     reason = out["abstain_reason"]
     q = out["follow_up_question"]
@@ -157,6 +159,7 @@ defmodule RescueCloud.Events.Payload do
         "prioritized" ->
           [
             {tier != nil, "priority_tier"},
+            {provisional == nil, "provisional_tier"},
             {dup == nil, "duplicate_of"},
             {reason == nil, "abstain_reason"}
           ]
@@ -164,6 +167,7 @@ defmodule RescueCloud.Events.Payload do
         "duplicate" ->
           [
             {tier != nil, "priority_tier"},
+            {provisional == nil, "provisional_tier"},
             {dup != nil, "duplicate_of"},
             {reason == nil, "abstain_reason"}
           ]
@@ -171,6 +175,7 @@ defmodule RescueCloud.Events.Payload do
         "abstain" ->
           [
             {tier == nil, "priority_tier"},
+            {provisional != nil, "provisional_tier"},
             {dup == nil, "duplicate_of"},
             {reason != nil, "abstain_reason"},
             {q != nil, "follow_up_question"}
@@ -179,6 +184,7 @@ defmodule RescueCloud.Events.Payload do
         "not_a_request" ->
           [
             {tier == nil, "priority_tier"},
+            {provisional == nil, "provisional_tier"},
             {dup == nil, "duplicate_of"},
             {reason == nil, "abstain_reason"},
             {q == nil, "follow_up_question"}

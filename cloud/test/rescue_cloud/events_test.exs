@@ -63,6 +63,46 @@ defmodule RescueCloud.EventsTest do
       bad = put_in(decided, ["engine_output", "outcome"], "abstain")
       refute Event.changeset(event(%{"type" => "decided", "payload" => bad})).valid?
     end
+
+    test "provisional_tier is required and set exactly on abstain outcomes (DECISIONS R1)" do
+      decided = example("payload-decided.valid")
+      out = decided["engine_output"]
+
+      valid? = fn o ->
+        Event.changeset(
+          event(%{"type" => "decided", "payload" => %{decided | "engine_output" => o}})
+        ).valid?
+      end
+
+      abstain = %{
+        out
+        | "outcome" => "abstain",
+          "priority_tier" => nil,
+          "provisional_tier" => "P1",
+          "rule_id" => "R-ABS-LOC",
+          "duplicate_of" => nil,
+          "abstain_reason" => "no_usable_location",
+          "follow_up_question" => "Where exactly are you?"
+      }
+
+      assert valid?.(abstain)
+      refute valid?.(%{abstain | "provisional_tier" => nil})
+      refute valid?.(%{abstain | "provisional_tier" => "P4"})
+      refute valid?.(Map.delete(abstain, "provisional_tier"))
+
+      prioritized = %{
+        out
+        | "outcome" => "prioritized",
+          "priority_tier" => "P2",
+          "provisional_tier" => nil,
+          "duplicate_of" => nil,
+          "abstain_reason" => nil
+      }
+
+      assert valid?.(prioritized)
+      refute valid?.(%{prioritized | "provisional_tier" => "P2"})
+      refute valid?.(Map.delete(prioritized, "provisional_tier"))
+    end
   end
 
   describe "append_batch/1" do

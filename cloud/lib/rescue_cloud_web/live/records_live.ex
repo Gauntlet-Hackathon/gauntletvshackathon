@@ -117,7 +117,7 @@ defmodule RescueCloudWeb.RecordsLive do
                 {r.request_id}
               </.link>
             </td>
-            <td data-role="tier">{r.priority_tier}</td>
+            <td data-role="tier">{tier_label(r)}</td>
             <td data-role="status">{r.status}</td>
             <td data-role="location">{r.location_text}</td>
             <td data-role="device">{r.device_id}</td>
@@ -138,7 +138,7 @@ defmodule RescueCloudWeb.RecordsLive do
           <dt>Outcome</dt>
           <dd data-role="outcome">{@record.request.outcome}</dd>
           <dt>Tier</dt>
-          <dd data-role="tier">{@record.request.priority_tier}</dd>
+          <dd data-role="tier">{tier_label(@record.request)}</dd>
           <dt>Rule</dt>
           <dd data-role="rule-id">{@record.request.rule_id}</dd>
           <dt>Rules version</dt>
@@ -192,6 +192,11 @@ defmodule RescueCloudWeb.RecordsLive do
     </Layouts.app>
     """
   end
+
+  # An abstain has no priority_tier; show its provisional tier marked as unconfirmed ("P1?").
+  defp tier_label(%{priority_tier: tier}) when is_binary(tier), do: tier
+  defp tier_label(%{provisional_tier: tier}) when is_binary(tier), do: tier <> "?"
+  defp tier_label(_), do: nil
 
   defp fmt(nil), do: ""
   defp fmt(%DateTime{} = dt), do: Calendar.strftime(dt, "%Y-%m-%d %H:%M:%S UTC")
