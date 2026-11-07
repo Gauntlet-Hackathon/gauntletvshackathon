@@ -89,6 +89,42 @@ def test_roof_and_rising_water_is_p1(client, text):
     assert (d["outcome"], d["priority_tier"]) == ("prioritized", "P1"), d
 
 
+@pytest.mark.parametrize(
+    "text, rule",
+    [
+        ("help, oxygen machine has no power at 12 Oak Street", "R-P1-03"),
+        ("my dad is unconscious and not breathing at 12 Oak Street, please help", "R-P1-02"),
+        ("help at 12 Oak Street, someone drowning", "R-P1-02"),
+    ],
+)
+def test_acute_medical_is_p1(client, text, rule):
+    d = post(client, text)
+    assert (d["outcome"], d["priority_tier"], d["rule_id"]) == ("prioritized", "P1", rule), d
+
+
+# ---- A18: a clear request with a hoax-marker word, and address capture ------------------
+
+
+def test_clear_request_saying_not_fake_is_prioritized(client):
+    d = post(client, "need help at 12 Oak Street, this is not fake, grandpa is bedridden")
+    assert d["outcome"] == "prioritized", d
+    assert d["rule_id"] != "R-ABS-HOAX"
+
+
+def test_fake_request_without_location_is_not_p1(client):
+    d = post(client, "need help, this is fake lol")
+    assert not (d["outcome"] == "prioritized" and d["priority_tier"] == "P1"), d
+
+
+def test_count_words_are_not_an_address(client, tmp_path):
+    post(client, "3 people at Main St need help water rising")
+    store = EventStore(tmp_path / "f.db")
+    extracted = [e for e in store.all_events() if e["type"] == "extracted"]
+    store.close()
+    assert extracted
+    assert extracted[-1]["payload"]["location"]["text"] != "3 people at Main St"
+
+
 def test_seed_file_has_no_low_confidence_request_abstains(tmp_path):
     store = EventStore(tmp_path / "seed.db")
     lines = SEED_TXT.read_text(encoding="utf-8").splitlines()

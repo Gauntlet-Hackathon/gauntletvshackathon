@@ -19,7 +19,14 @@ KEYWORD_MODEL_VERSION = "stub:keyword-extractor"
 LOW = 0.3  # nothing found
 MID = 0.6  # weak hint
 HIGH = 0.8  # explicit phrase
+CLEAR_REQUEST = 0.9  # explicit request phrase: above hoax_request_confidence_max (0.85)
 
+# Acute medical emergencies are extracted as injury (DECISIONS R6, contracts/engine_rules.md).
+_ACUTE_MEDICAL = (
+    "unconscious", "not breathing", "can't breathe", "cannot breathe", "chest pain",
+    "heart attack", "severe bleeding", "drowning", "seizure", "inconsciente", "no respira",
+    "ahogando", "se está ahogando",
+)  # fmt: skip
 # Each table maps kind -> (explicit phrases, weak hints). Explicit hit -> HIGH, weak hit -> MID.
 _HAZARDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "rising_water": (
@@ -28,12 +35,22 @@ _HAZARDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     ),
     "on_roof": (("on the roof", "on our roof", "en el techo", "en la azotea"), ("roof", "techo")),
     "injury": (
-        ("injured", "bleeding", "broken leg", "herido", "herida"),
+        ("injured", "bleeding", "broken leg", "herido", "herida", *_ACUTE_MEDICAL),
         ("injur", "broke", "herid"),
     ),
     "fire": (("on fire", "house fire", "incendio"), ("fire", "fuego")),
     "trapped": (("trapped", "atrapad"), ("stuck", "can't get out", "cannot get out")),
 }
+# medical_device_no_power needs a device word plus a power-loss phrase (explicit) or the
+# device word with "power"/"luz" anywhere (weak); see _medical_device().
+_DEVICE_WORDS = (
+    "oxygen", "concentrator", "ventilator", "cpap", "dialysis", "oxígeno", "diálisis",
+)  # fmt: skip
+_POWER_LOSS = (
+    "no power", "power is out", "power out", "lost power", "no electricity", "battery dying",
+    "se fue la luz", "sin luz", "sin electricidad",
+)  # fmt: skip
+_POWER_HINTS = ("power", "luz")
 _VULNERABLES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "child": (("baby", "infant", "bebé", "bebe", "toddler"), ("kid", "child", "niñ")),
     "elderly": (
@@ -49,27 +66,30 @@ _NEED_KEYWORDS = {
     "food": ("food", "comida", "diaper"),
     "meds": ("medic", "insulin", "meds"),
 }
-_REQUEST_WORDS = (
+# Explicit request phrases -> CLEAR_REQUEST; weak request words (or a firm hazard) -> HIGH.
+_REQUEST_EXPLICIT = (
     "help",
-    "need",
     "rescue",
-    "stuck",
-    "trapped",
+    "rescate",
     "ayuda",
-    "necesit",
     "socorro",
     "auxilio",
-    # SMS shorthand and danger-only phrasing (A15)
-    "please",
     "send someone",
     "come get",
     "save us",
     "emergency",
+)
+_REQUEST_WEAK = (
+    "need",
+    "stuck",
+    "trapped",
+    "necesit",
+    "please",
     "por favor",
-    "rescate",
 )
 # Short tokens only count as whole words ("sos" is not "sospecha", "911" not "19112").
-_REQUEST_TOKENS_RE = re.compile(r"\b(?:hlp|plz|pls|sos|911)\b", re.I)
+_REQUEST_EXPLICIT_RE = re.compile(r"\b(?:hlp|sos|911)\b", re.I)
+_REQUEST_WEAK_RE = re.compile(r"\b(?:plz|pls)\b", re.I)
 _STREET_SUFFIX = (
     r"(?:st|street|ave|avenue|rd|road|dr|drive|blvd|boulevard|ln|lane|way|ct|court|pkwy|parkway|"
     r"calle|avenida|av|camino)"
@@ -84,8 +104,14 @@ _STALE_RE = re.compile(
     r"|publicaci[oó]n antigua|\bdel año pasado\b|\bde hace (?:un )?año\b",
     re.I,
 )
+# Street-name words between the number and the suffix are never counts or prepositions,
+# so "3 people at Main St" is not an address.
+_NOT_STREET_WORD = (
+    r"(?:people|persons|personas|ppl|adults|adultos|kids|children|niños|of|us|at|in|on)\b"
+)
 _ADDRESS_RE = re.compile(
-    rf"\b\d{{1,5}}(?:\s+[A-Za-z][\w'.-]*){{1,4}}?\s+{_STREET_SUFFIX}\b\.?", re.I
+    rf"\b\d{{1,5}}(?:\s+(?!{_NOT_STREET_WORD})[A-Za-z][\w'.-]*){{1,4}}?\s+{_STREET_SUFFIX}\b\.?",
+    re.I,
 )
 _COORDS_RE = re.compile(r"-?\d{1,3}\.\d{3,},\s*-?\d{1,3}\.\d{3,}")
 _PHONE_RE = re.compile(r"(?:\+?1[\s.-]?)?\(?\b\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}\b")
@@ -163,6 +189,27 @@ def _graded(table: dict[str, tuple[tuple[str, ...], tuple[str, ...]]], low: str)
     return out
 
 
+def _medical_device(low: str) -> list[dict]:
+    if not any(w in low for w in _DEVICE_WORDS):
+        return []
+    if any(w in low for w in _POWER_LOSS):
+        return [{"kind": "medical_device_no_power", "confidence": HIGH}]
+    if any(w in low for w in _POWER_HINTS):
+        return [{"kind": "medical_device_no_power", "confidence": MID}]
+    return []
+
+
+def _request_confidence(raw_text: str, low: str, hazards: list[dict]) -> float | None:
+    """CLEAR_REQUEST for an explicit request phrase, HIGH for a weak one, None for none."""
+    if any(w in low for w in _REQUEST_EXPLICIT) or _REQUEST_EXPLICIT_RE.search(raw_text):
+        return CLEAR_REQUEST
+    weak = any(w in low for w in _REQUEST_WEAK) or _REQUEST_WEAK_RE.search(raw_text)
+    # A firm (explicit-phrase) hazard is itself a cry for help.
+    if weak or any(h["confidence"] == HIGH for h in hazards):
+        return HIGH
+    return None
+
+
 def _people(low: str) -> dict[str, Any]:
     m = _COUNT_RE.search(low) or _WE_ARE_RE.search(low)
     if not m:
@@ -188,13 +235,9 @@ class KeywordExtractor:
         def kinds(table: dict[str, tuple[str, ...]]) -> list[str]:
             return [k for k, words in table.items() if any(w in low for w in words)]
 
-        hazards = _graded(_HAZARDS, low)
-        # A firm (explicit-phrase) hazard is itself a cry for help.
-        is_req = (
-            any(w in low for w in _REQUEST_WORDS)
-            or bool(_REQUEST_TOKENS_RE.search(raw_text))
-            or any(h["confidence"] == HIGH for h in hazards)
-        )
+        hazards = _graded(_HAZARDS, low) + _medical_device(low)
+        req_conf = _request_confidence(raw_text, low, hazards)
+        is_req = req_conf is not None
         stale = _STALE_RE.search(raw_text)
         # The contract has no contact field, so a phone number is only recorded as a span.
         spans = []
@@ -210,7 +253,7 @@ class KeywordExtractor:
                 "is_stale_post": bool(stale),
                 "confidence": 0.7 if stale else LOW,
             },
-            "is_request": {"value": is_req, "confidence": HIGH if is_req else 0.4},
+            "is_request": {"value": is_req, "confidence": req_conf if is_req else 0.4},
             "spans": spans,
             "needs": [{"kind": k, "hours_without": None} for k in kinds(_NEED_KEYWORDS)],
             "request_kind": "rescue" if is_req else "other",
