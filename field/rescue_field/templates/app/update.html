@@ -1,0 +1,34 @@
+{% extends "app/_shell.html" %}
+{% block title %}How did it go? · CommunityRescue{% endblock %}
+{% block content %}
+<h1>How did it go?</h1>
+{% include "app/_summary.html" %}
+{% if error %}<p id="form-error" class="banner" role="alert"><strong>{{ error }}</strong></p>{% endif %}
+<form method="post" action="/requests/{{ c.request_id }}/update" class="dispatch-form">
+<fieldset>
+<legend>What happened?</legend>
+{% for key, label in outcomes %}
+<label class="choice"><input type="radio" name="outcome" value="{{ key }}" required{% if form.outcome == key %} checked{% endif %}> <strong>{{ label }}</strong></label>
+{% endfor %}
+</fieldset>
+<fieldset class="outcome-all">
+<legend>Got everyone out</legend>
+<label>How many people <input type="number" name="rescued_count" min="0" max="100000" value="{{ form.rescued_count if form.rescued_count is defined else (people if people is not none else '') }}"></label>
+<label>Taken to
+<select name="shelter">
+{% for s in shelters %}<option value="{{ s }}"{% if form.shelter == s %} selected{% endif %}>{{ s }}</option>
+{% endfor %}
+</select></label>
+</fieldset>
+<fieldset class="outcome-some">
+<legend>Got some out</legend>
+<label>How many did you get out <input type="number" name="got_count" min="1" max="100000" value="{{ form.got_count or '' }}"></label>
+</fieldset>
+<fieldset class="outcome-noreach">
+<legend>Couldn't get there</legend>
+<label>Why <input type="text" name="reason" maxlength="500" value="{{ form.reason or '' }}"></label>
+</fieldset>
+<button type="submit" class="btn btn-primary">Save</button>
+</form>
+<p><a href="/">Back to the queue</a></p>
+{% endblock %}

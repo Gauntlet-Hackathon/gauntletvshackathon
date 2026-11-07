@@ -1,0 +1,37 @@
+{% extends "app/_shell.html" %}
+{% block title %}Send someone · CommunityRescue{% endblock %}
+{% block content %}
+<h1>Send someone</h1>
+{% include "app/_summary.html" %}
+{% if error %}<p id="form-error" class="banner" role="alert"><strong>{{ error }}</strong></p>{% endif %}
+<form method="post" action="/requests/{{ c.request_id }}/send" class="dispatch-form">
+<fieldset>
+<legend>Who is going?</legend>
+{% for b in boats %}
+<label class="choice"><input type="radio" name="crew" value="{{ b.name }}"{% if form.crew == b.name %} checked{% endif %}>
+<span><strong>{{ b.name }}</strong> · {{ b.seats }} seats · {{ b.status_text }}
+{% if b.warning %}<br><span class="seat-warning">{{ b.warning }}</span>{% endif %}</span></label>
+{% else %}
+<p class="muted">No boats on the roster. <a href="/boats">Add a boat</a> or type who is going.</p>
+{% endfor %}
+<label class="choice-text">Someone else <input type="text" name="crew_other" maxlength="200" value="{{ form.crew_other or '' }}"></label>
+</fieldset>
+<h2>Message for the crew</h2>
+<pre id="draft" class="draft">{{ draft }}</pre>
+<button type="button" class="btn-small copy" data-copy="{{ draft }}">Copy message</button>
+<button type="submit" class="btn btn-primary">On the way</button>
+</form>
+<p><a href="/">Back to the queue</a></p>
+<script>
+document.querySelector(".copy").addEventListener("click", async (ev) => {
+  const btn = ev.currentTarget, text = btn.dataset.copy;
+  try { await navigator.clipboard.writeText(text); }
+  catch (e) {
+    const t = document.createElement("textarea");
+    t.value = text; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove();
+  }
+  btn.textContent = "Copied";
+  setTimeout(() => { btn.textContent = "Copy message"; }, 2000);
+});
+</script>
+{% endblock %}

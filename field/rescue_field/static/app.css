@@ -79,3 +79,11 @@ img { max-width: 100%; }
 .set-aside summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
 #queue h1 { font-size: 1.4rem; margin: 1rem 0 .4rem; }
 #queue h2#check-first-heading { font-size: 1.1rem; }
+/* Send someone and Update (UI-3). Seat warning: #FFFFFF on #B00020 7.3:1. */
+.send { margin-top: .6rem; text-decoration: none; }
+.update { display: inline-flex; align-items: center; margin-left: auto; text-decoration: none; }
+.dispatch-form fieldset { border: 1px solid var(--line); border-radius: 12px; margin: .6rem 0; padding: .5rem .75rem; }
+.choice { display: flex; gap: .6rem; align-items: flex-start; min-height: 48px; padding: .3rem 0; }
+.choice-text input, .dispatch-form input[type=number], .dispatch-form select { display: block; min-height: 44px; width: 100%; font: inherit; }
+.seat-warning { display: inline-block; margin-top: .2rem; padding: .1rem .5rem; border-radius: 6px; background: var(--red); color: var(--white); font-weight: 700; }
+.draft { white-space: pre-wrap; font: inherit; background: var(--white); border: 1px solid var(--line); border-radius: 8px; padding: .6rem .75rem; }
