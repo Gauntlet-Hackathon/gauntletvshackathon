@@ -13,6 +13,8 @@ defmodule RescueCloud.Projection do
       current status is ignored.
     * `extracted` is the latest extraction with every `corrected` event applied on top, in order
       (`field` is a dotted path into the extracted payload, e.g. `people_count.value`).
+    * `incident` and `sample` come from the `received` payload (both optional, #305; `sample`
+      is false unless the payload says `true`).
     * tier, rule_id and the rest of the engine output come from the latest `decided` event.
     * `rules_version` comes from the latest `decided` event, `model_version` from the latest
       event that carries one.
@@ -204,6 +206,8 @@ defmodule RescueCloud.Projection do
       channel: nil,
       raw_text: nil,
       contact: nil,
+      incident: nil,
+      sample: false,
       extracted: nil,
       outcome: nil,
       priority_tier: nil,
@@ -245,7 +249,9 @@ defmodule RescueCloud.Projection do
         device_id: e.device_id,
         channel: e.payload["channel"],
         raw_text: e.payload["raw_text"],
-        contact: e.payload["contact"]
+        contact: e.payload["contact"],
+        incident: e.payload["incident"],
+        sample: e.payload["sample"] == true
     }
   end
 

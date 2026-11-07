@@ -120,6 +120,19 @@ defmodule RescueCloud.ProjectionTest do
       assert req.duplicate_group == nil
     end
 
+    test "incident and sample come from the received payload; absent means nil / false (#305)" do
+      p = Map.merge(payload("received"), %{"incident" => "A-0147", "sample" => true})
+      push([event(rid("0S"), 1, "received", "2026-11-07T14:00:00Z", %{payload: p})])
+      assert %{incident: "A-0147", sample: true} = Projection.get_request(rid("0S"))
+
+      p = Map.merge(payload("received"), %{"incident" => nil, "sample" => nil})
+      push([event(rid("0T"), 1, "received", "2026-11-07T14:00:00Z", %{payload: p})])
+      assert %{incident: nil, sample: false} = Projection.get_request(rid("0T"))
+
+      push([received(rid("0V"), 1, "2026-11-07T14:00:00Z")])
+      assert %{incident: nil, sample: false} = Projection.get_request(rid("0V"))
+    end
+
     test "status is forward-only regardless of arrival order" do
       r = rid("02")
       push([received(r, 1, "2026-11-07T14:00:00Z")])

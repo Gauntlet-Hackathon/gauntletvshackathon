@@ -65,6 +65,32 @@ defmodule RescueCloudWeb.DashboardLiveTest do
     refute has_element?(view, "#last-event", "none yet")
   end
 
+  test "grader-mode samples are left out of the request counts (#305)", %{conn: conn} do
+    sample = Map.merge(payload("received"), %{"incident" => "A-0147", "sample" => true})
+    not_sample = Map.merge(payload("received"), %{"incident" => "A-0148", "sample" => false})
+
+    sync!([
+      event("A1", 1, "received", "2026-11-07T14:00:00Z", payload: sample),
+      event("A1", 2, "decided", "2026-11-07T14:00:05Z", tier: "P1"),
+      event("B2", 1, "received", "2026-11-07T14:01:00Z", payload: not_sample),
+      event("B2", 2, "decided", "2026-11-07T14:01:05Z", tier: "P1"),
+      event("C3", 1, "received", "2026-11-07T14:02:00Z")
+    ])
+
+    {:ok, view, _} = live(conn, ~p"/")
+
+    assert has_element?(view, "#requests-total", "2 requests")
+    assert has_element?(view, "#requests-p1", "1 P1")
+    assert has_element?(view, "#requests-samples", "samples hidden: 1")
+  end
+
+  test "no samples note without samples", %{conn: conn} do
+    sync!([event("A1", 1, "received", "2026-11-07T14:00:00Z")])
+    {:ok, view, _} = live(conn, ~p"/")
+    assert has_element?(view, "#requests-total", "1 requests")
+    refute has_element?(view, "#requests-samples")
+  end
+
   test "the total is not limited to 200 rows", %{conn: conn} do
     events =
       for i <- 1..250 do

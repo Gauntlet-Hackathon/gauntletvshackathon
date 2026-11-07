@@ -38,6 +38,29 @@
           "type": "null"
         }
       ]
+    },
+    "incident": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[A-Z0-9]{1,4}-[0-9]{4,6}$"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Optional. Incident number shown to volunteers; the per-laptop prefix keeps it unique offline (e.g. A-0147)."
+    },
+    "sample": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Optional. True for grader-mode samples; dashboards leave them out of request counts."
     }
   },
   "required": [

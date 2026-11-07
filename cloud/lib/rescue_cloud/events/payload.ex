@@ -2,7 +2,8 @@ defmodule RescueCloud.Events.Payload do
   @moduledoc """
   Payload validation per event type, a hand-written mirror of `contracts/payloads/*.schema.json`
   (also `engine_input` / `engine_output`). Checked against `contracts/examples/` in the tests.
-  Payloads are string-keyed maps; unknown keys are rejected.
+  Payloads are string-keyed maps; unknown keys are rejected. A field wrapped in `optional/1` is
+  not in the schema's `required` list: it may be left out, and is checked when present.
   """
 
   @ulid ~r/^[0-9A-HJKMNP-TV-Z]{26}$/
@@ -23,6 +24,7 @@ defmodule RescueCloud.Events.Payload do
   # --- specs -------------------------------------------------------------------------------
 
   defp nullable(s), do: {:nullable, s}
+  defp optional(s), do: {:optional, s}
   defp obj(fields), do: {:object, fields}
   defp arr(item), do: {:array, item}
   defp enum(values), do: {:enum, values}
@@ -36,7 +38,10 @@ defmodule RescueCloud.Events.Payload do
       "channel" => enum(~w(sms social form call_note csv)),
       "raw_text" => text(),
       "lang_hint" => nullable({:pattern, ~r/^[a-z]{2}$/}),
-      "contact" => nullable(text())
+      "contact" => nullable(text()),
+      # Optional (#305): per-laptop incident number and grader-mode sample flag.
+      "incident" => optional(nullable({:pattern, ~r/^[A-Z0-9]{1,4}-[0-9]{4,6}$/})),
+      "sample" => optional(nullable(:boolean))
     })
   end
 
@@ -219,6 +224,7 @@ defmodule RescueCloud.Events.Payload do
   defp check(:engine_output, _value, path), do: ["#{path} has the wrong type"]
 
   defp check(:any, _value, _path), do: []
+  defp check({:optional, s}, v, path), do: check(s, v, path)
   defp check(:boolean, v, _path) when is_boolean(v), do: []
   defp check({:nullable, _}, nil, _path), do: []
   defp check({:nullable, s}, v, path), do: check(s, v, path)
@@ -259,7 +265,12 @@ defmodule RescueCloud.Events.Payload do
   end
 
   defp check({:object, fields}, v, path) when is_map(v) do
-    missing = for {k, _} <- fields, not Map.has_key?(v, k), do: "#{path}.#{k} is required"
+    missing =
+      for {k, s} <- fields,
+          not match?({:optional, _}, s),
+          not Map.has_key?(v, k),
+          do: "#{path}.#{k} is required"
+
     extra = for k <- Map.keys(v), not Map.has_key?(fields, k), do: "#{path}.#{k} is not allowed"
 
     nested =

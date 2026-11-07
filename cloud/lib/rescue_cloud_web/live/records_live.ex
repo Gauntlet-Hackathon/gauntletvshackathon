@@ -93,7 +93,12 @@ defmodule RescueCloudWeb.RecordsLive do
         phx-submit="search"
         class="flex flex-wrap gap-2 items-end"
       >
-        <.input field={@form[:q]} type="search" label="Search" placeholder="text, location, contact" />
+        <.input
+          field={@form[:q]}
+          type="search"
+          label="Search"
+          placeholder="text, location, contact, incident"
+        />
         <.input
           field={@form[:tier]}
           type="select"
@@ -128,6 +133,10 @@ defmodule RescueCloudWeb.RecordsLive do
               <.link patch={detail_path(r.request_id, @filters)} data-role="open">
                 {r.request_id}
               </.link>
+              <span :if={r.incident} data-role="incident" class="block font-semibold">
+                {r.incident}
+              </span>
+              <.status_badge :if={r.sample} kind={:neutral}>sample</.status_badge>
             </td>
             <td data-role="tier">
               <.status_badge
@@ -154,6 +163,10 @@ defmodule RescueCloudWeb.RecordsLive do
         <h2 class="text-2xl font-semibold">Request {@record.request.request_id}</h2>
         <p data-role="raw-text">{@record.request.raw_text}</p>
         <dl class="grid grid-cols-2 gap-1 max-w-xl">
+          <dt :if={@record.request.incident}>Incident</dt>
+          <dd :if={@record.request.incident} data-role="incident">{@record.request.incident}</dd>
+          <dt :if={@record.request.sample}>Sample</dt>
+          <dd :if={@record.request.sample} data-role="sample">grader-mode sample</dd>
           <dt>Status</dt>
           <dd data-role="status">{@record.request.status}</dd>
           <dt>Outcome</dt>

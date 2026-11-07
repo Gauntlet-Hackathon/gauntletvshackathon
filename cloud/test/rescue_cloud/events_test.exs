@@ -36,6 +36,22 @@ defmodule RescueCloud.EventsTest do
       end
     end
 
+    # contracts/examples/extra/: optional properties added later (the main examples keep the old
+    # shape, so the loop above also proves old payloads stay valid).
+    for file <- File.ls!(Path.join(@examples, "extra")) |> Enum.sort() do
+      test "extra/#{file}" do
+        [_, type, kind] = Regex.run(~r/^payload-(.+)\.(valid|invalid)\.json$/, unquote(file))
+
+        changeset =
+          Event.changeset(%{
+            event(%{"type" => type})
+            | "payload" => example("extra/" <> String.trim_trailing(unquote(file), ".json"))
+          })
+
+        assert changeset.valid? == (kind == "valid")
+      end
+    end
+
     test "envelope violations" do
       for {k, v} <- [
             {"event_id", "nope"},
