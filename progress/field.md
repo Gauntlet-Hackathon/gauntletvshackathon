@@ -17,3 +17,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 field #127 F12: ENGINE_CMD path-safe: default engine cmd built as argv list, tests quote with shlex.join, new test with a space in the path
 2026-11-07 field #128 F13: demo seed (rescue_field/seed.py): templated messy requests via process_batch, deterministic per --seed; tests/test_seed.py
 2026-11-07 field #129 F14: tests/test_sync_integration.py: contract-faithful in-process fake cloud (auth, schema validation, dedupe); offline queueing, full drain, 500 retry/lost-ack idempotency, 401 keeps rows, ordering
+2026-11-07 field #152 F15: field/Dockerfile (python:3.12-slim, constraints, PYTHONPATH, uvicorn on $PORT, fallback engine) + root .dockerignore; verified image builds, GET / 200, POST /requests returns fallback-engine decision
