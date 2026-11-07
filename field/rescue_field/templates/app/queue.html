@@ -1,0 +1,62 @@
+{% extends "app/_shell.html" %}
+{% block title %}Queue · CommunityRescue{% endblock %}
+{% block content %}
+<div id="queue" data-refresh="{{ refresh_seconds }}">{% include "app/_queue.html" %}</div>
+<p id="queue-error" class="muted" role="status"></p>
+<script>
+(() => {
+  const root = document.getElementById("queue");
+  const skipped = new Set();  // the cursor lives here only: skipping writes nothing
+  function showNext() {
+    const items = [...root.querySelectorAll(".next-item")];
+    const current = items.find((el) => !skipped.has(el.dataset.requestId));
+    items.forEach((el) => { el.hidden = el !== current; });
+    const all = document.getElementById("all-skipped");
+    const skip = document.getElementById("skip");
+    if (all) all.hidden = !!current || !items.length;
+    if (skip) skip.hidden = !current;
+  }
+  async function refresh() {
+    try {
+      const r = await fetch("/", {headers: {"HX-Request": "true"}});
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const open = new Set([...root.querySelectorAll("details[open][data-key]")].map((d) => d.dataset.key));
+      root.innerHTML = await r.text();
+      root.querySelectorAll("details[data-key]").forEach((d) => { if (open.has(d.dataset.key)) d.open = true; });
+      showNext();
+      document.getElementById("queue-error").textContent = "";
+    } catch (e) {
+      document.getElementById("queue-error").textContent = "Could not refresh the list. Trying again.";
+    }
+  }
+  async function copy(text, btn) {
+    try { await navigator.clipboard.writeText(text); }
+    catch (e) {
+      const t = document.createElement("textarea");
+      t.value = text; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove();
+    }
+    btn.textContent = "Copied";
+    setTimeout(() => { btn.textContent = "Copy question"; }, 2000);
+  }
+  root.addEventListener("click", async (ev) => {
+    const btn = ev.target.closest("button");
+    if (!btn) return;
+    if (btn.id === "skip") {
+      const current = [...root.querySelectorAll(".next-item")].find((el) => !el.hidden);
+      if (current) skipped.add(current.dataset.requestId);
+      showNext();
+    } else if (btn.id === "skip-reset") {
+      skipped.clear(); showNext();
+    } else if (btn.classList.contains("copy")) {
+      copy(btn.dataset.copy, btn);
+    } else if (btn.classList.contains("recheck")) {
+      btn.disabled = true;
+      await fetch("/requests/" + encodeURIComponent(btn.dataset.requestId) + "/recheck", {method: "POST"});
+      await refresh();
+    }
+  });
+  showNext();
+  setInterval(refresh, (Number(root.dataset.refresh) || 5) * 1000);
+})();
+</script>
+{% endblock %}

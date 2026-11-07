@@ -14,11 +14,11 @@
 <div class="app">
 <header class="app-header">
 <div class="app-top">
-<a class="brand" href="/app"><img src="/static/icons/communityrescue-icon-64.png" width="40" height="40" alt=""><span>CommunityRescue</span></a>
+<a class="brand" href="/"><img src="/static/icons/communityrescue-icon-64.png" width="40" height="40" alt=""><span>CommunityRescue</span></a>
 <p class="who"><strong>{{ volunteer_name }}</strong> · {{ volunteer_role }}<br><span class="muted">{{ ecc_name }}</span></p>
 </div>
 <nav class="mode-toggle" aria-label="Mode">
-<a href="/app?mode=queue"{% if mode == "queue" %} class="selected" aria-current="page"{% endif %}>Queue</a>
+<a href="/"{% if mode == "queue" %} class="selected" aria-current="page"{% endif %}>Queue</a>
 <a href="/app?mode=respond"{% if mode == "respond" %} class="selected" aria-current="page"{% endif %}>Respond</a>
 </nav>
 <p id="connection" class="connection connection-{{ connection.state }}" role="status" aria-live="polite" data-state="{{ connection.state }}"><span class="dot" aria-hidden="true"></span>{{ connection.text }}</p>

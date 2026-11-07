@@ -94,7 +94,7 @@ def add(store, rid, out, raw, lang_hint=None):
 
 def board_html(store) -> str:
     with TestClient(create_app(store=store)) as client:
-        r = client.get("/", headers={"HX-Request": "true"})
+        r = client.get("/board", headers={"HX-Request": "true"})
     assert r.status_code == 200, r.text
     return r.text
 

@@ -321,7 +321,7 @@ def test_board_builds_and_renders_outside_the_intake_lock(store, monkeypatch):
     monkeypatch.setattr(board_module.templates, "TemplateResponse", render)
     with TestClient(app) as client:
         out = {}
-        t = threading.Thread(target=lambda: out.setdefault("r", client.get("/")))
+        t = threading.Thread(target=lambda: out.setdefault("r", client.get("/board")))
         t.start()
         while not held:
             time.sleep(0.005)
@@ -360,7 +360,7 @@ def test_abstained_root_lifted_to_a_tier_keeps_its_flag_and_follow_up(store):
     assert fu["provisional_tier"] == "P2"
     assert [d["request_id"] for d in fu["duplicates"]] == ["DUP"]
     assert board["counts"]["follow_ups"] == 1
-    page = TestClient(create_app(store=store)).get("/").text
+    page = TestClient(create_app(store=store)).get("/board").text
     p1 = row_html(page, "ROOT")
     assert '<strong class="confirm-label">Possible hoax</strong>' in p1
     queue = page[page.index('id="follow-ups"') :]
