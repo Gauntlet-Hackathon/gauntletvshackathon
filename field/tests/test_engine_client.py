@@ -59,3 +59,33 @@ def test_batch_preserves_order():
     outs = decide_batch(inputs, cmd=cmd("echo"))
     assert [o["rule_id"] for o in outs] == ["R-P2-3", "R-P2-1", "R-P2-2"]
     assert decide_batch([], cmd=cmd()) == []
+
+
+def test_batch_is_one_engine_call(monkeypatch):
+    import subprocess
+
+    calls = []
+    real = subprocess.run
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: calls.append(a) or real(*a, **k))
+    outs = decide_batch([EXAMPLE] * 5, cmd=cmd())
+    assert len(outs) == 5 and len(calls) == 1
+    decide_batch([], cmd=cmd())
+    assert len(calls) == 1  # an empty batch never starts the engine
+
+
+def test_batch_wrong_length_or_invalid_item():
+    with pytest.raises(EngineError, match="2 results for 3 inputs"):
+        decide_batch([EXAMPLE] * 3, cmd=cmd("short"))
+    with pytest.raises(EngineError, match="dict results for 1 inputs"):
+        decide_batch([EXAMPLE], cmd=cmd("invalid"))
+
+
+def test_env_is_passed_to_engine():
+    script = (
+        "import json, os, sys; json.load(sys.stdin); out = json.load(open(sys.argv[1]));"
+        " out['rule_id'] = os.environ['RULE']; print(json.dumps(out))"
+    )
+    example_out = Path(__file__).resolve().parents[2] / "contracts/examples"
+    out_file = next(example_out.glob("engine_output*.valid*.json"))
+    argv = [sys.executable, "-c", script, str(out_file)]
+    assert decide(EXAMPLE, cmd=argv, env={"RULE": "R-P3-09"})["rule_id"] == "R-P3-09"
