@@ -1,0 +1,33 @@
+{# Base layout for every volunteer screen. Child templates fill block "content" and may set "title". #}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}CommunityRescue{% endblock %}</title>
+<link rel="icon" type="image/png" sizes="32x32" href="/static/icons/communityrescue-icon-32.png">
+<link rel="icon" type="image/svg+xml" href="/static/icons/communityrescue-icon.svg">
+<link rel="apple-touch-icon" href="/static/icons/communityrescue-icon-180.png">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="app">
+<header class="app-header">
+<div class="app-top">
+<a class="brand" href="/app"><img src="/static/icons/communityrescue-icon-64.png" width="40" height="40" alt=""><span>CommunityRescue</span></a>
+<p class="who"><strong>{{ volunteer_name }}</strong> · {{ volunteer_role }}<br><span class="muted">{{ ecc_name }}</span></p>
+</div>
+<nav class="mode-toggle" aria-label="Mode">
+<a href="/app?mode=queue"{% if mode == "queue" %} class="selected" aria-current="page"{% endif %}>Queue</a>
+<a href="/app?mode=respond"{% if mode == "respond" %} class="selected" aria-current="page"{% endif %}>Respond</a>
+</nav>
+<p id="connection" class="connection connection-{{ connection.state }}" role="status" aria-live="polite" data-state="{{ connection.state }}"><span class="dot" aria-hidden="true"></span>{{ connection.text }}</p>
+</header>
+{% if model_banner %}<p id="model-banner" class="banner" role="alert"><strong>Real model not loaded, using keyword fallback: {{ model_banner }}</strong></p>
+{% endif %}
+<main id="main">
+{% block content %}{% endblock %}
+</main>
+</div>
+</body>
+</html>

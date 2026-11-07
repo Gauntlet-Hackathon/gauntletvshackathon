@@ -23,6 +23,8 @@ kill_signal = "SIGTERM"
 [env]
   PORT = "8080"
   DEMO_MODE = "1"
+  ECC_NAME = "ECC 1"
+  VOLUNTEER_ROLE = "Volunteer"
   DEVICE_ID = "demo-field-01"
   FIELD_DATA_DIR = "/data"
 
