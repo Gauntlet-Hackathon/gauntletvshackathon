@@ -30,7 +30,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
 from rescue_field.shell import model_banner
-from rescue_field.status import ORDER, RANK
+from rescue_field.status import ORDER, moves
 from rescue_field.store import EventStore
 from rescue_field.words_es import spanish_line
 from rescue_shared import logic
@@ -46,8 +46,9 @@ router = APIRouter()
 
 def _requests(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     """One record per request, in arrival order, from its received/extracted/decided events,
-    with its current status (the highest status event, as `status.current_status`). One pass
-    over the events (review M-04: a per-request rescan made the board O(requests x events))."""
+    with its current status (its status events folded in order, as `status.current_status`).
+    One pass over the events (review M-04: a per-request rescan made the board
+    O(requests x events))."""
     recs: dict[str, dict[str, Any]] = {}
     for ev in events:
         rec = recs.setdefault(ev["request_id"], {"request_id": ev["request_id"], "status": None})
@@ -65,7 +66,7 @@ def _requests(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
         elif kind == "decided":
             rec["decision"] = ev["payload"]["engine_output"]
             rec["rules_version"] = ev["rules_version"]
-        elif kind in RANK and (rec["status"] is None or RANK[kind] > RANK[rec["status"]]):
+        elif moves(rec["status"], kind):
             rec["status"] = kind
     return {
         rid: r for rid, r in recs.items() if {"received_at", "extracted", "decision"} <= r.keys()
@@ -135,9 +136,9 @@ def _questions(rec: dict[str, Any], members: list[dict[str, Any]]) -> list[dict[
 
 
 def allowed_statuses(current: str | None) -> list[str]:
-    """Statuses the order accepts next: strictly above `current` (any when it is None)."""
-    floor = RANK.get(current, 0) if current else 0
-    return [s for s in ORDER if RANK[s] > floor]
+    """Statuses the order accepts next (`status.moves`): strictly above `current`, plus
+    `assigned` after `escalated` (a second crew); any when it is None."""
+    return [s for s in ORDER if moves(current, s)]
 
 
 def build_board(store: EventStore) -> dict[str, Any]:

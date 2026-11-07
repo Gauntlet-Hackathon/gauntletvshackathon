@@ -20,7 +20,6 @@
 {% endfor %}
 <p class="contact muted">{{ c.contact }}</p>
 {% if c.why %}<details class="why" data-key="why-{{ c.request_id }}"><summary>{{ "Why check first?" if c.kind == "check" else "Why is this one first?" }}</summary><p>{{ c.why }}</p></details>{% endif %}
-{% if c.kind == "tier" and c.status is none %}<a class="btn btn-primary send" href="/requests/{{ c.request_id }}/send">Send someone</a>
-{% elif c.escalated %}<p class="muted second-crew">A second crew cannot be sent from this laptop yet. Tell the ECC.</p>{% endif %}
+{% if c.kind == "tier" and (c.status is none or c.escalated) %}<a class="btn btn-primary send" href="/requests/{{ c.request_id }}/send">{{ "Send another crew" if c.escalated else "Send someone" }}</a>{% endif %}
 {% if recheck %}<button type="button" class="link recheck" data-request-id="{{ c.request_id }}">Check again</button>{% endif %}
 </article>

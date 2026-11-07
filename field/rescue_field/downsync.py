@@ -2,7 +2,8 @@
 
 `pull` asks the cloud for events after the stored cursor, keeps only valid `assigned` and
 `rescued` events from other devices that move a request strictly forward (the same
-forward-only order as `rescue_field.status`: none < assigned < escalated < rescued), and
+forward-only order as `rescue_field.status`: none < assigned < escalated < rescued, plus
+escalated -> assigned), and
 stores them without outbox rows (they are not ours to send). In the same transaction it
 persists `next_since` and the approved rules/model versions: a newly approved version
 becomes `approved_*` (read at the next restart) and the one it replaces moves to
@@ -18,7 +19,7 @@ from typing import Any
 import httpx
 from jsonschema import Draft202012Validator
 
-from rescue_field.status import RANK, current_status
+from rescue_field.status import current_status, moves
 from rescue_field.store import EventStore
 from rescue_shared.contracts_io import validator_for
 
@@ -68,7 +69,7 @@ def forward_only(store: EventStore, events: list[dict[str, Any]]) -> list[dict[s
         if rid not in status:
             status[rid] = current_status(store.request_events(rid))
         now = status[rid]
-        if now is not None and RANK[ev["type"]] <= RANK[now]:
+        if not moves(now, ev["type"]):
             continue
         status[rid] = ev["type"]
         keep.append(ev)

@@ -1,21 +1,24 @@
 """Send someone and close the loop after a rescue (UI-3, UC-02 and UC-05).
 
 Two server-rendered screens over the existing `POST /requests/{id}/status` logic
-(`status.apply_status`); no contract change, no new event type.
+(`status.apply_status`); outcomes use the `rescued` fields from #306 (#309).
 
 - `GET /requests/{id}/send`: crew picker (the boat roster with a seat warning, or free text) and a
   drafted message built only from the extracted fields and the callback number (copy button).
   `POST` "On the way" writes one `assigned` event with the boat as `crew`.
 - `GET /requests/{id}/update` (a row in Out now): four outcomes, each one event:
-  - Got everyone out -> `rescued`, `rescued_count`, note `to: <shelter>` (`SHELTER_NAMES`).
-  - Got some out -> `escalated`, reason `Got N out, others still there`.
-  - Nobody there -> `rescued`, `rescued_count: 0`, note `nobody there`.
+  - Got everyone out -> `rescued`, `outcome: "all"`, `rescued_count`, `destination` (a
+    `SHELTER_NAMES` entry).
+  - Got some out -> `escalated`, reason `Got N out, others still there` (people remain, so the
+    card goes back to the top of Next and can get a second crew).
+  - Nobody there -> `rescued`, `outcome: "nobody"`, `rescued_count: 0`.
   - Couldn't get there -> `escalated` with the typed reason. The board tier comes from the
     engine's decision, so the card goes back to the top of Next at the same priority.
 
 A refused move (409, or a 422 for a bad count) re-renders the screen with the message and
 everything that was typed. Status events are written on the group's first request (the card), so
-the other posts folded into that card leave the lists with it.
+the other posts folded into that card leave the lists with it; a rescue also writes one
+`closed_duplicate` event per folded post (`status.apply_status`).
 """
 
 from __future__ import annotations
@@ -76,11 +79,15 @@ def outcome_status(outcome: str, form: dict[str, Any]) -> dict[str, Any]:
     """The `POST /requests/{id}/status` body for one Update outcome (StatusError when invalid)."""
     if outcome == "all":
         shelter = (form.get("shelter") or "").strip()
-        data: dict[str, Any] = {"status": "rescued", "rescued_count": form.get("rescued_count")}
+        data: dict[str, Any] = {
+            "status": "rescued",
+            "outcome": "all",
+            "rescued_count": form.get("rescued_count"),
+        }
         if data["rescued_count"] in (None, ""):
             raise StatusError(422, "invalid_input", "How many people did you get out?")
         if shelter:
-            data["note"] = f"to: {shelter}"
+            data["destination"] = shelter
         return data
     if outcome == "some":
         raw = str(form.get("got_count") or "").strip()
@@ -88,7 +95,7 @@ def outcome_status(outcome: str, form: dict[str, Any]) -> dict[str, Any]:
             raise StatusError(422, "invalid_input", "How many people did you get out? (1 or more)")
         return {"status": "escalated", "reason": f"Got {int(raw)} out, others still there"}
     if outcome == "nobody":
-        return {"status": "rescued", "rescued_count": 0, "note": "nobody there"}
+        return {"status": "rescued", "outcome": "nobody", "rescued_count": 0}
     if outcome == "noreach":
         reason = (form.get("reason") or "").strip()
         if not reason:
