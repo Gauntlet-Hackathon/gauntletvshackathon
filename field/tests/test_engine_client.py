@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from field_app.engine_client import EngineError, decide, decide_batch
+from rescue_field.engine_client import EngineError, decide, decide_batch
 
 FAKE = str(Path(__file__).with_name("fake_engine.py"))
 EXAMPLE = json.loads(
