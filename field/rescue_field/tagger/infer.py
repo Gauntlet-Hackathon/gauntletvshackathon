@@ -26,6 +26,7 @@ import torch
 from rescue_field.slm import validate_extracted
 
 from . import labels as L
+from .assemble import assemble_location
 from .durations import nearest_need, parse_hours
 from .model import RescueTagger
 
@@ -139,14 +140,7 @@ class Extractor:
             return max(cands, key=lambda s: (s["confidence"], -s["start"])) if cands else None
 
         loc_span = best("LOCATION")
-        loc_type = max(L.LOCATION_TYPES, key=lambda k: p["location_type"][k])
-        if loc_span is None or loc_type == "none":
-            # No usable span: report "none" with the model's own probability of no location.
-            location = {"text": None, "type": "none",
-                        "confidence": _r(p["location_type"]["none"])}
-        else:
-            location = {"text": text[loc_span["start"]:loc_span["end"]], "type": loc_type,
-                        "confidence": _r(p["location_type"][loc_type])}
+        location = assemble_location(text, loc_span, p["location_type"])
 
         pc = p["people_count"]
         k = max(range(len(pc)), key=lambda i: pc[i])

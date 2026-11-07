@@ -75,6 +75,7 @@ Decided 2026-11-07 (H11, #177) from the SLM trainer's answer, relayed by Paawan.
   - single-label: `request_kind`, `location_type`
   - `people_count`: 21 classes, where 0 means not stated and 1-20 are counts
   - Confidences are calibrated (temperature scaling) and truncated, not rounded.
+  - The field app reports `location.confidence` as `min(location_type head, LOCATION span confidence)` (F39, #246; local change in `tagger/assemble.py`). A weak span with a confident type head would otherwise pass the engine's 0.6 location gate with a doubtful address; now it yields the follow-up question instead. The trainer's evals should match.
 - **Sample raw output** from the Laya checkpoint `train_laya-20261107-043427`. The input is a message the trainer wrote, not one from any eval set: "Please help, water is up to the roof at 4512 Bellfort Ave. My grandmother is 82 and on oxygen, 3 of us stuck in the attic since last night, no food or water for 2 days". The output passes `rescue_field.slm.validate_extracted`:
   ```json
   {"location": {"text": "4512 Bellfort Ave", "type": "address", "confidence": 1.0},
