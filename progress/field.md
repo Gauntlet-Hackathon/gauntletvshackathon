@@ -7,3 +7,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 field #33 F3: Extractor protocol + FixtureExtractor stub (field_app/slm.py)
 2026-11-07 field #38 F4: intake pipeline process_request (rescue_field/pipeline.py): received/extracted/decided in one store transaction, context via rescue_shared.logic
 2026-11-07 field #46 F5: intake API (rescue_field/api.py): POST /requests (JSON/form) and /requests/bulk (CSV upload, text/csv, paste); bulk decides in engine batch mode (one call per duplicate wave, in-batch candidates carry tiers), 422 writes nothing; store at $FIELD_DATA_DIR/field.db; sync-worker lifespan hook
+2026-11-07 field #40 F8: sync worker (rescue_field/sync.py): /health ping, jittered backoff 2s..300s, heartbeat, batches of 200, delete-on-ack only; /sync/status + /sync/offline-toggle; started in app lifespan when CLOUD_URL set
