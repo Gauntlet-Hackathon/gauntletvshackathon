@@ -122,3 +122,21 @@ def test_real_model():
         pytest.skip("HF_REPO/HF_REVISION not set")
     r = HFExtractor().extract("trapped on roof, 3 kids, water rising, near the Shell on 5th")
     assert r.model_version.startswith("hf:")
+
+
+def test_repo_without_org_fails_in_constructor(monkeypatch):
+    _no_download(monkeypatch)
+
+    def factory(folder):
+        raise AssertionError("factory should not be called")
+
+    with pytest.raises(ValueError):
+        HFExtractor("mymodel", SHA, local_path="/x", extractor_factory=factory)
+
+
+def test_select_extractor_falls_back_on_repo_without_org(monkeypatch):
+    from rescue_field import api
+    from rescue_field.slm import FixtureExtractor
+
+    ex = api.select_extractor({"HF_REPO": "mymodel", "HF_REVISION": SHA})
+    assert isinstance(ex, FixtureExtractor)
