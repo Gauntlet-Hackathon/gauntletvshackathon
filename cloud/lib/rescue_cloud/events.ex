@@ -15,13 +15,19 @@ defmodule RescueCloud.Events do
   Valid events are inserted in one `insert_all` with `on_conflict: :nothing`; every valid
   event_id is acked, including ids that were already stored (retries are harmless).
   `inserted` lists the newly stored events (not duplicates), for broadcasting.
+  Every stored row gets `synced_at` = `opts[:synced_at]` (default: now, seconds precision);
+  a retried event keeps the `synced_at` of the sync that first delivered it.
   Invalid events are returned in `rejected` as `%{event_id: id | nil, error: "invalid_payload"}`
   (`"invalid_envelope"` when the envelope itself is wrong) and are not stored.
   """
-  @spec append_batch([map()]) ::
+  @spec append_batch([map()], keyword()) ::
           {:ok,
            %{acked: [String.t()], rejected: [%{event_id: String.t() | nil, error: String.t()}]}}
-  def append_batch(events) when is_list(events) do
+  def append_batch(events, opts \\ []) when is_list(events) do
+    synced_at =
+      Keyword.get_lazy(opts, :synced_at, fn -> DateTime.utc_now() end)
+      |> DateTime.truncate(:second)
+
     {rows, rejected} =
       Enum.reduce(events, {[], []}, fn attrs, {rows, rejected} ->
         case validate(attrs) do
@@ -30,7 +36,7 @@ defmodule RescueCloud.Events do
         end
       end)
 
-    rows = Enum.reverse(rows)
+    rows = rows |> Enum.reverse() |> Enum.map(&Map.put(&1, :synced_at, synced_at))
 
     inserted =
       if rows == [] do
