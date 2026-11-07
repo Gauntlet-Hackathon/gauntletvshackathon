@@ -125,25 +125,31 @@ defmodule RescueCloud.Replay do
   defp version_of(_), do: nil
 
   defp verify_group(version, events, opts) do
-    result =
-      with {:ok, dir, manifest} <- load_manifest(version, opts),
-           {:ok, outputs} <-
-             run_engine(dir, manifest["entrypoint"], Enum.map(events, &input_of/1), opts) do
-        {:ok, outputs, frozen_thresholds(dir)}
-      end
+    case load_manifest(version, opts) do
+      {:ok, dir, manifest} ->
+        frozen = frozen_thresholds(dir)
+        size = max(Keyword.get(opts, :chunk_size, conf(:chunk_size, 500)), 1)
 
-    case result do
-      {:ok, outputs, frozen} when length(outputs) == length(events) ->
+        events
+        |> Enum.chunk_every(size)
+        |> Enum.flat_map(&verify_chunk(version, &1, dir, manifest, frozen, opts))
+
+      {:missing_version, detail} ->
+        Enum.map(events, &row(&1, version, "missing_version", detail))
+    end
+  end
+
+  # One engine run per chunk: a failing chunk only turns its own events into errors.
+  defp verify_chunk(version, events, dir, manifest, frozen, opts) do
+    case run_engine(dir, manifest["entrypoint"], Enum.map(events, &input_of/1), opts) do
+      {:ok, outputs} when length(outputs) == length(events) ->
         events
         |> Enum.zip(outputs)
         |> Enum.map(fn {event, output} -> compare(event, version, output, frozen) end)
 
-      {:ok, outputs, _frozen} ->
+      {:ok, outputs} ->
         detail = "engine returned #{length(outputs)} outputs for #{length(events)} inputs"
         Enum.map(events, &row(&1, version, "error", detail))
-
-      {:missing_version, detail} ->
-        Enum.map(events, &row(&1, version, "missing_version", detail))
 
       {:error, detail} ->
         Enum.map(events, &row(&1, version, "error", detail))
