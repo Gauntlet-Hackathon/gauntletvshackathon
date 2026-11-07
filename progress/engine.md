@@ -35,3 +35,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 engine R15 (H12 config freeze): build copies thresholds.json/hoax_markers.txt/streets.txt into config/, writes config_hash+artifact_hash, bin_hash covers both; --rebuild-from; frozen build republished as +bin:2a2fac7006832dd7; replay_diff reports config_drift
 2026-11-07 engine runner CLI: `python -m rescue_evals.runner --system ours|stored|regex-baseline` now finds those systems (they registered into a second copy of the runner module); test in evals/tests/test_runner_cli.py
 2026-11-07 engine DECISIONS: record model delivery (baked into field image from an approved, pinned revision; laptop pull from the cloud registry not built) against plan 02/06
+2026-11-07 engine evals runner/consistency: engine context now gets street_list_hits + hoax_marker_hits from contracts/fixtures like the field pipeline (was always empty/0); DEMO.md notes how the challenge rows look with the trained model
