@@ -12,8 +12,8 @@ kill_signal = "SIGTERM"
   dockerfile = "field/Dockerfile"
 
 # Bake in the pinned model (gated repo; pass the token with --build-secret HF_TOKEN=..., see RUNBOOK.md).
-# Interim pin (#104, 2026-11-07 16:07Z): v3, the best checkpoint so far; training may continue, so a later
-# checkpoint is a revision swap here and in docs/DECISIONS.md.
+# Interim pin (#104, 2026-11-07 16:07Z): v3, pinned at Paawan's request (scores below laya-s13 on the draft
+# evals, see docs/DECISIONS.md). A later checkpoint is a revision swap here and in docs/DECISIONS.md.
 [build.args]
   HF_REPO = "paawandesai/rescue-tagger"
   HF_REVISION = "7279106609ccfc2a7953636d4c34bb9524179fd7"
