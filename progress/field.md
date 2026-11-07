@@ -35,3 +35,4 @@ One line per merged change: date, lane, issue, what changed.
 - 2026-11-07 field #184 F19: Simulate offline button (DEMO_MODE), badge role=status/aria-live, 'Sync status unavailable' on fetch error, 'N queued' text, no-worker badge reads store backlog
 2026-11-07 field #185 F20: per-row status form (assigned+crew, escalated+reason, rescued+count) with aria-labels, board.py allowed_statuses from status.ORDER/RANK, delegated submit handler + #status-error alert, 4 tests
 2026-11-07 field #186 F21: raised-tier rows show 'Needs confirmation' + question; build_board returns not_requests (newest first) rendered in a closed 'Not a request (N)' details; 2 tests
+2026-11-07 field #187 F22: board readable on projector (18px base, 1rem meta, 96rem max, AA contrast, :focus-visible), header/main landmarks, Skip to board link, tier sections aria-labelledby, 2 tests

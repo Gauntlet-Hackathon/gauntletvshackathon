@@ -5,25 +5,35 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rescue triage board</title>
 <style>
-body { font-family: system-ui, sans-serif; margin: 1rem auto; max-width: 60rem; padding: 0 1rem; }
-.tier-P1 h2 { color: #b00020; } .tier-P2 h2 { color: #b26a00; } .tier-P3 h2 { color: #1b5e20; }
-.row { border: 1px solid #ccc; border-radius: 4px; margin: .4rem 0; padding: .4rem .6rem; }
-.meta { color: #555; font-size: .85rem; }
-.dups { margin: .3rem 0 0 1rem; font-size: .9rem; }
+html { font-size: 18px; }
+body { font-family: system-ui, sans-serif; margin: 1rem auto; max-width: 96rem; padding: 0 1rem; color: #111; background: #fff; }
+.skip-link { position: absolute; left: -999px; top: 0; background: #fff; color: #00366b; padding: .5rem 1rem; z-index: 10; }
+.skip-link:focus { left: 0; }
+:focus-visible { outline: 3px solid #0b57d0; outline-offset: 2px; }
+.tier-P1 h2 { color: #b00020; } .tier-P2 h2 { color: #8a5200; } .tier-P3 h2 { color: #1b5e20; }
+.provisional-tier { font-weight: bold; }
+.row { border: 1px solid #767676; border-radius: 4px; margin: .4rem 0; padding: .4rem .6rem; }
+.meta { color: #4d4d4d; font-size: 1rem; }
+.dups { margin: .3rem 0 0 1rem; font-size: 1rem; }
 table { border-collapse: collapse; } td, th { padding: .1rem .6rem .1rem 0; text-align: left; }
-.badge { display: inline-block; padding: .15rem .6rem; border-radius: 1rem; font-size: .85rem; }
-#intake-error, #status-error { color: #b00020; } #intake form { margin: .6rem 0; }
-.badge-online { background: #c8e6c9; } .badge-offline { background: #ffcdd2; } .badge-nosync { background: #eee; }
+.badge { display: inline-block; padding: .15rem .6rem; border-radius: 1rem; font-size: 1rem; color: #111; }
+#intake-error, #status-error, #offline-toggle-msg { color: #b00020; } #intake form { margin: .6rem 0; }
+.badge-online { background: #c8e6c9; } .badge-offline { background: #ffcdd2; } .badge-nosync { background: #e0e0e0; }
 </style>
 </head>
 <body>
+<a class="skip-link" href="#board">Skip to board</a>
+<header>
 <h1>Rescue triage board</h1>
 <div id="sync-badge" role="status" aria-live="polite"></div>
 {% if demo_mode %}<p><button type="button" id="offline-toggle">Simulate offline</button> <span id="offline-toggle-msg" role="alert"></span></p>
 {% endif %}
+</header>
+<main id="main">
 {% include "_intake.html" %}
 <p id="status-error" role="alert"></p>
-<div id="board">{% include "_board.html" %}</div>
+<div id="board" tabindex="-1">{% include "_board.html" %}</div>
+</main>
 <script>
 async function refreshBadge() {
   try {

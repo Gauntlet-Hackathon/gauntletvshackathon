@@ -299,3 +299,32 @@ def test_refused_move_is_409(store):
         assert client.post(f"/requests/{RID}/status", json={"status": "rescued"}).status_code == 200
         r = client.post(f"/requests/{RID}/status", json={"status": "assigned", "crew": "A"})
     assert r.status_code == 409 and r.json()["detail"]
+
+
+# --- F22: landmarks, skip link, labels ------------------------------------------------------
+def test_page_has_main_skip_link_and_labelled_tier_sections(store):
+    add(store, "R1", output("P1"), extracted(location="Elm St"))
+    page = get(store).text
+    assert "<main" in page and "<header>" in page
+    first_link = re.search(r"<(a|button|input|select|textarea)\b[^>]*>", page)
+    assert 'class="skip-link"' in first_link.group(0) and 'href="#board"' in first_link.group(0)
+    assert "Skip to board" in page and 'id="board"' in page
+    sections = re.findall(r"<section\b[^>]*>", page)
+    tiers = [s for s in sections if 'class="tier ' in s]
+    assert len(tiers) == 3
+    for s in tiers:
+        ref = re.search(r'aria-labelledby="([^"]+)"', s).group(1)
+        assert re.search(rf'<h2 id="{ref}"', page)
+
+
+def test_every_form_control_has_a_label(store):
+    add(store, "R1", output("P1"), extracted(location="Elm St"))
+    page = get(store).text
+    controls = re.findall(r"<(?:input|select|textarea)\b[^>]*>", page)
+    assert controls
+    for c in controls:
+        if 'type="hidden"' in c:
+            continue
+        cid = re.search(r'\bid="([^"]+)"', c)
+        labelled = (cid and f'for="{cid.group(1)}"' in page) or "aria-label=" in c
+        assert labelled, c
