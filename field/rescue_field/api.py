@@ -32,7 +32,13 @@ from rescue_field import board as board_module
 from rescue_field import engine_client, freeze
 from rescue_field import status as status_module
 from rescue_field import sync as sync_module
-from rescue_field.pipeline import BatchDecider, IntakeItem, PipelineConfig, process_batch
+from rescue_field.pipeline import (
+    BatchDecider,
+    EngineInputError,
+    IntakeItem,
+    PipelineConfig,
+    process_batch,
+)
 from rescue_field.sanitize import clean_text
 from rescue_field.slm import Extractor, FixtureExtractor
 from rescue_field.store import EventStore
@@ -366,6 +372,8 @@ async def _intake(request: Request, items: list[IntakeItem]) -> list[dict[str, A
         results = await _run(request, items)
     except engine_client.EngineError as exc:
         return _error(502, "engine_failed", str(exc))
+    except EngineInputError as exc:
+        return _error(422, "invalid_input", exc.detail, exc.row)
     except ValueError as exc:  # an event failed schema validation
         return _error(422, "invalid_input", str(exc))
     return [
