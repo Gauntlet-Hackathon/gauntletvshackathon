@@ -7,6 +7,11 @@ engine_input, so each request is re-decided by both engines (latest `decided` ev
 OLD / NEW are version names under --dist (engine/dist/<rules_version>/) or paths to a version dir.
 A request counts as changed when its priority_tier, outcome or provisional_tier (the tier an
 abstain sorts by on the follow-up board, DECISIONS R1) differs.
+
+Config drift (DECISIONS H12 / R15): a build made after the config freeze carries its frozen
+thresholds in config/thresholds.json. A stored engine_input whose context.thresholds set a value
+other than them was decided with other inputs than the build was frozen with; such requests are
+listed under `config_drift` (per build) and flagged per row, whether or not the outcome changed.
 """
 
 from __future__ import annotations
@@ -17,6 +22,8 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+
+from rescue_shared import frozen_config
 
 from .build import DEFAULT_DIST
 
@@ -69,6 +76,21 @@ def run_engine(version_dir: Path, inputs: list[dict]) -> list[dict]:
     return json.loads(proc.stdout)
 
 
+def frozen_thresholds(version_dir: Path) -> dict | None:
+    """The build's frozen thresholds, or None for a build made before the config freeze."""
+    path = version_dir / frozen_config.CONFIG_SUBDIR / frozen_config.CONFIG_FILES["thresholds"]
+    return frozen_config.read_thresholds(path) if path.is_file() else None
+
+
+def thresholds_drift(engine_input: dict, frozen: dict | None) -> bool:
+    """True when a threshold the input sets differs from the frozen one. A threshold the input
+    leaves out falls back to the engine's default, which equals the frozen value (tested)."""
+    if frozen is None:
+        return False
+    given = (engine_input.get("context") or {}).get("thresholds") or {}
+    return any(k not in frozen or frozen[k] != v for k, v in given.items())
+
+
 def _brief(out: dict) -> dict:
     return {k: out.get(k) for k in ("priority_tier", "outcome", "provisional_tier", "rule_id")}
 
@@ -83,8 +105,10 @@ def diff(events_path: Path, old_dir: Path, new_dir: Path) -> dict:
     inputs = [by_request[i] for i in ids]
     old = run_engine(old_dir, inputs) if inputs else []
     new = run_engine(new_dir, inputs) if inputs else []
+    frozen_old, frozen_new = frozen_thresholds(old_dir), frozen_thresholds(new_dir)
     rows, changed = [], 0
-    for rid, a, b in zip(ids, old, new, strict=True):
+    drift = {"old": [], "new": []}
+    for rid, inp, a, b in zip(ids, inputs, old, new, strict=True):
         tier_changed = a.get("priority_tier") != b.get("priority_tier")
         outcome_changed = a.get("outcome") != b.get("outcome")
         provisional_changed = a.get("provisional_tier") != b.get("provisional_tier")
@@ -95,7 +119,12 @@ def diff(events_path: Path, old_dir: Path, new_dir: Path) -> dict:
             "tier_changed": tier_changed,
             "outcome_changed": outcome_changed,
             "provisional_tier_changed": provisional_changed,
+            "config_drift_old": thresholds_drift(inp, frozen_old),
+            "config_drift_new": thresholds_drift(inp, frozen_new),
         }
+        for side in ("old", "new"):
+            if row[f"config_drift_{side}"]:
+                drift[side].append(rid)
         if _changed(row):
             changed += 1
         rows.append(row)
@@ -104,6 +133,7 @@ def diff(events_path: Path, old_dir: Path, new_dir: Path) -> dict:
         "new_version": json.loads((new_dir / "manifest.json").read_text())["rules_version"],
         "total": len(rows),
         "changed": changed,
+        "config_drift": drift,
         "requests": rows,
     }
 
@@ -115,8 +145,15 @@ def to_markdown(report: dict) -> str:
         f"- before: `{report['old_version']}`",
         f"- after: `{report['new_version']}`",
         f"- requests: {report['total']}, changed: {report['changed']}",
-        "",
     ]
+    drift = report.get("config_drift") or {}
+    for side, label in (("old", "before"), ("new", "after")):
+        if drift.get(side):
+            lines.append(
+                f"- config drift vs {label} build: {len(drift[side])} request(s) were decided "
+                "with thresholds other than the build's frozen ones"
+            )
+    lines.append("")
     changed = [r for r in report["requests"] if _changed(r)]
     if not changed:
         lines.append("No tier or outcome changes.")

@@ -3,7 +3,7 @@
 FROM python:3.12-slim-trixie
 
 # Frozen engine build (H12, #178); must match the single folder under engine/dist/.
-ARG ENGINE_BUILD=rules@a4dbac566db96b00951930ad9da941e85c1b2429+bin:36c2f7f7da6998e5
+ARG ENGINE_BUILD=rules@a4dbac566db96b00951930ad9da941e85c1b2429+bin:2a2fac7006832dd7
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

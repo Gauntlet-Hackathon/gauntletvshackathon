@@ -1,0 +1,12 @@
+{
+  "request_confidence_min": 0.6,
+  "stale_confidence_min": 0.6,
+  "hoax_marker_min": 1,
+  "hoax_request_confidence_max": 0.85,
+  "location_confidence_min": 0.6,
+  "hazard_firm_min": 0.75,
+  "hazard_uncertain_min": 0.5,
+  "hazard_weak_min": 0.25,
+  "need_hours_over": 24,
+  "duplicate_window_hours": 12
+}

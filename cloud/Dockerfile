@@ -24,7 +24,7 @@ ARG ELIXIR_VERSION=1.20.5
 ARG OTP_VERSION=29.1.2
 ARG DEBIAN_VERSION=trixie-20261104-slim
 # frozen Mercury engine build replayed by RescueCloud.Replay (no Python needed)
-ARG ENGINE_BUILD=rules@a4dbac566db96b00951930ad9da941e85c1b2429+bin:36c2f7f7da6998e5
+ARG ENGINE_BUILD=rules@a4dbac566db96b00951930ad9da941e85c1b2429+bin:2a2fac7006832dd7
 
 ARG BUILDER_IMAGE="docker.io/hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-debian-${DEBIAN_VERSION}"
 ARG RUNNER_IMAGE="docker.io/debian:${DEBIAN_VERSION}"

@@ -22,6 +22,7 @@ import pytest
 
 from rescue_engine import build as b
 from rescue_engine.fallback import decide, decide_one, rules
+from rescue_shared import frozen_config
 from rescue_shared.contracts_io import validator_for
 from rescue_shared.versions import parse_rules_version
 
@@ -97,10 +98,14 @@ def test_build_registers_mercury_artifact(dist_dir: Path, binary: Path, tmp_path
     assert dist_dir.name == manifest["rules_version"]
     sha, bin_hash = parse_rules_version(manifest["rules_version"])
     assert (sha, bin_hash) == (manifest["rules_sha"], manifest["bin_hash"])
-    # bin_hash covers the binary as compiled, before the real version was stamped in (A2).
+    # artifact_hash covers the binary as compiled, before the real version was stamped in (A2);
+    # bin_hash covers it together with the frozen config (H12 / R15).
     original = tmp_path / binary.name
     original.write_bytes(b.unstamped(binary.read_bytes(), manifest["rules_version"], "mercury"))
-    assert b.hash_files([original], tmp_path)[:16] == bin_hash
+    assert b.hash_files([original], tmp_path)[:16] == manifest["artifact_hash"]
+    assert bin_hash == frozen_config.combined_bin_hash(
+        manifest["artifact_hash"], manifest["config_hash"]
+    )
     assert os.access(binary, os.X_OK)
 
 

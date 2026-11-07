@@ -18,6 +18,11 @@ defmodule RescueCloud.Replay do
     * `missing_version`: no manifest (or an unusable one) for the event's `rules_version`
     * `error`: the build exists but exited non-zero, timed out or broke the stdout format
 
+  Config drift (DECISIONS H12 / R15): a build made after the config freeze ships its frozen
+  thresholds in `config/thresholds.json`. An event whose `engine_input.context.thresholds` set a
+  value other than them is a `mismatch` ("context.thresholds differ from the build's frozen config"), even when
+  the replayed output agrees, because it was decided with other inputs than the build names.
+
   `missing_version` and `error` rows are retried on the next run; `match` and `mismatch` are
   final unless `all: true` is passed.
 
@@ -39,6 +44,7 @@ defmodule RescueCloud.Replay do
   @default_timeout 30_000
   @rules_version ~r/^rules@[0-9a-f]{7,40}\+bin:[0-9a-f]{8,64}$/
   @retry_statuses ~w(missing_version error)
+  @drift_detail "context.thresholds differ from the build's frozen config"
 
   def topic, do: @topic
 
@@ -119,17 +125,19 @@ defmodule RescueCloud.Replay do
 
   defp verify_group(version, events, opts) do
     result =
-      with {:ok, dir, manifest} <- load_manifest(version, opts) do
-        run_engine(dir, manifest["entrypoint"], Enum.map(events, &input_of/1), opts)
+      with {:ok, dir, manifest} <- load_manifest(version, opts),
+           {:ok, outputs} <-
+             run_engine(dir, manifest["entrypoint"], Enum.map(events, &input_of/1), opts) do
+        {:ok, outputs, frozen_thresholds(dir)}
       end
 
     case result do
-      {:ok, outputs} when length(outputs) == length(events) ->
+      {:ok, outputs, frozen} when length(outputs) == length(events) ->
         events
         |> Enum.zip(outputs)
-        |> Enum.map(fn {event, output} -> compare(event, version, output) end)
+        |> Enum.map(fn {event, output} -> compare(event, version, output, frozen) end)
 
-      {:ok, outputs} ->
+      {:ok, outputs, _frozen} ->
         detail = "engine returned #{length(outputs)} outputs for #{length(events)} inputs"
         Enum.map(events, &row(&1, version, "error", detail))
 
@@ -142,6 +150,40 @@ defmodule RescueCloud.Replay do
   end
 
   defp input_of(%Event{payload: payload}), do: Map.get(payload, "engine_input")
+
+  # The build's frozen thresholds (config/thresholds.json), or nil for a build made before the
+  # config freeze (nothing to compare against).
+  @doc false
+  def frozen_thresholds(dir) do
+    with {:ok, body} <- File.read(Path.join([dir, "config", "thresholds.json"])),
+         {:ok, %{} = thresholds} <- Jason.decode(body) do
+      thresholds
+    else
+      _ -> nil
+    end
+  end
+
+  defp thresholds_of(%Event{payload: %{"engine_input" => %{"context" => %{} = context}}}),
+    do: Map.get(context, "thresholds")
+
+  defp thresholds_of(_), do: nil
+
+  # A threshold the input leaves out falls back to the engine default (the frozen value), so only
+  # thresholds the input sets are compared.
+  defp drifted?(%{} = given, %{} = frozen),
+    do: Enum.any?(given, fn {k, v} -> not Map.has_key?(frozen, k) or frozen[k] != v end)
+
+  defp drifted?(_given, _frozen), do: false
+
+  defp compare(event, version, output, frozen) do
+    if drifted?(thresholds_of(event), frozen) do
+      replayed = if is_map(output), do: output, else: %{"value" => output}
+
+      %{row(event, version, "mismatch", @drift_detail) | replayed_output: replayed}
+    else
+      compare(event, version, output)
+    end
+  end
 
   defp compare(event, version, output) do
     stored = Map.get(event.payload, "engine_output")
