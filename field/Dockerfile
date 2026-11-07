@@ -2,8 +2,10 @@
 # trixie pinned: the Mercury engine binary needs glibc 2.38+ (bookworm has 2.36).
 FROM python:3.12-slim-trixie
 
-# Frozen engine build (H12, #178); must match the single folder under engine/dist/.
-ARG ENGINE_BUILD=rules@a4dbac566db96b00951930ad9da941e85c1b2429+bin:2a2fac7006832dd7
+# Frozen engine build (H12, #178). ENGINE_BUILD must match the single folder under engine/dist/,
+# which is RULES_VERSION with ':' as '-' (WINPATH-1: Windows cannot check out a ':' in a path).
+ARG RULES_VERSION=rules@a4dbac566db96b00951930ad9da941e85c1b2429+bin:2a2fac7006832dd7
+ARG ENGINE_BUILD=rules@a4dbac566db96b00951930ad9da941e85c1b2429+bin-2a2fac7006832dd7
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -14,7 +16,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     CLOUD_URL=http://cloud:4000 \
     DEMO_MODE=0 \
     ENGINE_CMD=/app/engine/dist/${ENGINE_BUILD}/bin/mercury_engine \
-    RULES_VERSION=${ENGINE_BUILD} \
+    RULES_VERSION=${RULES_VERSION} \
     PORT=8000
 
 WORKDIR /app

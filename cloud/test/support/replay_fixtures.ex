@@ -1,7 +1,7 @@
 defmodule RescueCloud.ReplayFixtures do
   @moduledoc """
   Fake engine builds for replay tests. `install_engine/4` writes
-  `<dist>/<rules_version>/manifest.json` (contracts/engine_manifest.schema.json) and copies one of
+  `<dist>/<Replay.dist_dirname(rules_version)>/manifest.json` (contracts/engine_manifest.schema.json) and copies one of
   the contract-shaped fake engines in `test/support/engines/` (`:v1` or `:v2`) as `engine.exs`.
   """
   import RescueCloud.RecordsFixtures
@@ -18,7 +18,7 @@ defmodule RescueCloud.ReplayFixtures do
 
   @doc "Installs a build for `version`. `engine` is `:v1`, `:v2` or nil (no script copied)."
   def install_engine(dist, version, entrypoint \\ "elixir engine.exs", engine \\ nil) do
-    dir = Path.join(dist, version)
+    dir = Path.join(dist, RescueCloud.Replay.dist_dirname(version))
     File.mkdir_p!(dir)
 
     if engine,

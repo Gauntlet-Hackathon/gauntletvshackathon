@@ -24,7 +24,7 @@ from rescue_engine import build as b
 from rescue_engine.fallback import decide, decide_one, rules
 from rescue_shared import frozen_config
 from rescue_shared.contracts_io import validator_for
-from rescue_shared.versions import parse_rules_version
+from rescue_shared.versions import dist_dirname, parse_rules_version
 
 ROOT = Path(__file__).resolve().parents[2]
 CASES = [
@@ -95,7 +95,7 @@ def test_build_registers_mercury_artifact(dist_dir: Path, binary: Path, tmp_path
     validator_for("engine_manifest.schema.json").validate(manifest)
     assert manifest["engine_kind"] == "mercury"
     assert manifest["entrypoint"] == b.MERCURY_ENTRYPOINT
-    assert dist_dir.name == manifest["rules_version"]
+    assert dist_dir.name == dist_dirname(manifest["rules_version"])  # WINPATH-1: no ':'
     sha, bin_hash = parse_rules_version(manifest["rules_version"])
     assert (sha, bin_hash) == (manifest["rules_sha"], manifest["bin_hash"])
     # artifact_hash covers the binary as compiled, before the real version was stamped in (A2);

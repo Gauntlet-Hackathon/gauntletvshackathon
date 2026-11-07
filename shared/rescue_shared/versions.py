@@ -9,6 +9,11 @@ model_version  hf:<org>/<repo>@<commit_sha>    (a pinned Hugging Face revision, 
     Example: hf:rescue-org/rescue-tagger@4d5e6f7a
 
 rules_version() is the only place the string is built: engine E1/E5 and cloud replay C9 call it.
+
+dist_dirname(rules_version) is the build's folder under engine/dist/: the rules_version with ':'
+replaced by '-' (rules@<rules_sha>+bin-<bin_hash>), because Windows cannot store ':' in a file
+name (WINPATH-1). The rules_version itself, in manifests, binaries and events, keeps its ':'.
+The cloud replay verifier (RescueCloud.Replay.dist_dirname/1) applies the same mapping.
 The JSON Schemas in contracts/common.schema.json carry the same patterns.
 """
 
@@ -43,6 +48,18 @@ def parse_rules_version(value: str) -> tuple[str, str]:
     if not match:
         raise ValueError(f"not a rules_version: {value!r}")
     return match["rules_sha"], match["bin_hash"]
+
+
+def dist_dirname(value: str) -> str:
+    """Folder name of the engine build for a rules_version: ':' becomes '-'.
+
+    WINPATH-1: folders were named after the rules_version itself, and its ':' made every Windows
+    checkout of main fail (git refuses a path NTFS would read as a data stream). The mapping is
+    one-to-one because a rules_version has exactly one ':'. Only a well-formed rules_version is
+    accepted, so the result can never be a path that leaves the dist folder.
+    """
+    parse_rules_version(value)
+    return value.replace(":", "-")
 
 
 def model_version(repo: str, revision: str) -> str:

@@ -50,7 +50,7 @@
     "built_at"
   ],
   "title": "engine manifest",
-  "description": "engine/dist/<rules_version>/manifest.json. rules_version must equal rules@<rules_sha>+bin:<bin_hash>.",
+  "description": "engine/dist/<rules_version with ':' as '-'>/manifest.json (the folder drops the ':' so Windows can check it out). rules_version must equal rules@<rules_sha>+bin:<bin_hash>.",
   "dependentRequired": {
     "artifact_hash": [
       "config_hash"

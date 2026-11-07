@@ -1,4 +1,7 @@
-"""Build an immutable engine artifact: engine/dist/<rules_version>/.
+"""Build an immutable engine artifact: engine/dist/<dist_dirname(rules_version)>/.
+
+The folder is the rules_version with ':' as '-' (rescue_shared.versions.dist_dirname,
+WINPATH-1); manifest.json and the stamped engine keep the real rules_version.
 
     python -m rescue_engine.build [--dist DIR] [--kind python|mercury]
     python -m rescue_engine.build [--dist DIR] --rebuild-from DIR
@@ -40,7 +43,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from rescue_shared import frozen_config
-from rescue_shared.versions import rules_version
+from rescue_shared.versions import dist_dirname, rules_version
 
 ENGINE_DIR = Path(__file__).resolve().parent
 REPO_ROOT = ENGINE_DIR.parent.parent
@@ -146,11 +149,12 @@ def _publish(
     config_dir: Path = frozen_config.FIXTURES_DIR,
 ) -> Path:
     """Fill a temp dir with stage(tmp, version) and the frozen config, add manifest.json, rename it
-    to dist/<version>."""
+    to dist/<dist_dirname(version)>."""
     cfg_hash = frozen_config.config_hash_of(config_dir)
     bin_hash = frozen_config.combined_bin_hash(artifact_hash, cfg_hash)
     version = rules_version(sha, bin_hash)
-    target = dist / version
+    # WINPATH-1: the folder name drops the ':' Windows cannot store; the manifest keeps it.
+    target = dist / dist_dirname(version)
     if target.exists():
         raise VersionExists(f"{target} already exists; versions are immutable")
     dist.mkdir(parents=True, exist_ok=True)
@@ -238,7 +242,7 @@ def build_mercury(
     rules_sha: str | None = None,
     config_dir: Path = frozen_config.FIXTURES_DIR,
 ) -> Path:
-    """Compile the Mercury engine and publish it as dist/<rules_version>/bin/mercury_engine."""
+    """Compile the Mercury engine and publish it as bin/mercury_engine in its dist folder."""
     sha = rules_sha or git_sha(source)
     with tempfile.TemporaryDirectory(prefix="mercury-build-") as work:
         binary = compile_mercury(Path(work), source)

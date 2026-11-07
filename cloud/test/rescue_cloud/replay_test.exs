@@ -21,7 +21,11 @@ defmodule RescueCloud.ReplayTest do
   end
 
   defp calls(dist, version) do
-    dist |> Path.join(version) |> Path.join("calls.log") |> File.read!() |> String.split()
+    dist
+    |> Path.join(Replay.dist_dirname(version))
+    |> Path.join("calls.log")
+    |> File.read!()
+    |> String.split()
   end
 
   defp statuses do
@@ -119,6 +123,14 @@ defmodule RescueCloud.ReplayTest do
     assert Repo.get_by!(Verification, request_id: rid("C1")).detail =~ "status 3"
   end
 
+  # WINPATH-1 (found by: Windows `git pull` refused engine/dist/rules@...+bin:.../)
+  test "a build lives in a folder without ':' and is found by its rules_version", %{dist: dist} do
+    assert Replay.dist_dirname(@v1) == "rules@1111111+bin-aaaaaaaa"
+    assert File.regular?(Path.join([dist, "rules@1111111+bin-aaaaaaaa", "manifest.json"]))
+    refute File.exists?(Path.join(dist, @v1))
+    assert {:ok, _dir, %{"rules_version" => @v1}} = Replay.load_manifest(@v1, engine_dist: dist)
+  end
+
   test "a manifest naming another version or a bad folder name is missing_version", %{dist: dist} do
     other = "rules@6666666+bin:ffffffff"
     dir = install_engine(dist, other, "elixir engine.exs", :v1)
@@ -214,7 +226,7 @@ defmodule RescueCloud.ReplayTest do
     dist: dist
   } do
     frozen = payload("decided")["engine_input"]["context"]["thresholds"]
-    config = dist |> Path.join(@v1) |> Path.join("config")
+    config = dist |> Path.join(Replay.dist_dirname(@v1)) |> Path.join("config")
     File.mkdir_p!(config)
     File.write!(Path.join(config, "thresholds.json"), Jason.encode!(frozen))
 

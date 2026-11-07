@@ -115,7 +115,7 @@ for `conflicting_counts` it is also raised to the highest candidate tier (R4). I
 It is never a decision: an abstain is still routed to a human.
 
 `rules_version` in the output is the version of the engine that produced it. The source tree emits the placeholder `rules@0000000+bin:00000000`;
-`python -m rescue_engine.build` stamps the real version into the engine it publishes to `engine/dist/<rules_version>/` (changed 2026-11-07, see DECISIONS; A2).
+`python -m rescue_engine.build` stamps the real version into the engine it publishes to `engine/dist/<rules_version with ':' as '-'>/` (changed 2026-11-07, see DECISIONS; A2, WINPATH-1).
 Fixtures use the placeholder; compare everything except `rules_version` against fixtures.
 
 ## Follow-up questions (exact strings)
