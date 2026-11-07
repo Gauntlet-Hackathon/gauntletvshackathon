@@ -39,3 +39,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 field #209 F29: seed.py --export-text/--export-csv (store untouched), committed field/demo/seed_requests.{txt,csv} + README for count 200 seed 7, 3 tests incl. bulk intake of both files
 2026-11-07 field #210 F30: DEMO.md demo-day runbook (pre-flight, reset, challenges, fallbacks) + test_demo_challenges.py (6 cases via real fallback engine with input spy)
 2026-11-07 field #218 F31: docker-compose field service sets DEMO_MODE=1; test_compose.py checks it as text
+2026-11-07 field #180 F23: Dockerfile pins python:3.12-slim-trixie, ships only the frozen Mercury build from engine/dist, ENGINE_CMD/RULES_VERSION set from ENGINE_BUILD; 3 static tests
