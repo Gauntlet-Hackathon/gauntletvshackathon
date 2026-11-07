@@ -25,6 +25,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
+from rescue_field import downsync
 from rescue_field.store import EventStore
 
 BATCH_SIZE = 200
@@ -73,6 +74,7 @@ class SyncWorker:
         rng: random.Random | None = None,
         idle_interval: float = IDLE_INTERVAL_S,
         batch_size: int = BATCH_SIZE,
+        down_sync: bool = False,
     ) -> None:
         self.store = store
         self.device_id = device_id
@@ -81,6 +83,7 @@ class SyncWorker:
         self.rng = rng or random.Random()
         self.idle_interval = idle_interval
         self.batch_size = batch_size
+        self.down_sync = down_sync
         self.client = httpx.Client(
             base_url=cloud_url.rstrip("/"),
             headers={"Authorization": f"Bearer {token}"},
@@ -160,6 +163,11 @@ class SyncWorker:
             if not acked and not any(i in self.rejected_ids for i in sent_ids):
                 break  # no progress this round (partial failure): back off rather than spin
         result.rejected = len(self.rejected_ids)
+        if self.down_sync and not self._stop.is_set() and not self._paused.is_set():
+            try:
+                downsync.pull(self.client, self.store, self.lock)
+            except downsync.DownSyncError as exc:
+                raise SyncError(str(exc)) from exc
         return result
 
     # ---- loop -------------------------------------------------------------------------
@@ -247,6 +255,7 @@ def worker_from_env(
         versions=lambda: (rules, model_version),
         lock=lock,
         transport=transport,
+        down_sync=True,
     )
 
 

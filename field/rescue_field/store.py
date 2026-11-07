@@ -22,6 +22,10 @@ CREATE TABLE IF NOT EXISTS events (
     body TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS events_request ON events(request_id);
+CREATE TABLE IF NOT EXISTS meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS outbox (
     seq INTEGER PRIMARY KEY AUTOINCREMENT,
     event_id TEXT NOT NULL UNIQUE REFERENCES events(event_id)
@@ -109,3 +113,47 @@ class EventStore:
     def all_events(self) -> list[dict[str, Any]]:
         rows = self._conn.execute("SELECT body FROM events ORDER BY seq").fetchall()
         return [json.loads(r[0]) for r in rows]
+
+    def get_meta(self, key: str, default: str | None = None) -> str | None:
+        row = self._conn.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
+        return row[0] if row else default
+
+    def set_meta(self, items: dict[str, str]) -> None:
+        """Upsert key/value pairs atomically."""
+        self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            for k, v in items.items():
+                self._conn.execute(
+                    "INSERT INTO meta(key, value) VALUES (?, ?)"
+                    " ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                    (k, v),
+                )
+            self._conn.execute("COMMIT")
+        except BaseException:
+            self._conn.execute("ROLLBACK")
+            raise
+
+    def append_remote_events(self, events: Iterable[dict[str, Any]]) -> list[str]:
+        """Store events that came from the cloud: no outbox row (they must not be echoed back)."""
+        stored: list[str] = []
+        self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            for ev in events:
+                cur = self._conn.execute(
+                    "INSERT OR IGNORE INTO events(event_id, request_id, type, occurred_at, body)"
+                    " VALUES (?, ?, ?, ?, ?)",
+                    (
+                        ev["event_id"],
+                        ev["request_id"],
+                        ev["type"],
+                        ev["occurred_at"],
+                        json.dumps(ev, separators=(",", ":")),
+                    ),
+                )
+                if cur.rowcount:
+                    stored.append(ev["event_id"])
+            self._conn.execute("COMMIT")
+        except BaseException:
+            self._conn.execute("ROLLBACK")
+            raise
+        return stored

@@ -12,3 +12,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 field #62 F7: status updates (rescue_field/status.py): POST /requests/{id}/status assigned/escalated/rescued, forward-only (409 on backward/repeat), appends event; board rows show status
 2026-11-07 field fix-main: CI red on cloud SyncEventsTest (flaky): refute_receive on the global "events" PubSub topic caught a broadcast from async live_updates_test; scoped the refute to the batch's own event_ids
 2026-11-07 field #65 F9: live sync badge (GET /sync/badge fragment + _sync_badge.html, polled by board); status/offline-toggle/lifespan wiring already from F8; tests/test_sync_status.py
+2026-11-07 field #68 F10: down-sync (rescue_field/downsync.py): GET /sync/down polled after each sync cycle, cursor persisted, forward-only apply without outbox echo, approved rules/model versions recorded with previous kept; store meta table
