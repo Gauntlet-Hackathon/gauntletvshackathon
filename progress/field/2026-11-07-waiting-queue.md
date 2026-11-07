@@ -1,0 +1,1 @@
+- 2026-11-07: Waiting/Out now lines are clickable (Send someone / Update); Waiting shows queue positions and its order.

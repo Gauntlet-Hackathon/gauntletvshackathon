@@ -365,3 +365,17 @@ def test_rescue_with_two_other_posts_writes_two_closed_duplicates(store, client)
     # A folded post is closed: its own status can no longer move.
     r = client.post(f"/requests/{dups[0]}/status", json={"status": "assigned", "crew": "x"})
     assert r.status_code == 409
+
+
+def test_waiting_and_out_now_lines_open_send_and_update(store, client):
+    """Each Waiting line opens Send someone; each Out now line opens Update."""
+    add(store, out("P1", "R-P1-01"), ext("1 Top St"))
+    waiting = add(store, out("P2", "R-P2-01"), ext("2 Mid St"))
+    gone = add(store, out("P2", "R-P2-01"), ext("3 Low St"))
+    assign(client, gone)
+    html = client.get("/").text
+    assert f'class="line-open" href="/requests/{waiting}/send"' in section(html, "waiting")
+    assert 'aria-label="Number 2 in the queue">2</span>' in section(html, "waiting")
+    assert "queue-pos" not in section(html, "out-now")
+    assert f'class="line-open" href="/requests/{gone}/update"' in section(html, "out-now")
+    assert client.get(f"/requests/{waiting}/send").status_code == 200

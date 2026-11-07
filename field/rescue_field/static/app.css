@@ -84,6 +84,16 @@ img { max-width: 100%; }
 .queue-line { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; background: var(--white); border: 1px solid var(--line);
   border-radius: 12px; padding: .6rem .75rem; margin: .4rem 0; }
 .line-address { flex-basis: 100%; color: var(--muted); }
+/* The whole Waiting / Out now line opens Send someone (or Update): the headline link stretches over the line. */
+.queue-line { position: relative; }
+.queue-line:has(.line-open):hover { border-color: var(--blue); }
+.line-open { color: inherit; text-decoration: none; }
+.line-open::after { content: ""; position: absolute; inset: 0; border-radius: 12px; }
+.line-open:focus-visible { outline: none; }
+.queue-line:has(.line-open:focus-visible) { outline: 3px solid var(--blue); outline-offset: 2px; }
+.queue-line .update { position: relative; z-index: 1; }
+.queue-pos { display: inline-flex; align-items: center; justify-content: center; min-width: 1.8rem; height: 1.8rem; border-radius: 999px;
+  background: #EEF3FD; color: #0A3A8C; font-weight: 700; }
 .set-aside summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
 #queue h1 { font-size: 1.4rem; margin: 1rem 0 .4rem; }
 #queue h2#check-first-heading { font-size: 1.1rem; }
