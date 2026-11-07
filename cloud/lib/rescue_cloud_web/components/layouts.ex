@@ -40,6 +40,7 @@ defmodule RescueCloudWeb.Layouts do
     {"Fleet", "/fleet"},
     {"Records", "/records"},
     {"Activity", "/activity"},
+    {"Flow", "/flow"},
     {"Corrections", "/corrections"},
     {"Evals", "/evals"}
   ]

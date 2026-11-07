@@ -43,6 +43,8 @@ defmodule RescueCloudWeb.Router do
     live "/records", RecordsLive
     live "/records/:request_id", RecordsLive
     live "/activity", ActivityLive
+    live "/flow", FlowLive
+    live "/flow/:request_id", FlowLive
     live "/corrections", CorrectionsLive
     live "/evals", EvalsLive
   end
