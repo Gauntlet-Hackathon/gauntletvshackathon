@@ -143,7 +143,7 @@ Findings R1–R13 (engine rules) and A1–A12 (agent assumptions) are in the ste
 **Cross-lane**
 - A1: status order is assigned < escalated < rescued (escalation follows an assignment), in field and cloud alike; written into `contracts/logic.md`.
 - A2: `build.py` stamps the real `rules_version` into the built engine, so emitted decisions carry it and replay can find the build.
-- A3: the evals runner writes `metrics.calibration.ece`, taken from the decision (outcome) calibration, for the promotion gate.
+- A3: the evals runner writes `metrics["calibration.ece"]` (one ECE pooled over every extracted-field confidence the decision is made from; engine output has no confidence of its own) for the promotion gate.
 - A4: rejected events are stored as rejected and never re-sent unchanged; /sync/status shows their count.
 - A5: the field app has one default `DEVICE_ID`, `laptop-dev-01`.
 - A6: `DEVICE_TOKENS` adds pairs to the device map. The committed dev tokens are loaded only in dev and test; prod accepts only `DEVICE_TOKENS`, so deploys must list every device (including `demo-field-01` for the demo).
