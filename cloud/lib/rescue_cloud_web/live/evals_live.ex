@@ -108,7 +108,7 @@ defmodule RescueCloudWeb.EvalsLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash}>
+    <Layouts.app flash={@flash} current="/evals">
       <h1 id="evals-title" class="text-2xl font-semibold">Evals</h1>
       <p :if={@summary == nil} id="evals-empty">No eval results published yet.</p>
 
