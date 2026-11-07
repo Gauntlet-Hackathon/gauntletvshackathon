@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.rescue.invalid/payloads/decided.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "engine_input": {
+      "$ref": "../engine_input.schema.json"
+    },
+    "engine_output": {
+      "$ref": "../engine_output.schema.json"
+    }
+  },
+  "required": [
+    "engine_input",
+    "engine_output"
+  ],
+  "title": "decided payload",
+  "description": "engine_input + engine_output, so replay can rebuild the exact input."
+}

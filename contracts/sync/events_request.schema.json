@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.rescue.invalid/sync/events_request.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "device_id": {
+      "$ref": "../common.schema.json#/$defs/device_id"
+    },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 200,
+      "items": {
+        "$ref": "../event.schema.json"
+      }
+    }
+  },
+  "required": [
+    "device_id",
+    "events"
+  ],
+  "title": "POST /sync/events request"
+}

@@ -1,0 +1,11 @@
+{
+  "acked": [
+    "01JCB00000000000000000EV01"
+  ],
+  "rejected": [
+    {
+      "event_id": "01JCB00000000000000000EV02",
+      "error": "invalid_payload"
+    }
+  ]
+}
