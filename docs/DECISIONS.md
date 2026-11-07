@@ -12,7 +12,7 @@ Agents: treat these as fixed. To change one, comment on the issue and add `needs
 | 3 | Rubric sources | Not verified. The rubric stays labelled "draft, to be validated with emergency managers" in the pitch. `contracts/engine_rules.md` is the working interpretation. |
 | 4 | Cloud stack and event store | **One Phoenix app** serves the sync API and the LiveView dashboard. Postgres via Ecto is the event store tonight; Kafka is a later swap behind the `Events` context (cut line 4). LiveView replaces the plan's HTMX + SSE on the cloud side only; the field app keeps FastAPI + HTMX. |
 | 5 | Team split | Lanes: `field` (field/), `cloud` (cloud/), `engine` (engine/ + evals/). Tokens: field → `CLAUDE_TOKEN_PAAWAN`, cloud → `CLAUDE_TOKEN_DEBU`, engine → `CLAUDE_TOKEN_TYLER`. |
-| 6 | Fleet thresholds | A device is **stale** after no heartbeat for more than **5 minutes** and **offline** after more than **30 minutes**, computed in the cloud from the last heartbeat. Both live in cloud config. |
+| 6 | Fleet thresholds | A device is **stale** after no heartbeat for more than **5 minutes** and **offline** after more than **30 minutes**, computed in the cloud from the last heartbeat. Both live in cloud config. Demo override (#179, 2026-11-07): the hosted cloud on Fly sets `FLEET_STALE_AFTER_S=60` and `FLEET_OFFLINE_AFTER_S=600` so a laptop going offline shows within the demo's 1:20 step; the product default stays 5 / 30 minutes. |
 | 7 | Down-sync scope | Included: **other sites' `assigned` and `rescued` events, plus approved model and rules versions** (`GET /sync/down`). Nothing else is pushed down. |
 
 Also fixed by W0-6:
