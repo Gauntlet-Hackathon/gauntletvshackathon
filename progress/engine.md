@@ -11,3 +11,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 engine #49 EV4: evals/rescue_evals/runner.py two-point scoring (extraction + decision), results <system>__<set>.json with failing ids and latency; tests in evals/tests/test_runner.py
 2026-11-07 engine #41 E5: engine/rescue_engine/build.py writes immutable engine/dist/<rules_version>/ (copied sources + manifest.json), refuses overwrite; tests in engine/tests/test_build.py
 2026-11-07 engine #51 EV3: evals/rescue_evals/baselines/regex_baseline.py regex/keyword extraction + fallback engine, registered as runner system regex-baseline; tests in evals/tests/test_regex_baseline.py
+2026-11-07 engine #57 EV6: evals/rescue_evals/baselines/stored.py replays stored JSONL outputs through the runner (system 'stored', env STORED_OUTPUTS), counts missing/malformed rows; tests in evals/tests/test_stored.py
