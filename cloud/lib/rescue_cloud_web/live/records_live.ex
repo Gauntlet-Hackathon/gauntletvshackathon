@@ -2,15 +2,19 @@ defmodule RescueCloudWeb.RecordsLive do
   @moduledoc """
   Records page at `/records`: search every request by text, tier and status (filters live in the
   URL query, so a search is linkable). `/records/:request_id` adds a detail panel with the rule
-  that fired, the rules and model versions, and the full event history in laptop time order.
+  that fired, the rules and model versions, the replay verification status (C9) and the full
+  event history in laptop time order.
   """
   use RescueCloudWeb, :live_view
 
-  alias RescueCloud.Records
+  alias RescueCloud.{Records, Replay}
 
   @impl true
   def mount(_params, _session, socket) do
-    if connected?(socket), do: Phoenix.PubSub.subscribe(RescueCloud.PubSub, "events")
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(RescueCloud.PubSub, "events")
+      Phoenix.PubSub.subscribe(RescueCloud.PubSub, Replay.topic())
+    end
 
     {:ok, assign(socket, :page_title, "Records")}
   end
@@ -29,6 +33,7 @@ defmodule RescueCloudWeb.RecordsLive do
 
   @impl true
   def handle_info({:event, _event}, socket), do: {:noreply, load(socket)}
+  def handle_info({:replay, _counts}, socket), do: {:noreply, load(socket)}
   def handle_info(_, socket), do: {:noreply, socket}
 
   # Re-query the list and the open detail panel; runs on navigation and on every new event.
@@ -38,7 +43,19 @@ defmodule RescueCloudWeb.RecordsLive do
     socket
     |> assign(:requests, Records.search_requests(filters))
     |> assign(:record, id && Records.get_record(id))
+    |> assign(:verifications, if(id, do: Replay.for_request(id), else: %{}))
   end
+
+  # Replay status of the request's latest decided event ("not verified" before the first run).
+  defp replay_status(%{events: events}, verifications) do
+    case events |> Enum.filter(&(&1.type == "decided")) |> List.last() do
+      nil -> nil
+      e -> verification_label(verifications[e.event_id])
+    end
+  end
+
+  defp verification_label(nil), do: "not verified"
+  defp verification_label(%{status: status}), do: status
 
   @impl true
   def handle_event("search", params, socket) do
@@ -132,6 +149,13 @@ defmodule RescueCloudWeb.RecordsLive do
           <dd data-role="follow-up">{@record.request.follow_up_question}</dd>
           <dt>Duplicate group</dt>
           <dd data-role="duplicate-group">{@record.request.duplicate_group}</dd>
+          <dt>Replay</dt>
+          <dd
+            data-role="replay-status"
+            class={replay_status(@record, @verifications) == "mismatch" && "text-error font-semibold"}
+          >
+            {replay_status(@record, @verifications)}
+          </dd>
         </dl>
 
         <h3 class="text-lg font-semibold">Event history</h3>
@@ -144,6 +168,7 @@ defmodule RescueCloudWeb.RecordsLive do
               <th>Rules</th>
               <th>Model</th>
               <th>Synced (cloud)</th>
+              <th>Replay</th>
             </tr>
           </thead>
           <tbody>
@@ -154,6 +179,12 @@ defmodule RescueCloudWeb.RecordsLive do
               <td data-role="rules-version">{e.rules_version}</td>
               <td data-role="model-version">{e.model_version}</td>
               <td data-role="synced-at">{fmt(e.synced_at)}</td>
+              <td
+                data-role="replay"
+                title={@verifications[e.event_id] && @verifications[e.event_id].detail}
+              >
+                {if e.type == "decided", do: verification_label(@verifications[e.event_id])}
+              </td>
             </tr>
           </tbody>
         </table>
