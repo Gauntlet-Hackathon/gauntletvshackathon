@@ -69,8 +69,14 @@ LONG_FILLER = (
     "please send someone as soon as you can",
     "I am writing this from my phone on the second floor",
 )
+DRY_EN = (
+    "we are safe and dry but would like to be evacuated when you can",
+    "no danger here, just need a ride out of the area",
+    "we are fine, please check on us when you get a chance",
+)
 STYLES = (
     "plain", "caps", "sms", "typo", "spanish", "mixed", "no_location", "short", "long", "emoji",
+    "dry",
 )  # fmt: skip
 DUPLICATE_RATE = 0.12
 
@@ -107,6 +113,8 @@ def _compose(rng: random.Random, style: str, address: str) -> str:
         return f"Please help, {es}. Estamos en {address}, {extra_en}"
     if style == "no_location":
         return f"Help, {en}. {extra_en}. I do not know the street name"
+    if style == "dry":  # no hazard words: a low-urgency report (provisional P3 on the board)
+        return f"Hello, {rng.choice(DRY_EN)}. We are {n} people at {address}."
     if style == "short":
         return rng.choice(("help flooding", "need rescue", "socorro agua", "stuck, send boat"))
     if style == "long":
@@ -129,17 +137,21 @@ def generate(count: int, seed: int) -> list[IntakeItem]:
     earlier incident (same address, reworded, often from another channel)."""
     rng = random.Random(seed)
     items: list[IntakeItem] = []
-    incidents: list[str] = []
+    incidents: list[tuple[str, str | None]] = []  # (address, contact of the first report)
     while len(items) < count:
         if incidents and rng.random() < DUPLICATE_RATE:
-            address = rng.choice(incidents)
+            address, first_contact = rng.choice(incidents)
+            repeat = True
             style = rng.choice(("plain", "sms", "caps", "typo", "spanish"))
         else:
-            address = _address(rng)
-            incidents.append(address)
+            address, first_contact, repeat = _address(rng), None, False
             style = rng.choice(STYLES)
         raw = _compose(rng, style, address)
         contact = f"+1555{rng.randrange(1000000, 9999999)}" if rng.random() < 0.6 else None
+        if repeat:
+            contact = first_contact  # a repeat report from the same phone, so it can match
+        else:
+            incidents.append((address, contact))
         lang = "es" if style == "spanish" else None
         items.append(IntakeItem(raw, rng.choice(CHANNELS), contact, lang))
     return items

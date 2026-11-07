@@ -68,3 +68,25 @@ def test_cli(tmp_path, monkeypatch):
     assert seed.main(["--count", "12", "--seed", "1", "--data-dir", str(tmp_path)]) == 0
     store = EventStore(tmp_path / "field.db")
     assert sum(e["type"] == "received" for e in store.all_events()) == 12
+
+
+def test_200_seeded_requests_are_not_all_abstain(tmp_path):
+    """No-model demo board: keyword extractor + real fallback engine give a varied board."""
+    from collections import Counter
+
+    from rescue_field.slm import FixtureExtractor
+
+    store = EventStore(tmp_path / "real.db")
+    seed.seed_store(
+        store, 200, 7, extractor=FixtureExtractor(), decide_batch=default_decide_batch({})
+    )
+    outs = [e["payload"]["engine_output"] for e in store.all_events() if e["type"] == "decided"]
+    assert len(outs) == 200
+    tiers = Counter(o["priority_tier"] or o["provisional_tier"] for o in outs)
+    outcomes = Counter(o["outcome"] for o in outs)
+    reasons = Counter(o["abstain_reason"] for o in outs if o["outcome"] == "abstain")
+    print("tiers", dict(tiers), "outcomes", dict(outcomes), "reasons", dict(reasons))
+    assert {"P1", "P2", "P3"} <= set(tiers)
+    assert outcomes["duplicate"] >= 1
+    assert len(reasons) >= 2
+    assert reasons["no_usable_location"] >= 1

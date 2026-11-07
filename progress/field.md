@@ -31,3 +31,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 field #175 F26: field/fly.toml (placeholder app rescue-field-demo, /data volume, /sync/status check), RUNBOOK 'Deploy hosted field demo to Fly', tests/test_fly_toml.py
 2026-11-07 field #176 F28: root README (what it is, mermaid architecture, run it, tests, demo walkthrough, eval placeholder)
 2026-11-07 field #182 F24a: KeywordExtractor (stub:keyword-extractor) with graded confidences; FixtureExtractor delegates non-fixture text to it
+2026-11-07 field #183 F24b: seed distribution test (200 rows, seed 7: P1/P2/P3, duplicates, 2 abstain reasons); seed repeat reports reuse the first contact, new low-urgency 'dry' template
