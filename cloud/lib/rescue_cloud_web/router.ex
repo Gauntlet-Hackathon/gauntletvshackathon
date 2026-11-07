@@ -30,6 +30,7 @@ defmodule RescueCloudWeb.Router do
     pipe_through :device_api
 
     post "/heartbeat", SyncController, :heartbeat
+    post "/events", SyncController, :events
   end
 
   scope "/", RescueCloudWeb do

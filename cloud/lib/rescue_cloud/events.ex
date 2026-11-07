@@ -14,6 +14,7 @@ defmodule RescueCloud.Events do
 
   Valid events are inserted in one `insert_all` with `on_conflict: :nothing`; every valid
   event_id is acked, including ids that were already stored (retries are harmless).
+  `inserted` lists the newly stored events (not duplicates), for broadcasting.
   Invalid events are returned in `rejected` as `%{event_id: id | nil, error: "invalid_payload"}`
   (`"invalid_envelope"` when the envelope itself is wrong) and are not stored.
   """
@@ -31,11 +32,26 @@ defmodule RescueCloud.Events do
 
     rows = Enum.reverse(rows)
 
-    if rows != [] do
-      Repo.insert_all(Event, rows, on_conflict: :nothing, conflict_target: :event_id)
-    end
+    inserted =
+      if rows == [] do
+        []
+      else
+        {_n, inserted} =
+          Repo.insert_all(Event, rows,
+            on_conflict: :nothing,
+            conflict_target: :event_id,
+            returning: true
+          )
 
-    {:ok, %{acked: Enum.map(rows, & &1.event_id), rejected: Enum.reverse(rejected)}}
+        inserted
+      end
+
+    {:ok,
+     %{
+       acked: Enum.map(rows, & &1.event_id),
+       rejected: Enum.reverse(rejected),
+       inserted: inserted
+     }}
   end
 
   @doc "Events with sequence number greater than `since` (default 0), in insert order."
