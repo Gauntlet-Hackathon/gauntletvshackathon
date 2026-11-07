@@ -175,7 +175,9 @@ def _location(text: str) -> dict[str, Any]:
         return {"text": m.group(0), "type": "coords", "confidence": HIGH}
     if m := _ADDRESS_RE.search(text):
         return {"text": m.group(0).rstrip("."), "type": "address", "confidence": HIGH}
-    low = text.lower()
+    # Lowercase one character at a time so indices into `low` are indices into `text`
+    # ("İ".lower() is two characters and shifted every slice after it, review L-04).
+    low = "".join(c.lower() if len(c.lower()) == 1 else c for c in text)
     for name in _streets():
         at = low.find(name.lower())
         if at >= 0:

@@ -7,10 +7,21 @@ the outbox. Rejected events are marked rejected in the store (with the cloud's e
 never sent again, across restarts too, so they do not block newer events; /sync/status shows
 their count. Unacked events stay and are retried. Any failure (connection error,
 non-2xx, bad body) backs off exponentially with jitter, 2 s, 4 s, ... capped at 300 s.
+
+One poison event must not hold back every event behind it (review H-02, O-01, O-06), so some
+failures are settled per event instead of retried for ever. An event the cloud can never take
+(not encodable as JSON: a lone surrogate or a non-finite number; or holding U+0000, which the
+cloud's database refuses) is marked rejected locally before sending. On HTTP 413 an event whose
+encoded size is over OVERSIZE_EVENT_BYTES (intake keeps real events far below it) is marked
+rejected; otherwise the batch is halved, and a single event of normal size that still gets 413
+backs off like any other failure (a proxy that answers 413 to everything rejects nothing).
+Other 4xx answers are not event-specific in the sync API (400 is a malformed envelope, 401/403
+are auth) and keep backing off, so a cloud-side problem never rejects the whole outbox.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import random
 import threading
@@ -37,6 +48,9 @@ BACKOFF_CAP_S = 300.0
 JITTER = 0.2  # +/- fraction of the delay
 IDLE_INTERVAL_S = 10.0  # wait between cycles while online
 REQUEST_TIMEOUT_S = 10.0
+# An event this large is never a real request (intake caps bodies at 64 KB): on HTTP 413 it is
+# marked rejected instead of retried. Smaller events that get 413 are retried in smaller batches.
+OVERSIZE_EVENT_BYTES = 1_000_000
 # placeholder until the first decision (or RULES_VERSION) names the engine build
 DEFAULT_RULES_VERSION = "rules@0000000+bin:00000000"
 
@@ -49,7 +63,38 @@ def backoff_delay(failures: int, rng: random.Random | None = None) -> float:
 
 
 class SyncError(Exception):
-    """A cycle failed; the worker backs off and retries."""
+    """A cycle failed; the worker backs off and retries. `status` is the HTTP status code when
+    the cloud answered with one."""
+
+    def __init__(self, message: str, status: int | None = None) -> None:
+        super().__init__(message)
+        self.status = status
+
+
+def _has_nul(value: Any) -> bool:
+    if isinstance(value, str):
+        return "\x00" in value
+    if isinstance(value, dict):
+        return any(_has_nul(k) or _has_nul(v) for k, v in value.items())
+    if isinstance(value, list):
+        return any(_has_nul(v) for v in value)
+    return False
+
+
+def _unsendable(event: dict[str, Any]) -> str | None:
+    """Why the cloud could never take `event`, or None. httpx encodes strict UTF-8 JSON without
+    NaN or Infinity; PostgreSQL jsonb refuses U+0000 (events stored before intake cleaned it)."""
+    try:
+        json.dumps(event, ensure_ascii=False, allow_nan=False).encode("utf-8")
+    except ValueError as exc:  # UnicodeEncodeError is a ValueError too
+        return f"local: not sendable as JSON ({type(exc).__name__}: {exc})"[:300]
+    if _has_nul(event):
+        return "local: contains U+0000, which the cloud's database refuses"
+    return None
+
+
+def _encoded_size(event: dict[str, Any]) -> int:
+    return len(json.dumps(event, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
 
 
 @dataclass
@@ -79,6 +124,7 @@ class SyncWorker:
         idle_interval: float = IDLE_INTERVAL_S,
         batch_size: int = BATCH_SIZE,
         down_sync: bool = False,
+        oversize_bytes: int = OVERSIZE_EVENT_BYTES,
     ) -> None:
         self.store = store
         self.device_id = device_id
@@ -88,6 +134,7 @@ class SyncWorker:
         self.idle_interval = idle_interval
         self.batch_size = batch_size
         self.down_sync = down_sync
+        self.oversize_bytes = oversize_bytes
         self.client = httpx.Client(
             base_url=cloud_url.rstrip("/"),
             headers={"Authorization": f"Bearer {token}"},
@@ -111,7 +158,7 @@ class SyncWorker:
         except httpx.HTTPError as exc:
             raise SyncError(f"{path}: {exc}") from exc
         if resp.status_code != 200:
-            raise SyncError(f"{path}: HTTP {resp.status_code}")
+            raise SyncError(f"{path}: HTTP {resp.status_code}", resp.status_code)
         try:
             data = resp.json()
         except ValueError as exc:
@@ -136,6 +183,13 @@ class SyncWorker:
         if resp.status_code != 200:
             raise SyncError(f"/health: HTTP {resp.status_code}")
 
+    def _quarantine(self, rejections: list[tuple[str, str]], result: SyncResult) -> int:
+        """Mark events rejected locally; they leave the outbox for good. Returns rows marked."""
+        with self.lock:
+            marked = self.store.mark_rejected(rejections, _utc_now())
+        result.rejected += marked
+        return marked
+
     def sync_once(self) -> SyncResult:
         """Ping, heartbeat, then drain the outbox. Raises SyncError on any failure."""
         self.ping()
@@ -151,12 +205,37 @@ class SyncWorker:
             },
         )
         result = SyncResult()
+        size = self.batch_size
         while not self._stop.is_set() and not self._paused.is_set():
             with self.lock:
-                batch = self.store.pending_outbox(self.batch_size)
+                batch = self.store.pending_outbox(size)
             if not batch:
                 break
-            data = self._post("/sync/events", {"device_id": self.device_id, "events": batch})
+            poison = [(e["event_id"], why) for e in batch if (why := _unsendable(e))]
+            if poison:
+                if not self._quarantine(poison, result):
+                    break
+                size = self.batch_size
+                continue  # the next read skips them
+            try:
+                data = self._post("/sync/events", {"device_id": self.device_id, "events": batch})
+            except SyncError as exc:
+                if exc.status != 413:
+                    raise
+                too_large = [
+                    (e["event_id"], f"local: {n} bytes, too large for the cloud (HTTP 413)")
+                    for e in batch
+                    if (n := _encoded_size(e)) > self.oversize_bytes
+                ]
+                if too_large:
+                    if not self._quarantine(too_large, result):
+                        break
+                    size = self.batch_size
+                    continue
+                if len(batch) == 1:
+                    raise  # a normal-sized event: not its fault, back off
+                size = len(batch) // 2  # too large together: try fewer at a time
+                continue
             sent_ids = {e["event_id"] for e in batch}
             acked = [i for i in data.get("acked") or [] if i in sent_ids]
             rejected = [

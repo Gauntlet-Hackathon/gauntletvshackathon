@@ -1,4 +1,8 @@
 # Source: fastresponderSLM src/rescue_tagger/durations.py @ c287541c25e08bd3c8173d74e106384c58e26f74
+# Local changes (keep when re-vendoring): _number returns None for a token it cannot read
+# ("1.2.3" raised ValueError and lost the request, review M-05) and parse_hours then returns None
+# when no number it found is readable; parse_hours clamps to MAX_HOURS (a 400-digit number gave
+# inf, which no JSON encoder sends, review O-06). See docs/DECISIONS.md (model output format).
 """Deterministic parsing of NEED_DURATION spans into hours, and attaching them to a need kind.
 
 The model only finds the words ("for 30 hours", "desde ayer", "2 days"); turning them into a number
@@ -52,6 +56,7 @@ NEED_WORDS = {
              "pastilla", "receta", "oxygen", "oxigeno", "inhaler", "inhalador"),
 }
 NEED_WINDOW = 40  # a duration attaches to a need keyword at most this many characters away
+MAX_HOURS = 24.0 * 365  # local change: a year; longer (or inf) is clamped to this
 
 
 def plain(text: str) -> str:
@@ -67,11 +72,14 @@ def plain(text: str) -> str:
     return "".join(out)
 
 
-def _number(token: str) -> float:
+def _number(token: str) -> float | None:
     if token[0].isdigit():
         if re.fullmatch(r"\d{1,3}(,\d{3})+", token):  # "1,000": thousands separator
             return float(token.replace(",", ""))
-        return float(token.replace(",", "."))  # "1,5": decimal comma
+        try:
+            return float(token.replace(",", "."))  # "1,5": decimal comma
+        except ValueError:  # local change: "1.2.3" has no reading
+            return None
     return float(NUMBER_WORDS[token])
 
 
@@ -81,9 +89,12 @@ def parse_hours(span_text: str) -> float | None:
     for pattern, hours in PHRASES:
         if re.search(pattern, t):
             return hours
-    found = [_number(n) * UNIT_HOURS[u] for n, u in NUM_UNIT.findall(t)]
+    numbers = [(_number(n), u) for n, u in NUM_UNIT.findall(t)]
+    found = [n * UNIT_HOURS[u] for n, u in numbers if n is not None]
     if found:
-        return round(max(found), 2)
+        return min(round(max(found), 2), MAX_HOURS)
+    if numbers:  # local change: "1.2.3 hours" is unreadable, not the lone unit "hours"
+        return None
     lone = LONE_UNIT.search(t)  # "all day", "toda la semana"
     return UNIT_HOURS[lone.group(1)] if lone else None
 
