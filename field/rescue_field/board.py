@@ -11,6 +11,7 @@ fragment for an HTMX request (`HX-Request` header), so a page can swap it in pla
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -140,5 +141,6 @@ async def board(request: Request) -> HTMLResponse:
             return build_board(store)
 
     ctx = await run_in_threadpool(read)
+    ctx["demo_mode"] = os.environ.get("DEMO_MODE") == "1"
     name = "_board.html" if request.headers.get("HX-Request") else "board.html"
     return templates.TemplateResponse(request, name, ctx)

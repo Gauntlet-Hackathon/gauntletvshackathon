@@ -18,16 +18,46 @@ table { border-collapse: collapse; } td, th { padding: .1rem .6rem .1rem 0; text
 </head>
 <body>
 <h1>Rescue triage board</h1>
-<div id="sync-badge"></div>
+<div id="sync-badge" role="status" aria-live="polite"></div>
+{% if demo_mode %}<p><button type="button" id="offline-toggle">Simulate offline</button> <span id="offline-toggle-msg" role="alert"></span></p>
+{% endif %}
 {% include "_intake.html" %}
 <div id="board">{% include "_board.html" %}</div>
 <script>
 async function refreshBadge() {
   try {
     const r = await fetch("/sync/badge");
-    if (r.ok) document.getElementById("sync-badge").innerHTML = await r.text();
-  } catch (e) {}
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    document.getElementById("sync-badge").innerHTML = await r.text();
+  } catch (e) {
+    document.getElementById("sync-badge").textContent = "Sync status unavailable";
+  }
 }
+async function toggleOffline() {
+  const btn = document.getElementById("offline-toggle");
+  const msg = document.getElementById("offline-toggle-msg");
+  msg.textContent = "";
+  btn.disabled = true;
+  try {
+    const r = await fetch("/sync/offline-toggle", {method: "POST"});
+    let body = null;
+    try { body = await r.json(); } catch (e) {}
+    if (!r.ok) {
+      msg.textContent = (body && (body.detail || body.error)) || ("Toggle failed (HTTP " + r.status + ")");
+      return;
+    }
+    btn.textContent = body.paused ? "Go back online" : "Simulate offline";
+    await refreshBadge();
+    const b = await fetch("/", {headers: {"HX-Request": "true"}});
+    if (b.ok) document.getElementById("board").innerHTML = await b.text();
+  } catch (e) {
+    msg.textContent = "Error: " + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+const toggleBtn = document.getElementById("offline-toggle");
+if (toggleBtn) toggleBtn.addEventListener("click", toggleOffline);
 
 function lineCount(form) {
   if (form.dataset.kind === "paste") return form.elements.text.value.split("\n").filter(l => l.trim()).length;

@@ -38,7 +38,7 @@ def test_toggle_offline_then_requests_grow_backlog(env):
         assert st["paused"] is True and st["outbox_backlog"] > 0
         before = st["outbox_backlog"]
         badge = client.get("/sync/badge").text
-        assert 'data-state="offline"' in badge and f"backlog {before}" in badge
+        assert 'data-state="offline"' in badge and f"{before} queued" in badge
         assert "/sync/badge" in client.get("/").text
         client.post("/requests", json={"raw_text": "another"})
         assert client.get("/sync/status").json()["outbox_backlog"] > before
@@ -74,3 +74,34 @@ def test_badge_without_cloud_url(tmp_path, monkeypatch):
     with TestClient(create_app(decide_batch=fake_engine())) as client:
         assert 'data-state="no-sync"' in client.get("/sync/badge").text
         assert "/sync/badge" in client.get("/").text
+
+
+def test_badge_without_worker_shows_store_backlog(tmp_path, monkeypatch):
+    monkeypatch.delenv("CLOUD_URL", raising=False)
+    monkeypatch.setenv("FIELD_DATA_DIR", str(tmp_path))
+    with TestClient(create_app(decide_batch=fake_engine())) as client:
+        for _ in range(2):
+            assert client.post("/requests", json={"raw_text": "help, flooding"}).status_code == 200
+        n = client.get("/sync/status").json()["outbox_backlog"]
+        assert n > 0
+        assert f"{n} queued" in client.get("/sync/badge").text
+
+
+def test_badge_markup_is_accessible_status(tmp_path, monkeypatch):
+    monkeypatch.delenv("CLOUD_URL", raising=False)
+    monkeypatch.setenv("FIELD_DATA_DIR", str(tmp_path))
+    with TestClient(create_app(decide_batch=fake_engine())) as client:
+        page = client.get("/").text
+        assert 'role="status"' in page and 'aria-live="polite"' in page
+        assert "Sync status unavailable" in page
+        assert "Sync not configured" in client.get("/sync/badge").text
+
+
+BTN = '<button type="button" id="offline-toggle">Simulate offline</button>'
+
+
+def test_toggle_button_only_in_demo_mode(env, monkeypatch):
+    with TestClient(build(FakeCloud())) as client:
+        assert BTN in client.get("/").text
+        monkeypatch.delenv("DEMO_MODE")
+        assert BTN not in client.get("/").text

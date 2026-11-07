@@ -312,7 +312,11 @@ async def sync_status(request: Request) -> Any:
 def _badge_ctx(request: Request) -> dict[str, Any]:
     worker = _worker(request)
     if worker is None:
-        return {"state": "no-sync", "paused": False, "last_sync_at": None, "backlog": 0}
+        store = getattr(request.app.state, "store", None)
+        lock = getattr(request.app.state, "intake_lock", None) or nullcontext()
+        with lock:  # the store connection is shared across threads
+            backlog = store.outbox_count() if store is not None else 0
+        return {"state": "no-sync", "paused": False, "last_sync_at": None, "backlog": backlog}
     st = worker.status()
     online = st["online"] and not st["paused"]
     return {
