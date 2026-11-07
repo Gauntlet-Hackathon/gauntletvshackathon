@@ -15,7 +15,8 @@ deploy details are in [RUNBOOK.md](RUNBOOK.md). Placeholders `<cloud-app>` and `
       row turns stale while the laptop is offline.
 - [ ] Warm up the field app: paste one throwaway request on the board (or `curl -X POST https://<field-app>.fly.dev/requests -d raw_text=warmup`).
       The first request after a deploy or restart took about 25 s on Fly while the model and engine warmed up; later ones take about 0.3 s.
-      Reset afterwards (section 2) if the board must start empty.
+      Do this after any reset (section 2): a machine restart undoes the warm-up. The request stays on the board and
+      syncs to the cloud, so use realistic text you are happy to show.
 - [ ] Open three tabs: the field board (`https://<field-app>.fly.dev/`), the cloud fleet page (`/fleet`) and `/evals`.
 - [ ] Have the backup video ready to play offline.
 
