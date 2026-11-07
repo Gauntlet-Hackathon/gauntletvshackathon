@@ -1,0 +1,77 @@
+{% extends "app/_shell.html" %}
+{% block title %}Respond · CommunityRescue{% endblock %}
+{% block content %}
+<style>
+.pill { display: inline-block; padding: 5px 12px; border-radius: 999px; font-weight: 700; }
+.pill-P1 { background: #B00020; color: #FFFFFF; }
+.pill-P2 { background: #FFE8B3; color: #5C3B00; }
+.pill-P3 { background: #E9EBEF; color: #111418; }
+.incident { display: inline-block; padding: 3px 9px; border: 2px solid #111418; border-radius: 6px; font-weight: 700; letter-spacing: .04em; }
+#job-card .place { background: #E7F3E8; border-radius: 10px; padding: 10px 12px; font-size: 1.3rem; }
+#job-card .call { background: #F6F7F9; border-radius: 10px; padding: 10px 12px; }
+#osm-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+#radio-line { background: #111418; color: #FFFFFF; font-size: 1.05rem; }
+</style>
+<form id="boat-form" class="card" method="get" action="/respond">
+<label for="boat-name"><strong>Your boat</strong></label>
+<input id="boat-name" type="text" name="crew" value="{{ crew }}" list="boat-list" maxlength="60" autocomplete="off" placeholder="Pick a boat or type your crew name" required>
+<datalist id="boat-list">
+{% for b in boats %}<option value="{{ b }}">
+{% endfor %}
+</datalist>
+<button class="btn" type="submit">Show my job</button>
+</form>
+{% if not crew %}
+<p class="muted">Pick your boat to see the job dispatch sent you.</p>
+{% elif not job %}
+<h1>No job right now</h1>
+<p id="no-job" class="card">Dispatch will send your next job here. Stay near the launch and keep your radio on.</p>
+{% else %}
+<h1 id="headline">Dispatch sent you a rescue</h1>
+<section aria-labelledby="osm-label">
+<p id="osm-label" class="muted"><strong>Operational Status Messages (OSM)</strong><br>Tap a status to get the line to read on the radio.</p>
+<div id="osm-chips" role="group" aria-labelledby="osm-label">
+{% for key, label in steps %}<button type="button" class="chip" data-step="{{ key }}" aria-pressed="false">{{ label }}</button>
+{% endfor %}
+</div>
+</section>
+<article id="job-card" class="card">
+<p><span class="pill {{ 'pill-' ~ job.tier if job.tier else 'pill-check' }}">{{ job.pill }}</span>
+<span class="incident" aria-label="Incident {{ job.incident }}">#{{ job.incident }}</span></p>
+<div class="place">
+<strong>{{ job.place or "No address in the message" }}</strong>{% if job.place_kind == "landmark" %}<br><span class="muted">Landmark</span>{% endif %}
+</div>
+{% if job.details %}<ul class="details">
+{% for d in job.details %}<li>{{ d }}</li>
+{% endfor %}
+</ul>{% endif %}
+<p class="call"><strong>Call when close: {{ job.contact or "no phone number in the message" }}</strong></p>
+</article>
+<section id="radio" hidden>
+<p><strong>Tell dispatch (radio or text)</strong></p>
+<p id="radio-line" class="card"></p>
+<button id="copy-radio" type="button" class="btn">Copy</button>
+<p class="muted">No signal? Read it on the radio.</p>
+</section>
+<section id="outcomes" hidden>
+<h2>How did it go?</h2>
+<label for="out-count">How many people did you get out?</label>
+<input id="out-count" type="number" min="0" max="100000" value="{{ job.people if job.people is not none else '' }}">
+<label for="out-shelter">Where did they go?</label>
+<select id="out-shelter">
+{% for s in shelter_names %}<option value="{{ s }}">{{ s }}</option>
+{% endfor %}
+</select>
+<button type="button" class="btn btn-primary" data-outcome="all">Got everyone out</button>
+<button type="button" class="btn" data-outcome="some">Got some out</button>
+<button type="button" class="btn" data-outcome="nobody">Nobody there</button>
+<label for="out-reason">Why couldn't you get there?</label>
+<input id="out-reason" type="text" maxlength="200" placeholder="Water too fast, road blocked…">
+<button type="button" class="btn" data-outcome="noreach">Couldn't get there</button>
+</section>
+<button id="cant-take" type="button" class="btn" data-outcome="cant">I can't take this one</button>
+<p id="respond-error" class="banner" role="alert" hidden></p>
+<script id="respond-job" type="application/json">{{ {"request_id": job.request_id, "crew": crew, "radio": job.radio} | tojson }}</script>
+{% endif %}
+<script src="/static/respond.js"></script>
+{% endblock %}
