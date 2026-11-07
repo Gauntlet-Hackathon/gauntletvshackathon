@@ -6,7 +6,7 @@ The interfaces every lane builds against. Owned by the integrator; change them o
 |---|---|
 | `event.schema.json`, `payloads/*.schema.json` | Event envelope and the eight payloads (received, extracted, decided, assigned, rescued, corrected, escalated, closed_duplicate) |
 | `engine_input.schema.json`, `engine_output.schema.json` | Decision-engine stdin/stdout JSON |
-| `engine_manifest.schema.json` | `engine/dist/<rules_version>/manifest.json` |
+| `engine_manifest.schema.json` | `engine/dist/<rules_version with ':' as '-'>/manifest.json` |
 | `sync/*.schema.json`, `sync_api.md` | Field ↔ cloud sync API |
 | `engine_rules.md` | The rubric (`docs/plan/04`) made precise: order, boundaries, rule ids, follow-up texts |
 | `logic.md` | Spec of `shared/rescue_shared/logic.py` (location normalization, duplicates, hoax markers, sort key) |

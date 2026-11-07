@@ -6,7 +6,8 @@ from collections.abc import Callable
 from typing import Any
 
 # Placeholder in the source tree. rescue_engine.build rewrites this line in the copy it
-# publishes to engine/dist/<rules_version>/, so a built engine emits its real version (A2).
+# publishes to engine/dist/<dist_dirname(rules_version)>/, so a built engine emits its real
+# version (A2).
 RULES_VERSION = "rules@0000000+bin:00000000"
 
 DEFAULT_THRESHOLDS: dict[str, float] = {

@@ -184,7 +184,7 @@ Findings R1–R13 (engine rules) and A1–A12 (agent assumptions) are in the ste
 ## Rules freeze for the demo (H12, #178)
 - **Engine kind:** the Mercury build (Paawan, 2026-11-07), because the pitch is "a Mercury rules engine decides". The Python fallback stays in the repo as the backup and for parity tests.
 - **Frozen version:** `rules@a4dbac566db96b00951930ad9da941e85c1b2429+bin:2a2fac7006832dd7`. The binary was compiled with `python -m rescue_engine.build --kind mercury` from the commit that last changed `engine/mercury/` (`a4dbac5`); it first shipped as `…+bin:36c2f7f7da6998e5`, and was republished unchanged (same compiled bytes, `artifact_hash` `36c2f7f7da6998e5`) with `--rebuild-from` when the config freeze below was added. The `…36c2f7f7…` folder is removed; nothing was deployed with it.
-- **How it ships (option a):** the build is committed at `engine/dist/rules@a4dbac566db96b00951930ad9da941e85c1b2429+bin:2a2fac7006832dd7/` (`.gitignore` re-includes `engine/dist/`). The field image (F23, #180) and the cloud image (C26a, #207) copy that folder; the binary is linked statically against the Mercury runtime (`--mercury-linkage static`), so the images need no Mercury toolchain and no Python to run it. It needs glibc 2.38 or newer (both images are Debian trixie).
+- **How it ships (option a):** the build is committed at `engine/dist/rules@a4dbac566db96b00951930ad9da941e85c1b2429+bin-2a2fac7006832dd7/` (`.gitignore` re-includes `engine/dist/`). The field image (F23, #180) and the cloud image (C26a, #207) copy that folder; the binary is linked statically against the Mercury runtime (`--mercury-linkage static`), so the images need no Mercury toolchain and no Python to run it. It needs glibc 2.38 or newer (both images are Debian trixie).
 - **Freeze:** no rule changes in `engine/mercury/`, `engine/rescue_engine/fallback/` or `contracts/engine_rules.md` after this, unless Paawan lifts the freeze. A change means a new build, a new folder and a new entry here. Tag: `rules-freeze-a4dbac5`.
 - **Config freeze (R15; Paawan, 2026-11-07 07:36Z):** the inputs that change decisions without being in the binary are frozen with it: the thresholds (moved from `field/rescue_field/pipeline.py` to `contracts/fixtures/thresholds.json`, which the field now reads), `contracts/fixtures/hoax_markers.txt` and `contracts/fixtures/streets.txt`.
   - `rescue_engine.build` copies them to `config/` in the build folder, writes `config_hash` (over their parsed content, `rescue_shared.frozen_config`) and `artifact_hash` into the manifest, and sets `bin_hash = combined_bin_hash(artifact_hash, config_hash)`, so the rules_version names the config too.
@@ -195,3 +195,10 @@ Findings R1–R13 (engine rules) and A1–A12 (agent assumptions) are in the ste
 
 ## Code license (H15 #212; Paawan, 2026-11-07)
 - **Code:** MIT (`LICENSE`). It covers the code in this repo only. Data sets keep their own licenses (see "Dataset licenses (H2)"), and the trained model is published separately under CC BY-NC-SA 4.0 (see H1a above and #213).
+
+## WINPATH-1: build folders drop the ':' (2026-11-07)
+
+- A build lives in `engine/dist/<rules_version with ':' as '-'>/` (`rescue_shared.versions.dist_dirname`, `RescueCloud.Replay.dist_dirname/1`), not `engine/dist/<rules_version>/`: Windows cannot store ':' in a file name, so git refused every Windows checkout of main after H12 committed the frozen build.
+- The rules_version itself is unchanged everywhere it is data: manifest.json, the stamped binary, events, contracts. The committed build was renamed, not rebuilt, so its bytes and hashes are the same.
+- The field image now takes two build args: `RULES_VERSION` (reported) and `ENGINE_BUILD` (the folder); `field/tests/test_dockerfile.py` checks they agree.
+- `shared/tests/test_portable_paths.py` fails if any tracked path contains a character Windows cannot store.

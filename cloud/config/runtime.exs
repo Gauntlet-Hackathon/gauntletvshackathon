@@ -133,7 +133,7 @@ if config_env() == :prod do
   # Check `Plug.SSL` for all available options in `force_ssl`.
 end
 
-# Replay verifier (C9): folder holding engine/dist/<rules_version>/manifest.json builds.
+# Replay verifier (C9): folder holding engine/dist/<dist_dirname(rules_version)>/manifest.json builds.
 if engine_dist = System.get_env("ENGINE_DIST") do
   config :rescue_cloud, RescueCloud.Replay, engine_dist: engine_dist
 end

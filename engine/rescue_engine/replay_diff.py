@@ -4,7 +4,8 @@
 
 EVENTS.jsonl holds event envelopes (one JSON per line). Every `decided` event carries the exact
 engine_input, so each request is re-decided by both engines (latest `decided` event per request).
-OLD / NEW are version names under --dist (engine/dist/<rules_version>/) or paths to a version dir.
+OLD / NEW are rules_versions or folder names under --dist
+(engine/dist/<dist_dirname(rules_version)>/) or paths to a version dir.
 A request counts as changed when its priority_tier, outcome or provisional_tier (the tier an
 abstain sorts by on the follow-up board, DECISIONS R1) differs.
 
@@ -24,6 +25,7 @@ import sys
 from pathlib import Path
 
 from rescue_shared import frozen_config
+from rescue_shared.versions import dist_dirname, is_rules_version
 
 from .build import DEFAULT_DIST
 
@@ -31,7 +33,10 @@ SHARED_DIR = Path(__file__).resolve().parents[2] / "shared"
 
 
 def resolve_version(version: str, dist: Path = DEFAULT_DIST) -> Path:
-    for cand in (Path(version), dist / version):
+    cands = [Path(version), dist / version]
+    if is_rules_version(version):
+        cands.insert(1, dist / dist_dirname(version))  # WINPATH-1: folders drop the ':'
+    for cand in cands:
         if (cand / "manifest.json").is_file():
             return cand
     raise FileNotFoundError(f"engine version not found: {version}")

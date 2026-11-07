@@ -3,7 +3,7 @@ defmodule RescueCloud.Replay do
   Replay verifier (C9): re-runs every `decided` event with the exact engine build that made it.
 
   For each `rules_version` among the events to verify, it reads
-  `<engine_dist>/<rules_version>/manifest.json` (`contracts/engine_manifest.schema.json`) and runs
+  `<engine_dist>/<dist_dirname(rules_version)>/manifest.json` (`contracts/engine_manifest.schema.json`) and runs
   the manifest's `entrypoint` **once per batch** through a `Port`, with the manifest's folder as the
   working directory. Following the engine contract, stdin is ONE JSON document: the array of the
   batch's `engine_input`s (taken from each decided payload); stdout must be ONE JSON array with one
@@ -27,7 +27,8 @@ defmodule RescueCloud.Replay do
   final unless `all: true` is passed.
 
   Configuration (`config :rescue_cloud, RescueCloud.Replay, ...`, env `ENGINE_DIST` at runtime):
-    * `:engine_dist`: folder holding one subfolder per rules_version (default `../engine/dist`
+    * `:engine_dist`: folder holding one subfolder per rules_version, named by `dist_dirname/1`
+      (default `../engine/dist`
       relative to the cloud app's working directory)
     * `:timeout`: milliseconds per engine run (default 30_000)
     * `:pythonpath`: extra `PYTHONPATH` entries appended after the version folder (default `[]`)
@@ -219,15 +220,24 @@ defmodule RescueCloud.Replay do
     }
   end
 
+  @doc """
+  Folder name of the build for `rules_version` under the dist folder: `:` becomes `-`.
+
+  WINPATH-1: build folders were named after the rules_version itself, and its `:` made every
+  Windows checkout of main fail (git refuses a path NTFS would read as a data stream). Same
+  mapping as `rescue_shared.versions.dist_dirname`; manifests and events keep the real version.
+  """
+  def dist_dirname(version) when is_binary(version), do: String.replace(version, ":", "-")
+
   @doc false
-  # The version is used as a folder name: only a well-formed rules_version is accepted, so it
+  # The version names a folder: only a well-formed rules_version is accepted, so it
   # cannot escape the dist folder.
   def load_manifest(version, opts \\ [])
 
   def load_manifest(nil, _opts), do: {:missing_version, "event has no rules_version"}
 
   def load_manifest(version, opts) do
-    dir = Path.join(engine_dist(opts), version)
+    dir = Path.join(engine_dist(opts), dist_dirname(version))
     path = Path.join(dir, "manifest.json")
 
     cond do

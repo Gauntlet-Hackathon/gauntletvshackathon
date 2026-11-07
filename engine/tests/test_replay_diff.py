@@ -194,3 +194,10 @@ def test_build_before_config_freeze_reports_no_drift(tmp_path):
     path = tmp_path / "events.jsonl"
     path.write_text(json.dumps(_event(1, 1, inp)) + "\n")
     assert rd.diff(path, v, v)["config_drift"] == {"old": [], "new": []}
+
+
+def test_resolve_version_finds_a_build_by_its_rules_version(tmp_path):
+    """WINPATH-1 (found by: Windows `git pull` refused engine/dist/rules@...+bin:.../)."""
+    built = b.build(tmp_path)
+    version = json.loads((built / "manifest.json").read_text())["rules_version"]
+    assert rd.resolve_version(version, tmp_path) == built

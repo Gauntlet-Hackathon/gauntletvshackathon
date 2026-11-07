@@ -32,7 +32,8 @@ CONFIG_FILES: dict[str, str] = {
     "hoax_markers": "hoax_markers.txt",
     "streets": "streets.txt",
 }
-CONFIG_SUBDIR = "config"  # engine/dist/<rules_version>/config/ holds a copy of the frozen files
+# engine/dist/<dist_dirname(rules_version)>/config/ holds a copy of the frozen files
+CONFIG_SUBDIR = "config"
 HASH_CHARS = 16
 
 

@@ -1,6 +1,9 @@
 """Static checks that field/Dockerfile and the root .dockerignore keep the F15 contract."""
 
+import json
 from pathlib import Path
+
+from rescue_shared.versions import dist_dirname
 
 ROOT = Path(__file__).resolve().parents[2]
 DOCKERFILE = (ROOT / "field" / "Dockerfile").read_text()
@@ -15,7 +18,7 @@ def test_base_image_and_constraints():
 def test_pythonpath_and_runtime_env():
     assert "PYTHONPATH=/app/shared:/app/field:/app/engine" in DOCKERFILE
     assert "ENGINE_CMD=/app/engine/dist/${ENGINE_BUILD}/bin/mercury_engine" in DOCKERFILE
-    assert "RULES_VERSION=${ENGINE_BUILD}" in DOCKERFILE
+    assert "RULES_VERSION=${RULES_VERSION}" in DOCKERFILE
     names = ("DEVICE_ID", "DEVICE_TOKEN", "CLOUD_URL", "FIELD_DATA_DIR=/data", "DEMO_MODE", "PORT")
     for name in names:
         assert name in DOCKERFILE
@@ -41,6 +44,10 @@ def test_engine_build_arg_matches_dist_folder():
     folders = [p.name for p in (ROOT / "engine" / "dist").iterdir() if p.is_dir()]
     assert len(folders) == 1
     assert f"ARG ENGINE_BUILD={folders[0]}\n" in DOCKERFILE
+    # WINPATH-1: the folder drops the ':' of the rules_version the image reports
+    manifest = json.loads((ROOT / "engine" / "dist" / folders[0] / "manifest.json").read_text())
+    assert f"ARG RULES_VERSION={manifest['rules_version']}\n" in DOCKERFILE
+    assert folders[0] == dist_dirname(manifest["rules_version"])
 
 
 def test_copies_frozen_build_and_checks_manifest():

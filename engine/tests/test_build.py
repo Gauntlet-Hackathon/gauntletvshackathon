@@ -5,14 +5,14 @@ import pytest
 from rescue_engine import build as b
 from rescue_shared import frozen_config
 from rescue_shared.contracts_io import validator_for
-from rescue_shared.versions import is_rules_version, parse_rules_version
+from rescue_shared.versions import dist_dirname, is_rules_version, parse_rules_version
 
 
 def test_build_writes_valid_manifest(tmp_path):
     target = b.build(tmp_path)
     manifest = json.loads((target / "manifest.json").read_text())
     validator_for("engine_manifest.schema.json").validate(manifest)
-    assert target.name == manifest["rules_version"]
+    assert target.name == dist_dirname(manifest["rules_version"])
     assert is_rules_version(manifest["rules_version"])
     assert parse_rules_version(manifest["rules_version"]) == (
         manifest["rules_sha"],
@@ -160,7 +160,7 @@ def test_committed_build_is_frozen_with_the_current_config():
     [build] = [p for p in (b.REPO_ROOT / "engine" / "dist").iterdir() if p.is_dir()]
     manifest = json.loads((build / "manifest.json").read_text())
     validator_for("engine_manifest.schema.json").validate(manifest)
-    assert build.name == manifest["rules_version"]
+    assert build.name == dist_dirname(manifest["rules_version"])
     assert manifest["config_hash"] == frozen_config.config_hash_of(), (
         "contracts/fixtures/{thresholds.json,hoax_markers.txt,streets.txt} changed after the "
         "demo freeze; restore them or make a new build"
@@ -208,3 +208,11 @@ def test_rebuild_from_refuses_a_tampered_binary(tmp_path):
     target.write_bytes(target.read_bytes() + b"x")
     with pytest.raises(RuntimeError, match="does not match"):
         b.rebuild(old, tmp_path / "new")
+
+
+def test_build_folder_name_is_windows_safe(tmp_path):
+    """WINPATH-1 (found by: Windows `git pull` refused engine/dist/rules@...+bin:.../)."""
+    target = b.build(tmp_path)
+    manifest = json.loads((target / "manifest.json").read_text())
+    assert ":" not in target.name
+    assert target.name == dist_dirname(manifest["rules_version"])
