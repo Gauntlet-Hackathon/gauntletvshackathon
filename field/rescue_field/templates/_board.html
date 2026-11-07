@@ -1,0 +1,21 @@
+{% for t in tiers %}
+<section class="tier tier-{{ t.tier }}" id="tier-{{ t.tier }}">
+  <h2>{{ t.tier }} <small>({{ t.rows|length }})</small></h2>
+  {% for r in t.rows %}{% include "_row.html" %}{% else %}<p class="meta">None.</p>{% endfor %}
+</section>
+{% endfor %}
+<section class="followups" id="follow-ups">
+  <h2>Follow-up queue <small>({{ follow_ups|length }})</small></h2>
+  {% for r in follow_ups %}
+  <div class="row" data-request-id="{{ r.request_id }}">
+    <strong class="question">{{ r.decision.follow_up_question }}</strong>
+    <div class="meta">{{ r.decision.abstain_reason }} · {{ r.decision.rule_id }} ·
+      rules {{ r.rules_version }} · model {{ r.model_version }} · {{ r.received_at }}</div>
+    <details><summary>Details</summary>
+      <p>{{ r.raw_text }}</p>
+      {% set e = r.extracted %}{% include "_fields.html" %}
+    </details>
+    {% for d in r.duplicates %}<div class="dups">duplicate: {{ d.request_id }}</div>{% endfor %}
+  </div>
+  {% else %}<p class="meta">Nothing to follow up.</p>{% endfor %}
+</section>

@@ -28,6 +28,7 @@ from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
 
+from rescue_field import board as board_module
 from rescue_field import engine_client
 from rescue_field import sync as sync_module
 from rescue_field.pipeline import BatchDecider, IntakeItem, PipelineConfig, process_batch
@@ -343,6 +344,7 @@ def create_app(
     app.state.sync_worker = None
     app.include_router(router)
     app.include_router(sync_module.router)
+    app.include_router(board_module.router)
     return app
 
 
