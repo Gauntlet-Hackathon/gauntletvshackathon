@@ -122,3 +122,50 @@ def test_dry_reports_are_known_fixture_texts():
     assert any(i.raw in seed.DRY_REPORTS for i in seed.generate(200, 7))
     for raw in seed.DRY_REPORTS:
         assert FixtureExtractor().extract(raw).payload["request_kind"] == "evacuation"
+
+
+# ---- demo paste file and CSV (F29) -----------------------------------------------------
+
+DEMO = Path(__file__).parents[1] / "demo"
+
+
+def test_committed_demo_files_match_fresh_export(tmp_path):
+    rc = seed.main(
+        [
+            "--count", "200", "--seed", "7",
+            "--export-text", str(tmp_path / "a.txt"),
+            "--export-csv", str(tmp_path / "a.csv"),
+        ]
+    )  # fmt: skip
+    assert rc == 0
+    assert (tmp_path / "a.txt").read_bytes() == (DEMO / "seed_requests.txt").read_bytes()
+    assert (tmp_path / "a.csv").read_bytes() == (DEMO / "seed_requests.csv").read_bytes()
+    assert not (tmp_path / "field.db").exists()
+
+
+def test_demo_text_has_200_nonempty_lines():
+    lines = (DEMO / "seed_requests.txt").read_text(encoding="utf-8").split("\n")
+    assert lines[-1] == ""
+    assert len(lines[:-1]) == 200 and all(ln.strip() for ln in lines[:-1])
+
+
+def test_demo_files_are_accepted_by_bulk_intake(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from rescue_field.api import create_app
+
+    store = EventStore(tmp_path / "b.db", check_same_thread=False)
+    try:
+        with TestClient(create_app(store=store, decide_batch=decider())) as client:
+            text = (DEMO / "seed_requests.txt").read_bytes()
+            r = client.post("/requests/bulk", content=text, headers={"content-type": "text/plain"})
+            assert r.status_code == 200, r.text
+            assert r.json()["count"] == 200
+            csv_bytes = (DEMO / "seed_requests.csv").read_bytes()
+            r = client.post(
+                "/requests/bulk", files={"file": ("seed_requests.csv", csv_bytes, "text/csv")}
+            )
+            assert r.status_code == 200, r.text
+            assert r.json()["count"] == 200
+    finally:
+        store.close()

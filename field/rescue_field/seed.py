@@ -18,6 +18,7 @@ so they match as duplicates (`contracts/logic.md`).
 from __future__ import annotations
 
 import argparse
+import csv
 import random
 import sys
 from collections.abc import Sequence
@@ -191,6 +192,22 @@ def seed_store(
     return len(items)
 
 
+def export_text(items: Sequence[IntakeItem], path: str | Path) -> None:
+    """One request per line (UTF-8); newlines inside a request become spaces."""
+    lines = [" ".join(item.raw.splitlines()) for item in items]
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        f.write("".join(line + "\n" for line in lines))
+
+
+def export_csv(items: Sequence[IntakeItem], path: str | Path) -> None:
+    """CSV with the columns the bulk intake reads: raw_text,channel,contact,lang_hint."""
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(("raw_text", "channel", "contact", "lang_hint"))
+        for i in items:
+            writer.writerow((i.raw, i.channel, i.contact or "", i.lang_hint or ""))
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     from rescue_field import api
 
@@ -198,9 +215,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--count", type=int, default=200)
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--data-dir", help="directory holding field.db (default $FIELD_DATA_DIR)")
+    parser.add_argument("--export-text", help="write one request per line here; skips the store")
+    parser.add_argument("--export-csv", help="write a bulk-intake CSV here; skips the store")
     args = parser.parse_args(argv)
     if args.count < 0:
         parser.error("--count must be >= 0")
+    if args.export_text or args.export_csv:
+        items = generate(args.count, args.seed)
+        if args.export_text:
+            export_text(items, args.export_text)
+        if args.export_csv:
+            export_csv(items, args.export_csv)
+        return 0
     env = {"FIELD_DATA_DIR": args.data_dir} if args.data_dir else None
     store = api.open_store(env)
     try:

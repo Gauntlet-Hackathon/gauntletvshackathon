@@ -36,3 +36,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 field #185 F20: per-row status form (assigned+crew, escalated+reason, rescued+count) with aria-labels, board.py allowed_statuses from status.ORDER/RANK, delegated submit handler + #status-error alert, 4 tests
 2026-11-07 field #186 F21: raised-tier rows show 'Needs confirmation' + question; build_board returns not_requests (newest first) rendered in a closed 'Not a request (N)' details; 2 tests
 2026-11-07 field #187 F22: board 18px base/1rem meta/90rem width, AA colour pairs (P2 heading #8a4b00), :focus-visible outlines, skip link + header/main landmarks, tier sections aria-labelledby, tier label text on rows; 6 tests in test_board.py
+2026-11-07 field #209 F29: seed.py --export-text/--export-csv (store untouched), committed field/demo/seed_requests.{txt,csv} + README for count 200 seed 7, 3 tests incl. bulk intake of both files
