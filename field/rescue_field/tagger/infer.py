@@ -1,4 +1,7 @@
 # Source: fastresponderSLM src/rescue_tagger/infer.py @ c287541c25e08bd3c8173d74e106384c58e26f74
+# Local changes (keep when re-vendoring): calibrated flag + ERROR log when calibration.json is
+# missing (F37, #244); location confidence via assemble.assemble_location = min(type head, span)
+# (F39, #246).
 """Deterministic CPU inference: raw text -> schema-valid `extracted` payload.
 
 This is the module the field adapter (ticket F11) wraps:
