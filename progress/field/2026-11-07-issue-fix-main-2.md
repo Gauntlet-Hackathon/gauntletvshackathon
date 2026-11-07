@@ -1,0 +1,1 @@
+Fix-main check: test_app_shell::test_header_who_block_and_segmented_toggle (Respond link /app?mode=respond vs /respond) was already fixed on main by #347; ruff + pytest green except Mercury parity tests that need the CI mmc toolchain, no code change needed.
