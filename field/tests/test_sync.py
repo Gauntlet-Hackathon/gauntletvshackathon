@@ -387,3 +387,50 @@ def test_heartbeat_rules_version_follows_pipeline_decisions(tmp_path, monkeypatc
     decided = [e for e in s.all_events() if e["type"] == "decided"]
     assert heartbeat_rules(s, {}) == decided[-1]["rules_version"]
     s.close()
+
+
+def test_malformed_ack_backs_off_instead_of_killing_the_worker(store):
+    # A cloud (or proxy) answering 200 with acked as a number used to raise TypeError out of
+    # run_cycle, which ends the worker thread for good while the app keeps running.
+    fill(store, 3)
+
+    def cloud(request):
+        if request.url.path == "/health":
+            return httpx.Response(200, json={"status": "ok"})
+        if request.url.path == "/sync/heartbeat":
+            return httpx.Response(200, json={"ok": True})
+        return httpx.Response(200, json={"acked": 5, "rejected": "x"})
+
+    w = make(store, cloud)
+    delay = w.run_cycle()
+    assert delay > 0
+    assert w.online is False
+    assert w.failures == 1
+    assert "TypeError" in w.last_error
+    assert store.outbox_count() == 3
+
+
+def test_resume_cuts_a_long_backoff_short(store):
+    import time
+
+    cloud = FakeCloud()
+    cloud.health_status = 500
+    fill(store, 3)
+    w = make(store, cloud, idle_interval=0.05)
+    w.failures = 7  # next backoff is about 256 s
+    w.start()
+    try:
+        deadline = time.time() + 5
+        while w.failures < 8 and time.time() < deadline:
+            time.sleep(0.02)
+        assert w.failures >= 8  # now sleeping in backoff
+        w.pause()
+        cloud.health_status = 200
+        w.resume()
+        deadline = time.time() + 5
+        while store.outbox_count() and time.time() < deadline:
+            time.sleep(0.05)
+        assert store.outbox_count() == 0
+        assert w.online is True
+    finally:
+        w.stop()
