@@ -1,7 +1,7 @@
-"""Decision engine, steps 1-2: request check and location check.
+"""Decision engine, steps 1-3: request check, location check, priority tier.
 
 Pure and deterministic: reads an engine_input dict, returns an engine_output dict.
-Later steps (hoax, tier, duplicates) are added by later tickets.
+Later steps (hoax, duplicates, contradictions) are added by E3.
 """
 
 from __future__ import annotations
@@ -16,10 +16,11 @@ def _output(
     rule_id: str,
     abstain_reason: str | None = None,
     follow_up_question: str | None = None,
+    priority_tier: str | None = None,
 ) -> dict[str, Any]:
     return {
         "outcome": outcome,
-        "priority_tier": None,
+        "priority_tier": priority_tier,
         "rule_id": rule_id,
         "duplicate_of": None,
         "abstain_reason": abstain_reason,
@@ -59,14 +60,27 @@ def check_location(
     return _output("abstain", rules.R_ABS_LOC, "no_usable_location", rules.Q_LOCATION)
 
 
+def check_tier(extracted: dict[str, Any], th: dict[str, float]) -> dict[str, Any]:
+    """Step 3. Always decides: a prioritized output, or abstain on a weak raising signal."""
+    tier = rules.assess_tier(extracted, th)
+    if tier["abstain"]:
+        return _output("abstain", rules.R_ABS_HAZ, "low_confidence_hazard", rules.Q_HAZARD)
+    return _output(
+        "prioritized", tier["rule_id"], None, tier["follow_up_question"], tier["tier"]
+    )
+
+
 def decide_one(engine_input: dict[str, Any]) -> dict[str, Any]:
-    """Decide one engine_input. Steps 1-2 only: raises NotImplementedError past them."""
+    """Decide one engine_input. Raises NotImplementedError when duplicate candidates exist."""
     extracted = engine_input["extracted"]
     context = engine_input.get("context") or {}
     th = _thresholds(context)
     result = check_request(extracted, th) or check_location(extracted, context, th)
-    if result is None:
-        raise NotImplementedError("steps 3-5 (tier, duplicates) are not implemented yet")
+    if result is not None:
+        return result
+    result = check_tier(extracted, th)
+    if context.get("duplicate_candidates") and result["outcome"] == "prioritized":
+        raise NotImplementedError("duplicates and contradictions (E3) are not implemented yet")
     return result
 
 
