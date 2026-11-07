@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import functools
+import hashlib
 import logging
 import sys
 import time
@@ -177,6 +178,9 @@ def arrival_times(cases: Sequence[EvalCase]) -> dict[str, str]:
     }
 
 
+_CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+
 class DuplicateIndex:
     """The set's earlier requests, for ``logic.duplicate_candidates``, as the field builds them
     (``rescue_field.pipeline``: location text, people count, contact, arrival time and the tier
@@ -187,13 +191,27 @@ class DuplicateIndex:
     def __init__(self, window_hours: float) -> None:
         self.window_hours = window_hours
         self._by_location: dict[str, list[dict[str, Any]]] = {}
+        self._case_of: dict[str, str] = {}
 
     @staticmethod
+    def request_id(case_id: str) -> str:
+        """A ULID-shaped stand-in for a case id. The engine contract types request ids (and so
+        ``duplicate_of``) as ULIDs, and the engine client validates its output against it, so a
+        case id like ``B-077`` would fail validation on every duplicate outcome."""
+        digest = int.from_bytes(hashlib.sha256(case_id.encode()).digest()[:17], "big")
+        return "".join(_CROCKFORD[(digest >> (5 * i)) & 31] for i in range(25, -1, -1))
+
+    def case_id(self, request_id: str | None) -> str | None:
+        """The case id behind a stand-in request id (``duplicate_of`` in an engine output)."""
+        return self._case_of.get(request_id, request_id) if request_id else request_id
+
     def _record(
-        case_id: str, received_at: str, contact: str | None, extracted: dict[str, Any]
+        self, case_id: str, received_at: str, contact: str | None, extracted: dict[str, Any]
     ) -> dict[str, Any]:
+        rid = self.request_id(case_id)
+        self._case_of[rid] = case_id
         return {
-            "request_id": case_id,
+            "request_id": rid,
             "received_at": received_at,
             "location_text": extracted["location"]["text"],
             "people_count": extracted["people_count"]["value"],
@@ -209,7 +227,7 @@ class DuplicateIndex:
         if not key:
             return []
         prior = self._by_location.get(key, [])
-        return logic.duplicate_candidates([*prior, rec], self.window_hours)[case_id]
+        return logic.duplicate_candidates([*prior, rec], self.window_hours)[rec["request_id"]]
 
     def add(
         self,
@@ -660,7 +678,7 @@ def run_set(
             "pred_tier": board_tier(out.get("outcome"), out.get("priority_tier")),
             "provisional_tier": out.get("provisional_tier"),
             "pred_field": follow_up_field(out),
-            "duplicate_of": out.get("duplicate_of"),
+            "duplicate_of": index.case_id(out.get("duplicate_of")),
             "t_extract": t1 - t0,
             "t_decide": t2 - t1,
         }
