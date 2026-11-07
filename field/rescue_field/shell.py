@@ -18,6 +18,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
 from rescue_field import sync as sync_module
+from rescue_field.screens.grader import grader_mode
 
 STATIC_DIR = Path(__file__).with_name("static")
 templates = Jinja2Templates(directory=str(Path(__file__).with_name("templates")))
@@ -97,6 +98,7 @@ def shell_context(request: Request) -> dict[str, Any]:
     ctx = shell_config()
     ctx["connection"] = connection_line(sync_module._badge_ctx(request))
     ctx["model_banner"] = model_banner(request)
+    ctx["grader_mode"] = grader_mode(request)
     return ctx
 
 
