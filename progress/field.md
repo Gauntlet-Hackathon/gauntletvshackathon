@@ -10,3 +10,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 field #40 F8: sync worker (rescue_field/sync.py): /health ping, jittered backoff 2s..300s, heartbeat, batches of 200, delete-on-ack only; /sync/status + /sync/offline-toggle; started in app lifespan when CLOUD_URL set
 2026-11-07 field #56 F6: ranked board GET / (rescue_field/board.py + templates): P1-P3 by within_tier_sort_key, abstain follow-up queue, duplicates collapsed under earliest at group's top tier, rule/rules/model versions and expandable fields; HX-Request returns fragment
 2026-11-07 field #62 F7: status updates (rescue_field/status.py): POST /requests/{id}/status assigned/escalated/rescued, forward-only (409 on backward/repeat), appends event; board rows show status
+2026-11-07 field fix-main: CI red on cloud SyncEventsTest (flaky): refute_receive on the global "events" PubSub topic caught a broadcast from async live_updates_test; scoped the refute to the batch's own event_ids
