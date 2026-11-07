@@ -19,7 +19,7 @@ from collections.abc import Sequence
 
 import httpx
 
-from rescue_field import api, seed, sync
+from rescue_field import api, freeze, seed, sync
 from rescue_field.pipeline import PipelineConfig, process_batch
 
 MAX_SYNC_ROUNDS = 1000
@@ -39,11 +39,12 @@ def run(
     transport: httpx.BaseTransport | None = None,
 ) -> dict:
     env = {"FIELD_DATA_DIR": data_dir} if data_dir else {"FIELD_DATA_DIR": tempfile.mkdtemp()}
+    config = PipelineConfig.from_env()
+    freeze.check(config.thresholds, config.hoax_markers, config.streets)  # R15
     store = api.open_store(env)
     try:
         items = seed.generate(count, seed_value)
         decide = api.default_decide_batch()
-        config = PipelineConfig.from_env()
         before = store.outbox_count()
         tiers: Counter[str] = Counter()
         start = time.perf_counter()

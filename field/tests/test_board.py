@@ -478,3 +478,15 @@ def test_offline_button_says_simulate_offline_when_not_paused(store, monkeypatch
     monkeypatch.setenv("DEMO_MODE", "1")
     page = get(store).text
     assert '<button type="button" id="offline-toggle">Simulate offline</button>' in page
+
+
+def test_board_hoax_text_matches_the_contract():
+    """board.Q_HOAX is a copy of the possible_hoax question in contracts/engine_rules.md."""
+    import re
+    from pathlib import Path
+
+    rules = (Path(__file__).resolve().parents[2] / "contracts" / "engine_rules.md").read_text()
+    m = re.search(r"^\| `possible_hoax` \| `([^`]+)` \|", rules, re.M)
+    from rescue_field.board import Q_HOAX
+
+    assert m and m.group(1) == Q_HOAX

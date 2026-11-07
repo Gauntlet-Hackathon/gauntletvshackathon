@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from rescue_field import api
 from rescue_field.pipeline import IntakeItem, process_batch
+from rescue_field.slm import KeywordExtractor
 from rescue_field.store import EventStore
 
 SEED_TXT = Path(__file__).parents[1] / "demo" / "seed_requests.txt"
@@ -137,3 +138,39 @@ def test_seed_file_has_no_low_confidence_request_abstains(tmp_path):
     outs = [r[2]["payload"]["engine_output"] for r in rows]
     reasons = Counter(o["abstain_reason"] for o in outs if o["outcome"] == "abstain")
     assert reasons["low_confidence_request"] == 0, json.dumps(reasons)
+
+
+# --- review follow-ups on #240 ------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "in 2019 we flooded too, now water is rising at 12 Oak Street, help",
+        "from 2008 Ike to now, this is the worst, trapped at 40 Bay Lane",
+    ],
+)
+def test_a_year_about_past_events_is_not_stale(client, text):
+    out = post(client, text)
+    assert out["outcome"] != "not_a_request"
+
+
+def test_a_year_describing_the_post_is_still_stale():
+    p = KeywordExtractor().payload("photo from 2017 on Westheimer Rd, water rising, help")
+    assert p["time_ref"]["is_stale_post"] is True
+
+
+def test_curly_apostrophe_still_reads_acute_medical(client):
+    out = post(client, "my son can’t breathe, asthma attack, 14 Pine Drive, help")
+    assert (out["priority_tier"], out["rule_id"]) == ("P1", "R-P1-02")
+
+
+def test_hoax_marker_with_a_location_still_gets_the_hoax_check(client):
+    out = post(client, "need help at 12 Oak Street, this is fake lol")
+    assert out["outcome"] != "prioritized" or out["follow_up_question"]
+    assert out.get("abstain_reason") == "possible_hoax" or out["priority_tier"] == "P1"
+
+
+def test_negated_hoax_word_keeps_a_clear_request():
+    p = KeywordExtractor().payload("need help at 12 Oak Street, this is not fake")
+    assert p["is_request"]["confidence"] >= 0.85

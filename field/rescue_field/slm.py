@@ -7,11 +7,13 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import re
 from dataclasses import dataclass
 from functools import cache
 from typing import Any, Protocol
 
+from rescue_shared import frozen_config
 from rescue_shared.contracts_io import CONTRACTS, validator_for
 
 STUB_MODEL_VERSION = "stub:fixture-extractor"
@@ -94,13 +96,14 @@ _STREET_SUFFIX = (
     r"(?:st|street|ave|avenue|rd|road|dr|drive|blvd|boulevard|ln|lane|way|ct|court|pkwy|parkway|"
     r"calle|avenida|av|camino)"
 )
-# A year is a stale marker only when it is not a house number ("in 2014 Elm Street"), and
-# "last year" only when it describes the post itself, not the events ("last year we evacuated").
+# A year or "last year" is a stale marker only when it describes the post itself ("photo from
+# 2017", "this is from last year"), never the events or a house number ("in 2019 we flooded too",
+# "from 2008 Ike to now", "in 2014 Elm Street", "last year we evacuated").
+_POST_WORD = r"(?:posted|post|photo|picture|pic|video|tweet|footage|image|this is|this was)"
 _STALE_RE = re.compile(
-    r"old post|\b(?:from|in)\s+(?:19|20)\d\d\b"
-    rf"(?!(?:\s+[A-Za-z][\w'.-]*){{1,4}}?\s+{_STREET_SUFFIX}\b)"
+    rf"old post|\b{_POST_WORD}\s+(?:from|in|of)\s+(?:19|20)\d\d\b"
     r"|\bfrom last year\b"
-    r"|\b(?:posted|post|photo|picture|pic|video|tweet)\s+(?:from\s+|of\s+)?last year\b"
+    rf"|\b{_POST_WORD}\s+(?:from\s+|of\s+)?last year\b"
     r"|publicaci[oó]n antigua|\bdel año pasado\b|\bde hace (?:un )?año\b",
     re.I,
 )
@@ -159,8 +162,9 @@ def _norm(text: str) -> str:
 
 @cache
 def _streets() -> tuple[str, ...]:
-    lines = (CONTRACTS / "fixtures" / "streets.txt").read_text(encoding="utf-8").splitlines()
-    names = {ln.strip() for ln in lines if ln.strip()}
+    # Same file and parsing as PipelineConfig.streets, which the frozen config_hash covers (R15).
+    path = os.environ.get("FIELD_STREETS_PATH") or (CONTRACTS / "fixtures" / "streets.txt")
+    names = set(frozen_config.read_list(path))
     return tuple(
         sorted(names, key=len, reverse=True)
     )  # longest first: "Katy Freeway" before "I-10"
@@ -199,15 +203,39 @@ def _medical_device(low: str) -> list[dict]:
     return []
 
 
-def _request_confidence(raw_text: str, low: str, hazards: list[dict]) -> float | None:
-    """CLEAR_REQUEST for an explicit request phrase, HIGH for a weak one, None for none."""
+def _request_confidence(
+    raw_text: str, low: str, hazards: list[dict], hoax_markers: tuple[str, ...] = ()
+) -> float | None:
+    """CLEAR_REQUEST for an explicit request phrase, HIGH for a weak one, None for none.
+
+    A hoax marker outside a negation ("fake lol", but not "not fake") caps an explicit request at
+    HIGH, below hoax_request_confidence_max, so the engine's hoax check (R3) still applies."""
     if any(w in low for w in _REQUEST_EXPLICIT) or _REQUEST_EXPLICIT_RE.search(raw_text):
-        return CLEAR_REQUEST
+        return HIGH if _hoax_hint(low, hoax_markers) else CLEAR_REQUEST
     weak = any(w in low for w in _REQUEST_WEAK) or _REQUEST_WEAK_RE.search(raw_text)
     # A firm (explicit-phrase) hazard is itself a cry for help.
     if weak or any(h["confidence"] == HIGH for h in hazards):
         return HIGH
     return None
+
+
+_NEGATED_HOAX_RE = re.compile(
+    r"\b(?:not|no|isn't|nada de)\s+(?:a\s+)?(?:fake|joke|prank|broma)"
+)
+
+
+def _hoax_hint(low: str, markers: tuple[str, ...]) -> bool:
+    """True when a hoax marker appears outside a negation such as "not fake" / "no joke"."""
+    rest = _NEGATED_HOAX_RE.sub(" ", low)
+    return any(re.search(rf"\b{re.escape(m.lower())}\b", rest) for m in markers)
+
+
+@cache
+def _hoax_markers() -> tuple[str, ...]:
+    # Same file and parsing as PipelineConfig.hoax_markers (frozen config_hash, R15).
+    default = CONTRACTS / "fixtures" / "hoax_markers.txt"
+    path = os.environ.get("FIELD_HOAX_MARKERS_PATH") or default
+    return frozen_config.read_list(path)
 
 
 def _people(low: str) -> dict[str, Any]:
@@ -230,13 +258,14 @@ class KeywordExtractor:
 
     @staticmethod
     def payload(raw_text: str) -> dict[str, Any]:
-        low = raw_text.lower()
+        # Phone keyboards send a curly apostrophe ("can’t breathe").
+        low = raw_text.lower().replace("\u2019", "'")
 
         def kinds(table: dict[str, tuple[str, ...]]) -> list[str]:
             return [k for k, words in table.items() if any(w in low for w in words)]
 
         hazards = _graded(_HAZARDS, low) + _medical_device(low)
-        req_conf = _request_confidence(raw_text, low, hazards)
+        req_conf = _request_confidence(raw_text, low, hazards, _hoax_markers())
         is_req = req_conf is not None
         stale = _STALE_RE.search(raw_text)
         # The contract has no contact field, so a phone number is only recorded as a span.

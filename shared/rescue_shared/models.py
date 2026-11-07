@@ -181,9 +181,17 @@ class EngineManifest(Contract):
     rules_version: RulesVersion
     rules_sha: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{7,40}$")]
     bin_hash: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{8,64}$")]
+    artifact_hash: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{8,64}$")] | None = None
+    config_hash: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{8,64}$")] | None = None
     engine_kind: Literal["python", "mercury"]
     entrypoint: NonEmpty
     built_at: Timestamp
+
+    @model_validator(mode="after")
+    def _hashes_together(self) -> EngineManifest:
+        if (self.artifact_hash is None) != (self.config_hash is None):
+            raise ValueError("artifact_hash and config_hash are set together")
+        return self
 
 
 # ---- event payloads ----
