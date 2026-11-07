@@ -108,8 +108,30 @@ def test_abstains_in_follow_up_queue_with_exact_question(store):
 
 
 def test_not_a_request_is_left_off(store):
-    add(store, "N", output(None, "R-NAR-01", "not_a_request"), extracted(location="loc-nar"))
-    assert "loc-nar" not in get(store).text
+    add(store, "N", output(None, "R-NAR-01", "not_a_request"), extracted(location="loc-nar"),
+        raw="thanks everyone, stay safe")
+    add(store, "N2", output(None, "R-NAR-01", "not_a_request"), extracted(),
+        at="2026-11-07T11:00:00Z", raw="just a joke")
+    board = build_board(store)
+    assert board["counts"] == {"P1": 0, "P2": 0, "P3": 0, "follow_ups": 0}
+    assert [r["request_id"] for r in board["not_requests"]] == ["N2", "N"]
+    text = get(store).text
+    assert "loc-nar" not in text
+    assert "<summary>Not a request (2)</summary>" in text
+    assert "<details open" not in text.split('id="not-requests"')[1]
+    tail = text.split('id="not-requests"')[1]
+    assert "thanks everyone, stay safe" in tail and "R-NAR-01" in tail
+    assert "2026-11-07T11:00:00Z" in tail
+
+
+def test_raised_tier_row_shows_confirm_question(store):
+    q = "Is anyone hurt?"
+    add(store, "U", output("P1", "R-P1-05", question=q), extracted(location="loc-u"))
+    add(store, "V", output("P2", "R-P2-01"), extracted(location="loc-v"))
+    text = get(store).text
+    assert text.count("Needs confirmation") == 1
+    assert f'<span class="question">{q}</span>' in text
+    assert text.index("Needs confirmation") < text.index("loc-v")
 
 
 def test_duplicates_collapse_under_earliest_with_highest_tier(store):

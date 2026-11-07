@@ -20,3 +20,14 @@
   </div>
   {% else %}<p class="meta">Nothing to follow up.</p>{% endfor %}
 </section>
+<section class="not-requests" id="not-requests">
+  <details>
+    <summary>Not a request ({{ not_requests|length }})</summary>
+    {% for r in not_requests %}
+    <div class="row" data-request-id="{{ r.request_id }}">
+      <p>{{ r.raw_text }}</p>
+      <div class="meta">{{ r.decision.rule_id }} · {{ r.received_at }}</div>
+    </div>
+    {% else %}<p class="meta">None.</p>{% endfor %}
+  </details>
+</section>

@@ -3,7 +3,8 @@
 Everything is derived from the event store. Within a tier the order is
 `rescue_shared.logic.within_tier_sort_key` (04). Requests the engine marked `duplicate` are
 collapsed under the earliest request of their group, which shows the group's highest tier.
-Not-a-request items are left off the board. The follow-up queue is sorted by the engine's
+Not-a-request items stay off the tiers and the queue (listed newest first in `not_requests`).
+The follow-up queue is sorted by the engine's
 `provisional_tier` (P1 first; DECISIONS R1), then by the same within-tier key; an abstain
 without one (older engine output) sorts after P3. `GET /` returns the full page, or just the board
 fragment for an HTMX request (`HX-Request` header), so a page can swap it in place.
@@ -103,6 +104,7 @@ def build_board(store: EventStore) -> dict[str, Any]:
 
     by_tier: dict[str, list[dict[str, Any]]] = {t: [] for t in TIERS}
     follow_ups: list[dict[str, Any]] = []
+    not_requests: list[dict[str, Any]] = []
     for root, group in members.items():
         rec = recs[root]
         dups = sorted((m for m in group if m is not rec), key=lambda m: m["received_at"])
@@ -115,7 +117,8 @@ def build_board(store: EventStore) -> dict[str, Any]:
             )
             continue
         if tier is None:
-            continue  # not_a_request
+            not_requests.append(rec)
+            continue
         # Show the decision of the member that set the group's tier (the root when it ties).
         shown = next(
             (m for m in [rec, *dups] if m["decision"]["priority_tier"] == tier), rec
@@ -136,9 +139,11 @@ def build_board(store: EventStore) -> dict[str, Any]:
             )
         )
     follow_ups.sort(key=_follow_up_key)
+    not_requests.sort(key=lambda r: (r["received_at"], r["request_id"]), reverse=True)
     return {
         "tiers": [{"tier": t, "rows": by_tier[t]} for t in TIERS],
         "follow_ups": follow_ups,
+        "not_requests": not_requests,
         "counts": {t: len(by_tier[t]) for t in TIERS} | {"follow_ups": len(follow_ups)},
     }
 
