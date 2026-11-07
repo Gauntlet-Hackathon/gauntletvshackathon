@@ -113,6 +113,34 @@ def test_invalid_payload_raises(monkeypatch):
         ex.extract("x")
 
 
+def test_repo_without_org_fails_in_constructor(monkeypatch):
+    _no_download(monkeypatch)
+    called = []
+
+    def factory(folder):
+        called.append(folder)
+        return _Fake(SAMPLE)
+
+    with pytest.raises(ValueError, match="invalid Hugging Face repo"):
+        HFExtractor("mymodel", SHA, local_path="/x", extractor_factory=factory)
+    assert called == []
+
+
+def test_select_extractor_falls_back_on_repo_without_org(monkeypatch):
+    from rescue_field import api
+    from rescue_field.slm import FixtureExtractor
+
+    monkeypatch.setenv("HF_REPO", "mymodel")
+    monkeypatch.setenv("HF_REVISION", SHA)
+    _no_download(monkeypatch)
+    ex, info = api.select_extractor_with_info({"HF_REPO": "mymodel", "HF_REVISION": SHA})
+    assert isinstance(ex, FixtureExtractor)
+    assert "invalid Hugging Face repo" in info["fallback_reason"]
+    assert api.select_extractor({"HF_REPO": "mymodel", "HF_REVISION": SHA}).__class__ is (
+        FixtureExtractor
+    )
+
+
 @pytest.mark.slow
 def test_real_model():
     pytest.importorskip("torch")

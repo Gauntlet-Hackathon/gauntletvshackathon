@@ -15,6 +15,7 @@ from collections.abc import Callable
 from typing import Any
 
 from rescue_field.slm import Extraction, validate_extracted
+from rescue_shared.versions import model_version as _model_version
 
 _SHA = re.compile(r"^[0-9a-f]{40}$")
 ExtractorFactory = Callable[[str], Any]  # folder -> object with .extract(text) -> dict
@@ -57,7 +58,8 @@ class HFExtractor:
         if not self.repo:
             raise ValueError("HF_REPO is not set")
         self.revision = _check_revision(revision or os.environ.get("HF_REVISION"))
-        self.model_version = f"hf:{self.repo}@{self.revision}"
+        # Validated here so a bad HF_REPO fails at start-up, not on every request (F38).
+        self.model_version = _model_version(self.repo, self.revision)
         folder = _resolve_folder(self.repo, self.revision, local_path)
         self._extractor = (
             extractor_factory(folder)
