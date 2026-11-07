@@ -1,0 +1,9 @@
+{
+  "outcome": "prioritized",
+  "priority_tier": null,
+  "rule_id": "R-P1-01",
+  "duplicate_of": null,
+  "abstain_reason": null,
+  "follow_up_question": null,
+  "rules_version": "rules@a1b2c3d+bin:9f8e7d6c5b4a3f21"
+}

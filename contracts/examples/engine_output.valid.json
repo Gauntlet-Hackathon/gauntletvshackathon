@@ -1,0 +1,9 @@
+{
+  "outcome": "duplicate",
+  "priority_tier": "P1",
+  "rule_id": "R-DUP-01",
+  "duplicate_of": "01JCB00000000000000000RQ01",
+  "abstain_reason": null,
+  "follow_up_question": null,
+  "rules_version": "rules@a1b2c3d+bin:9f8e7d6c5b4a3f21"
+}

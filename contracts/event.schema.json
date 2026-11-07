@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.rescue.invalid/event.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "event_id": {
+      "$ref": "common.schema.json#/$defs/ulid"
+    },
+    "request_id": {
+      "$ref": "common.schema.json#/$defs/ulid"
+    },
+    "type": {
+      "enum": [
+        "received",
+        "extracted",
+        "decided",
+        "assigned",
+        "rescued",
+        "corrected",
+        "escalated",
+        "closed_duplicate"
+      ]
+    },
+    "device_id": {
+      "$ref": "common.schema.json#/$defs/device_id"
+    },
+    "occurred_at": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    },
+    "rules_version": {
+      "anyOf": [
+        {
+          "$ref": "common.schema.json#/$defs/rules_version"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "model_version": {
+      "anyOf": [
+        {
+          "$ref": "common.schema.json#/$defs/model_version"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "event_id",
+    "request_id",
+    "type",
+    "device_id",
+    "occurred_at",
+    "rules_version",
+    "model_version",
+    "payload"
+  ],
+  "title": "event envelope",
+  "description": "Every event, field and cloud. rules_version and model_version are null when not applicable (e.g. corrected events made in the cloud).",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "received"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "payloads/received.schema.json"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "extracted"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "payloads/extracted.schema.json"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "decided"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "payloads/decided.schema.json"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "assigned"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "payloads/assigned.schema.json"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "rescued"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "payloads/rescued.schema.json"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "corrected"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "payloads/corrected.schema.json"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "escalated"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "payloads/escalated.schema.json"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "closed_duplicate"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "payloads/closed_duplicate.schema.json"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -13,3 +13,8 @@ coverage/
 !.env.example
 .DS_Store
 *.log
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+.coverage
+htmlcov/

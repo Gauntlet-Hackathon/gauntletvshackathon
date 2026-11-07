@@ -1,0 +1,50 @@
+{
+  "location": {
+    "text": "behind the Kroger on Westheimer",
+    "type": "landmark",
+    "confidence": 0.81
+  },
+  "people_count": {
+    "value": 3,
+    "confidence": 0.93
+  },
+  "vulnerable": [
+    {
+      "kind": "child",
+      "confidence": 0.88
+    }
+  ],
+  "hazards": [
+    {
+      "kind": "rising_water",
+      "confidence": 0.9
+    },
+    {
+      "kind": "on_roof",
+      "confidence": 0.85
+    }
+  ],
+  "time_ref": {
+    "text": "since last night",
+    "is_stale_post": false,
+    "confidence": 0.7
+  },
+  "is_request": {
+    "value": true,
+    "confidence": 0.97
+  },
+  "spans": [
+    {
+      "start": 43,
+      "end": 74,
+      "label": "LOCATION"
+    }
+  ],
+  "needs": [
+    {
+      "kind": "water",
+      "hours_without": 30
+    }
+  ],
+  "request_kind": "rescue"
+}

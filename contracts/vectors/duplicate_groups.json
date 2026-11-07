@@ -1,0 +1,138 @@
+{
+  "description": "duplicate_candidates(requests, window_hours) must equal expected.candidates and duplicate_groups(requests, window_hours) must equal expected.groups. Hand-computed from contracts/logic.md. Both rescue_shared.logic and the Elixir cloud must pass every case.",
+  "cases": [
+    {
+      "name": "spelling variants of one address with equal counts",
+      "window_hours": 12,
+      "requests": [
+        {"request_id": "01JCB00000000000000000A001", "received_at": "2026-11-07T08:00:00Z", "location_text": "123 Main St", "people_count": 3, "contact": null, "priority_tier": "P2"},
+        {"request_id": "01JCB00000000000000000A002", "received_at": "2026-11-07T09:30:00Z", "location_text": "123 main street", "people_count": 3, "contact": null, "priority_tier": "P1"},
+        {"request_id": "01JCB00000000000000000A003", "received_at": "2026-11-07T10:00:00Z", "location_text": "Main St 123", "people_count": 3, "contact": null, "priority_tier": null}
+      ],
+      "expected": {
+        "candidates": {
+          "01JCB00000000000000000A001": [],
+          "01JCB00000000000000000A002": [
+            {"request_id": "01JCB00000000000000000A001", "received_at": "2026-11-07T08:00:00Z", "people_count": 3, "contact_match": false, "priority_tier": "P2"}
+          ],
+          "01JCB00000000000000000A003": [
+            {"request_id": "01JCB00000000000000000A001", "received_at": "2026-11-07T08:00:00Z", "people_count": 3, "contact_match": false, "priority_tier": "P2"},
+            {"request_id": "01JCB00000000000000000A002", "received_at": "2026-11-07T09:30:00Z", "people_count": 3, "contact_match": false, "priority_tier": "P1"}
+          ]
+        },
+        "groups": [["01JCB00000000000000000A001", "01JCB00000000000000000A002", "01JCB00000000000000000A003"]]
+      }
+    },
+    {
+      "name": "same contact with different counts is still a candidate",
+      "window_hours": 12,
+      "requests": [
+        {"request_id": "01JCB00000000000000000B001", "received_at": "2026-11-07T09:00:00Z", "location_text": "Kroger on Westheimer", "people_count": 4, "contact": "+1 (713) 555-0123", "priority_tier": "P1"},
+        {"request_id": "01JCB00000000000000000B002", "received_at": "2026-11-07T09:20:00Z", "location_text": "the Kroger on Westheimer", "people_count": 6, "contact": "713-555-0123", "priority_tier": null}
+      ],
+      "expected": {
+        "candidates": {
+          "01JCB00000000000000000B001": [],
+          "01JCB00000000000000000B002": [
+            {"request_id": "01JCB00000000000000000B001", "received_at": "2026-11-07T09:00:00Z", "people_count": 4, "contact_match": true, "priority_tier": "P1"}
+          ]
+        },
+        "groups": [["01JCB00000000000000000B001", "01JCB00000000000000000B002"]]
+      }
+    },
+    {
+      "name": "same place, different counts, no shared contact: not duplicates",
+      "window_hours": 12,
+      "requests": [
+        {"request_id": "01JCB00000000000000000C001", "received_at": "2026-11-07T10:00:00Z", "location_text": "400 Fannin St", "people_count": 2, "contact": null, "priority_tier": "P2"},
+        {"request_id": "01JCB00000000000000000C002", "received_at": "2026-11-07T10:10:00Z", "location_text": "400 Fannin Street", "people_count": 5, "contact": "+17135550111", "priority_tier": "P3"}
+      ],
+      "expected": {
+        "candidates": {"01JCB00000000000000000C001": [], "01JCB00000000000000000C002": []},
+        "groups": []
+      }
+    },
+    {
+      "name": "window edge is inclusive; groups are transitive, candidates are direct",
+      "window_hours": 2,
+      "requests": [
+        {"request_id": "01JCB00000000000000000D001", "received_at": "2026-11-07T08:00:00Z", "location_text": "9 Elm Dr", "people_count": 1, "contact": null, "priority_tier": "P3"},
+        {"request_id": "01JCB00000000000000000D002", "received_at": "2026-11-07T10:00:00Z", "location_text": "9 Elm Drive", "people_count": 1, "contact": null, "priority_tier": "P3"},
+        {"request_id": "01JCB00000000000000000D003", "received_at": "2026-11-07T10:00:01Z", "location_text": "9 Elm Dr", "people_count": 1, "contact": null, "priority_tier": null}
+      ],
+      "expected": {
+        "candidates": {
+          "01JCB00000000000000000D001": [],
+          "01JCB00000000000000000D002": [
+            {"request_id": "01JCB00000000000000000D001", "received_at": "2026-11-07T08:00:00Z", "people_count": 1, "contact_match": false, "priority_tier": "P3"}
+          ],
+          "01JCB00000000000000000D003": [
+            {"request_id": "01JCB00000000000000000D002", "received_at": "2026-11-07T10:00:00Z", "people_count": 1, "contact_match": false, "priority_tier": "P3"}
+          ]
+        },
+        "groups": [["01JCB00000000000000000D001", "01JCB00000000000000000D002", "01JCB00000000000000000D003"]]
+      }
+    },
+    {
+      "name": "equal timestamps are ordered by request_id; empty locations never match",
+      "window_hours": 12,
+      "requests": [
+        {"request_id": "01JCB00000000000000000E001", "received_at": "2026-11-07T12:00:00Z", "location_text": "7 Oak Ln", "people_count": 2, "contact": null, "priority_tier": "P2"},
+        {"request_id": "01JCB00000000000000000E002", "received_at": "2026-11-07T12:00:00Z", "location_text": "7 oak lane", "people_count": 2, "contact": null, "priority_tier": "P2"},
+        {"request_id": "01JCB00000000000000000E003", "received_at": "2026-11-07T12:05:00Z", "location_text": null, "people_count": 2, "contact": null, "priority_tier": "P2"},
+        {"request_id": "01JCB00000000000000000E004", "received_at": "2026-11-07T12:06:00Z", "location_text": "the", "people_count": 2, "contact": null, "priority_tier": "P2"}
+      ],
+      "expected": {
+        "candidates": {
+          "01JCB00000000000000000E001": [],
+          "01JCB00000000000000000E002": [
+            {"request_id": "01JCB00000000000000000E001", "received_at": "2026-11-07T12:00:00Z", "people_count": 2, "contact_match": false, "priority_tier": "P2"}
+          ],
+          "01JCB00000000000000000E003": [],
+          "01JCB00000000000000000E004": []
+        },
+        "groups": [["01JCB00000000000000000E001", "01JCB00000000000000000E002"]]
+      }
+    },
+    {
+      "name": "two interleaved groups are listed by their oldest member",
+      "window_hours": 12,
+      "requests": [
+        {"request_id": "01JCB00000000000000000F001", "received_at": "2026-11-07T07:00:00Z", "location_text": "10 Pine Rd", "people_count": 2, "contact": null, "priority_tier": "P2"},
+        {"request_id": "01JCB00000000000000000F002", "received_at": "2026-11-07T07:05:00Z", "location_text": "22 Cedar Rd", "people_count": 4, "contact": null, "priority_tier": "P1"},
+        {"request_id": "01JCB00000000000000000F003", "received_at": "2026-11-07T07:10:00Z", "location_text": "10 Pine Road", "people_count": 2, "contact": null, "priority_tier": "P3"},
+        {"request_id": "01JCB00000000000000000F004", "received_at": "2026-11-07T07:15:00Z", "location_text": "22 cedar road", "people_count": 4, "contact": null, "priority_tier": "P2"}
+      ],
+      "expected": {
+        "candidates": {
+          "01JCB00000000000000000F001": [],
+          "01JCB00000000000000000F002": [],
+          "01JCB00000000000000000F003": [
+            {"request_id": "01JCB00000000000000000F001", "received_at": "2026-11-07T07:00:00Z", "people_count": 2, "contact_match": false, "priority_tier": "P2"}
+          ],
+          "01JCB00000000000000000F004": [
+            {"request_id": "01JCB00000000000000000F002", "received_at": "2026-11-07T07:05:00Z", "people_count": 4, "contact_match": false, "priority_tier": "P1"}
+          ]
+        },
+        "groups": [["01JCB00000000000000000F001", "01JCB00000000000000000F003"], ["01JCB00000000000000000F002", "01JCB00000000000000000F004"]]
+      }
+    },
+    {
+      "name": "coordinates with different precision are the same place",
+      "window_hours": 12,
+      "requests": [
+        {"request_id": "01JCB00000000000000000G001", "received_at": "2026-11-07T06:00:00Z", "location_text": "29.7604, -95.3698", "people_count": 2, "contact": null, "priority_tier": "P2"},
+        {"request_id": "01JCB00000000000000000G002", "received_at": "2026-11-07T06:30:00Z", "location_text": "29.760412,-95.369811", "people_count": 2, "contact": null, "priority_tier": "P2"}
+      ],
+      "expected": {
+        "candidates": {
+          "01JCB00000000000000000G001": [],
+          "01JCB00000000000000000G002": [
+            {"request_id": "01JCB00000000000000000G001", "received_at": "2026-11-07T06:00:00Z", "people_count": 2, "contact_match": false, "priority_tier": "P2"}
+          ]
+        },
+        "groups": [["01JCB00000000000000000G001", "01JCB00000000000000000G002"]]
+      }
+    }
+  ]
+}

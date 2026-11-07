@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.rescue.invalid/engine_manifest.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "rules_version": {
+      "$ref": "common.schema.json#/$defs/rules_version"
+    },
+    "rules_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,40}$"
+    },
+    "bin_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8,64}$"
+    },
+    "engine_kind": {
+      "enum": [
+        "python",
+        "mercury"
+      ]
+    },
+    "entrypoint": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Command relative to the manifest's folder; reads engine_input JSON on stdin, writes engine_output JSON on stdout."
+    },
+    "built_at": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    }
+  },
+  "required": [
+    "rules_version",
+    "rules_sha",
+    "bin_hash",
+    "engine_kind",
+    "entrypoint",
+    "built_at"
+  ],
+  "title": "engine manifest",
+  "description": "engine/dist/<rules_version>/manifest.json. rules_version must equal rules@<rules_sha>+bin:<bin_hash>."
+}
