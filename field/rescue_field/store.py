@@ -87,6 +87,9 @@ class EventStore:
         ).fetchall()
         return [json.loads(r[0]) for r in rows]
 
+    def outbox_count(self) -> int:
+        return self._conn.execute("SELECT COUNT(*) FROM outbox").fetchone()[0]
+
     def ack(self, event_ids: Iterable[str]) -> int:
         """Remove the given ids from the outbox (events stay). Returns rows removed."""
         ids = [(i,) for i in event_ids]

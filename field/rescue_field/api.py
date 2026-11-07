@@ -29,6 +29,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
 
 from rescue_field import engine_client
+from rescue_field import sync as sync_module
 from rescue_field.pipeline import BatchDecider, IntakeItem, PipelineConfig, process_batch
 from rescue_field.slm import Extractor, FixtureExtractor
 from rescue_field.store import EventStore
@@ -44,13 +45,13 @@ _LANG_RE = re.compile(r"^[a-z]{2}$")
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-class SyncWorker(Protocol):
+class SyncWorkerLike(Protocol):
     def start(self) -> None: ...
 
     def stop(self) -> None: ...
 
 
-SyncWorkerFactory = Callable[[EventStore, str], SyncWorker]
+SyncWorkerFactory = Callable[[EventStore, str], SyncWorkerLike]
 
 
 class InputError(Exception):
@@ -311,8 +312,16 @@ def create_app(
             opened = app.state.store = open_store()
         cloud_url = os.environ.get("CLOUD_URL")
         worker = None
-        if cloud_url and sync_worker_factory is not None:
-            worker = sync_worker_factory(app.state.store, cloud_url)
+        if cloud_url:
+            factory = sync_worker_factory or (
+                lambda st, url: sync_module.worker_from_env(
+                    st,
+                    url,
+                    model_version=getattr(app.state.extractor, "model_version", "unknown"),
+                    lock=app.state.intake_lock,
+                )
+            )
+            worker = factory(app.state.store, cloud_url)
             worker.start()
         app.state.sync_worker = worker
         try:
@@ -333,6 +342,7 @@ def create_app(
     app.state.intake_lock = threading.Lock()
     app.state.sync_worker = None
     app.include_router(router)
+    app.include_router(sync_module.router)
     return app
 
 
