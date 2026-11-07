@@ -95,7 +95,7 @@ def test_initials():
 
 
 def test_header_who_block_and_segmented_toggle():
-    html = client().get("/app?mode=respond").text
+    html = client().get("/respond").text
     assert '<span class="avatar" aria-hidden="true">' in html
     assert '<span class="who-sub">Volunteer</span><span class="who-sub">ECC 1</span>' in html
     assert '<a href="/respond" class="selected" aria-current="page">Respond</a>' in html
