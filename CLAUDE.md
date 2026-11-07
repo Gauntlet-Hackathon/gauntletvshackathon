@@ -29,8 +29,7 @@ Run your lane's command before opening a PR. All of them run from the repo root.
 - Everything CI runs: `ruff check . && pytest`, plus the `cloud` and picker commands above.
 
 ## Agent coordination
-See AGENT_RULES.md. Summary: work only on issues in your lane, one issue = one branch = one PR, never push to main,
-never edit .github/, .claude/, CLAUDE.md or AGENTS.md from an agent PR, append one line to progress/<lane>.md per change
+See AGENT_RULES.md. Summary: work only on issues in your lane, one issue = one branch = one PR, never push to main, append one line to progress/<lane>.md per change
 (one file per lane, so parallel PRs never conflict; never a shared progress.md).
 
 ## Ticket path mapping (read before every ticket)

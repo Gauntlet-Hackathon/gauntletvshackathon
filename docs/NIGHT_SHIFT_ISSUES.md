@@ -112,7 +112,6 @@ Make these `human` tickets instead (label `human` plus the lane, no `night-safe`
 
 | Kind of work | Why |
 |---|---|
-| Changes to `.github/`, `.claude/`, `CLAUDE.md`, `AGENTS.md` or `.mcp.json` | Agents are blocked from editing these paths. The PR is rejected. |
 | Changes to `contracts/` (schemas, `engine_rules.md`, `sync_api.md`, vectors) | Every lane depends on them. A person decides, then agents update code to match. |
 | Product decisions (what the product should do, thresholds, wording for users) | The agent would guess. Decide first and write the answer into the ticket or `DECISIONS.md`. |
 | Anything needing API keys, accounts, billing, deploys or secrets | Agents have none. |
