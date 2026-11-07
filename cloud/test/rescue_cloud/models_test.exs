@@ -124,6 +124,7 @@ defmodule RescueCloud.ModelsTest do
                Path.join(
                  Application.get_env(:rescue_cloud, Models)[:models_dir],
                  "org__slm",
+                 @sha,
                  @sha
                )
              )
