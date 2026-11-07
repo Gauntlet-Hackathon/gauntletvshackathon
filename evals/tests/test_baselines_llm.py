@@ -97,7 +97,11 @@ def test_mock_rows_have_usage_and_latency_and_result_has_latency_block(tmp_path)
     assert all(r["input_tokens"] == 120 and r["output_tokens"] == 80 for r in rows)
     assert all(isinstance(r["latency_ms"], float) and r["latency_ms"] >= 0 for r in rows)
     result = json.loads((tmp_path / "res" / "opus__B.json").read_text())
-    assert set(result["baseline_latency"]) == {"total_ms_per_request", "seconds_per_1000_requests"}
+    assert set(result["baseline_latency"]) == {
+        "total_ms_per_request",
+        "median_ms_per_request",
+        "seconds_per_1000_requests",
+    }
     assert "running" not in result  # no prices set -> no cost, never hard-coded
 
 
@@ -153,3 +157,41 @@ def test_opus_prompt_has_rubric_and_schema_and_no_temperature(monkeypatch):
     generate("help")
     assert sent["system"] == prompt
     assert "temperature" not in sent  # current Opus models reject it
+
+
+def test_rescore_reuses_stored_rows_without_a_model(tmp_path):
+    assert _run(tmp_path, "--mock") == 0
+    stored = tmp_path / "res" / "opus" / "mock-opus.jsonl"
+    before = stored.read_text()
+    first = json.loads((tmp_path / "res" / "opus__B.json").read_text())
+    (tmp_path / "res" / "opus__B.json").unlink()
+    # no --mock and no API key: only the stored file is read
+    assert _run(tmp_path, "--rescore", str(stored)) == 0
+    again = json.loads((tmp_path / "res" / "opus__B.json").read_text())
+    assert stored.read_text() == before
+    assert again["metrics"] == first["metrics"] and again["model_version"] == "mock-opus"
+    assert "median_ms_per_request" in again["baseline_latency"]
+    assert _run(tmp_path, "--rescore", str(tmp_path / "nope.jsonl")) == 2
+
+
+def test_mock_replies_follow_case_order_not_text():
+    from rescue_evals.loaders import EvalCase
+
+    def case(cid, loc):
+        ex = extract(TEXT).model_dump(mode="json")
+        ex["location"]["text"] = loc
+        return EvalCase.model_validate(
+            {
+                "id": cid,
+                "raw_text": "SOS",
+                "gold_extracted": ex,
+                "gold_decision": {"outcome": "prioritized", "priority_tier": "P1"},
+                "gold_duplicate_group": None,
+                "set": "B",
+                "split": "dev",
+            }
+        )
+
+    _, generate = llm.mock_client("opus", [case("a", "1 Oak St"), case("b", "99 Elm St")])
+    # was the same reply twice (keyed by text)
+    assert "1 Oak St" in generate("SOS") and "99 Elm St" in generate("SOS")

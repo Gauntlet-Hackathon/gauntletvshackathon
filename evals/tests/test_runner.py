@@ -74,7 +74,11 @@ def test_two_points_and_failures(tmp_path):
     assert res["metrics"]["extraction.location_exact"] == 0.0
     assert res["failures"]["extraction.location_exact"] == ["a"]  # b has no gold extraction
     assert res["failures"]["decision.p1_misses_per_1000"] == ["a"]
-    assert res["metrics"]["decision.p1_misses_per_1000"] == 500.0
+    # one urgent request, missed: 1000 per 1000 urgent (O-03); 500 per 1000 requests
+    assert res["metrics"]["decision.p1_misses_per_1000"] == 1000.0
+    assert res["metrics"]["decision.p1_misses_per_1000_requests"] == 500.0
+    assert res["metric_n"]["decision.p1_misses_per_1000"] == 1
+    assert res["metric_n"]["decision.p1_misses_per_1000_requests"] == 2
     assert set(res["failures"]) == set(res["metrics"])
     assert res["model_version"] == "stub:wrong"
     assert res["rules_version"].startswith("rules@")

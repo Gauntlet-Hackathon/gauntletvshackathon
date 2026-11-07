@@ -11,6 +11,8 @@ and the file is then scored with the stored-baseline harness
 and the standard runner report (``<results-dir>/<system>__<set>.json``).
 Set E is refused (EV10 guard).
 ``--mock`` never touches the network; CI uses only ``--mock``.
+``--rescore FILE`` skips the model and re-scores an existing ``<model-id>.jsonl`` with the current
+runner (run it after any scoring change, so stored columns use the same scoring as live ones).
 """
 
 from __future__ import annotations
@@ -27,6 +29,7 @@ import urllib.request
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
+from statistics import median
 from typing import Any
 
 from pydantic import ValidationError
@@ -186,13 +189,17 @@ def slm_client(env: dict[str, str]) -> tuple[str, Generate]:
 
 
 def mock_client(system: str, cases: Sequence[EvalCase]) -> tuple[str, Generate]:
-    """Canned outputs, no network: every 4th reply is schema-invalid, every 7th is not JSON."""
-    gold = {c.raw_text: c.gold_extracted for c in cases}
-    order = {c.raw_text: i for i, c in enumerate(cases)}
+    """Canned outputs, no network: every 4th reply is schema-invalid, every 7th is not JSON.
+
+    Replies follow the call order (``run_baseline`` asks in case order), not a text lookup, so
+    two cases with the same text get their own gold (review F-04)."""
+    calls = iter(range(len(cases)))
 
     def generate(text: str) -> str:
-        i = order.get(text, 0)
-        ex = gold.get(text)
+        i = next(calls, None)
+        if i is None or cases[i].raw_text != text:  # asked out of order: no canned reply
+            i = len(cases)
+        ex = cases[i].gold_extracted if i < len(cases) else None
         if i % 7 == 6 or ex is None:
             generate.last_usage = MOCK_USAGE  # type: ignore[attr-defined]
             return "sorry, I cannot help with that"
@@ -276,7 +283,11 @@ def baseline_latency(rows: Sequence[dict[str, Any]]) -> dict[str, float] | None:
     if not ms:
         return None
     mean = sum(ms) / len(ms)
-    return {"total_ms_per_request": mean, "seconds_per_1000_requests": mean}  # ms*1000/1000 = s
+    return {
+        "total_ms_per_request": mean,
+        "median_ms_per_request": median(ms),  # the plan's row (review L-11)
+        "seconds_per_1000_requests": mean,  # ms*1000/1000 = s
+    }
 
 
 def cost_per_1000_usd(
@@ -305,6 +316,9 @@ def main(argv: Sequence[str] | None = None, env: dict[str, str] | None = None) -
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--sets-dir", type=Path, default=DEFAULT_SETS_DIR)
     ap.add_argument("--results-dir", type=Path, default=DEFAULT_RESULTS_DIR)
+    ap.add_argument(
+        "--rescore", type=Path, default=None, help="re-score this stored JSONL; no model calls"
+    )
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO)
 
@@ -322,16 +336,22 @@ def main(argv: Sequence[str] | None = None, env: dict[str, str] | None = None) -
         cases = [c for name in set_names for c in by_set[name]]
         if args.limit is not None:
             cases = cases[: max(args.limit, 0)]
-        if args.mock:
-            model_id, generate = mock_client(args.system, cases)
-        elif args.system == "opus":
-            model_id, generate = opus_client(env)
+        if args.rescore is not None:
+            out_path = args.rescore
+            if not out_path.is_file():
+                raise ConfigError(f"no stored outputs at {out_path}")
+            stored = _read_rows(out_path, {c.id for c in cases})
+            model_id = next((r["model_id"] for r in stored if r.get("model_id")), out_path.stem)
         else:
-            model_id, generate = slm_client(env)
-
-        out_path = args.results_dir / args.system / f"{_safe(model_id)}.jsonl"
-        ok, bad = run_baseline(args.system, cases, generate, model_id, out_path)
-        print(f"wrote {out_path} ({ok} valid, {bad} schema-invalid or failed)")
+            if args.mock:
+                model_id, generate = mock_client(args.system, cases)
+            elif args.system == "opus":
+                model_id, generate = opus_client(env)
+            else:
+                model_id, generate = slm_client(env)
+            out_path = args.results_dir / args.system / f"{_safe(model_id)}.jsonl"
+            ok, bad = run_baseline(args.system, cases, generate, model_id, out_path)
+            print(f"wrote {out_path} ({ok} valid, {bad} schema-invalid or failed)")
         for name in set_names:
             subset = [c for c in cases if c.set == name]
             if not subset:

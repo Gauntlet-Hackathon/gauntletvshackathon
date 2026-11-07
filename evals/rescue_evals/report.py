@@ -7,9 +7,13 @@ Reads ``<system>__<set>.json`` files (written by the runner) and writes, next to
 * ``summary.json``: the feed the cloud panel (C10/C11) reads.
 * ``TABLE.md``: the one table the judges see.
 
-Rows are metrics, columns are regex / Opus 5.5 / generic SLM / ours. Sets A-D are pooled
-(weighted by ``n``) into the main table; the sealed holdout (set E) is reported separately,
-never pooled.
+Rows are metrics, columns are regex / Opus 5.5 / generic SLM / ours. Sets A-D are pooled into
+the main table; the sealed holdout (set E) is reported separately, never pooled.
+Pooling (review H-03) uses each metric's own denominator: a rate is the sum of its numerators
+over the sum of its ``metric_n``, an F1 is recomputed from the summed ``metric_counts``
+(tp/fp/fn), and a set that left a metric out (denominator 0, e.g. no gold extraction) adds
+nothing to it. Each row carries the pooled ``n`` per column. Result docs from before PR-3 (no
+``metric_n``) fall back to weighting by the document's ``n``.
 The best cell per row is marked ``**bold**`` (ties all marked); rows where "ours" loses are kept
 and flagged. A system with no results for a row shows ``n/a``.
 """
@@ -24,6 +28,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from rescue_evals import metrics as M
 from rescue_evals.runner import DEFAULT_RESULTS_DIR
 
 # column key -> (header, accepted system names; the first is the canonical one)
@@ -38,6 +43,7 @@ COLUMNS: dict[str, tuple[str, list[str]]] = {
 STORED_BASELINES = {"opus", "generic_slm"}
 WORKS_OFFLINE = {"regex": 1, "opus": 0, "generic_slm": 1, "ours": 1}
 ROW_MS = "running.mean_ms_per_request"
+ROW_MEDIAN_MS = "running.median_ms_per_request"  # the plan's row (review L-11)
 ROW_S1000 = "running.seconds_per_1000_requests"
 ROW_COST = "running.cost_per_1000_usd"
 LOCAL_COLUMNS = ("regex", "ours")
@@ -48,14 +54,29 @@ MAIN_SETS = ("A", "B", "C", "D")
 SEALED_SET = "E"
 LOWER_IS_BETTER = {
     "decision.p1_misses_per_1000",
+    "decision.p1_misses_per_1000_requests",
+    "decision.p1_hard_misses_per_1000",
     "decision.false_alarm_rate",
     "calibration.ece",
     ROW_MS,
+    ROW_MEDIAN_MS,
     ROW_S1000,
     ROW_COST,
     ROW_CONSISTENCY,
 }
 EPS = 1e-9
+# Plain-language names for TABLE.md (the key stays in the row; the cloud panel has its own).
+LABELS = {
+    "decision.p1_misses_per_1000": "Urgent requests missed per 1,000 urgent requests (headline)",
+    "decision.p1_misses_per_1000_requests": "Urgent requests missed per 1,000 requests (any kind)",
+    "decision.p1_hard_misses_per_1000": (
+        "Urgent requests missed per 1,000 urgent, not counting P1-flagged follow-ups"
+    ),
+    "decision.top20_accuracy": "Top-20 accuracy (first 20 board rows that belong there)",
+    "decision.duplicate_pairwise_f1": "Duplicate merging, pairwise F1",
+    ROW_MEDIAN_MS: "Median time per request (ms)",
+    ROW_MS: "Mean time per request (ms)",
+}
 
 
 def load_results(results_dir: Path) -> list[dict[str, Any]]:
@@ -70,17 +91,48 @@ def load_results(results_dir: Path) -> list[dict[str, Any]]:
     return out
 
 
-def _pool(docs: list[dict[str, Any]]) -> tuple[dict[str, float], int]:
-    """n-weighted mean per metric over the given result docs."""
+def _number(v: Any) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def pool_metrics(docs: list[dict[str, Any]]) -> tuple[dict[str, float], dict[str, int]]:
+    """Pooled value and pooled denominator per metric over the given result docs.
+
+    A metric with ``metric_counts`` (tp/fp/fn) is an F1 recomputed from the summed counts;
+    any other metric is weighted by its ``metric_n`` (the document's ``n`` for an old document
+    without ``metric_n``). A document that left a metric out contributes nothing to it."""
     num: dict[str, float] = {}
     den: dict[str, int] = {}
+    counts: dict[str, dict[str, int]] = {}
     for d in docs:
-        n = int(d.get("n") or 0)
+        doc_n = int(d.get("n") or 0)
+        metric_n = d.get("metric_n")
+        metric_counts = d.get("metric_counts") or {}
         for k, v in d["metrics"].items():
-            if isinstance(v, (int, float)):
-                num[k] = num.get(k, 0.0) + v * n
-                den[k] = den.get(k, 0) + n
-    return {k: num[k] / den[k] for k in num if den[k]}, sum(int(d.get("n") or 0) for d in docs)
+            if not _number(v):
+                continue
+            c = metric_counts.get(k)
+            if isinstance(c, dict) and all(_number(c.get(x)) for x in ("tp", "fp", "fn")):
+                acc = counts.setdefault(k, {"tp": 0, "fp": 0, "fn": 0})
+                for x in acc:
+                    acc[x] += int(c[x])
+                continue
+            n = metric_n.get(k) if isinstance(metric_n, dict) else doc_n
+            n = int(n) if _number(n) else 0
+            num[k] = num.get(k, 0.0) + v * n
+            den[k] = den.get(k, 0) + n
+    out = {k: num[k] / den[k] for k in num if den[k]}
+    ns = {k: den[k] for k in num if den[k]}
+    for k, c in counts.items():
+        f1 = M.f1_from_counts(c)
+        if f1 is not None:
+            out[k], ns[k] = f1, sum(c.values())
+    return out, ns
+
+
+def _pool(docs: list[dict[str, Any]]) -> tuple[dict[str, float], int]:
+    """Pooled value per metric (``pool_metrics``) and the total number of cases."""
+    return pool_metrics(docs)[0], sum(int(d.get("n") or 0) for d in docs)
 
 
 def _pool_latency(docs: list[dict[str, Any]], key: str) -> float | None:
@@ -119,7 +171,12 @@ def _consistency(results_dir: Path | None, col: str) -> float | None:
     return None
 
 
-def _row(metric: str, cells: dict[str, float | None], rank: bool = True) -> dict[str, Any]:
+def _row(
+    metric: str,
+    cells: dict[str, float | None],
+    rank: bool = True,
+    ns: dict[str, int | None] | None = None,
+) -> dict[str, Any]:
     vals = {c: v for c, v in cells.items() if v is not None}
     lower = metric in LOWER_IS_BETTER
     best: list[str] = []
@@ -128,13 +185,16 @@ def _row(metric: str, cells: dict[str, float | None], rank: bool = True) -> dict
         best = sorted(c for c, v in vals.items() if abs(v - best_v) <= EPS)
     ours = cells.get(OURS)
     ours_loses = rank and ((ours is not None and OURS not in best) or (ours is None and bool(vals)))
-    return {
+    row = {
         "metric": metric,
         "lower_is_better": lower,
         "values": cells,
         "best": best,
         "ours_loses": bool(ours_loses),
     }
+    if ns is not None:  # pooled denominator per column (review H-03); None where no value
+        row["n"] = ns
+    return row
 
 
 def _block(
@@ -144,6 +204,7 @@ def _block(
     extra: bool = False,
 ) -> dict[str, Any]:
     pooled: dict[str, dict[str, float]] = {}
+    pooled_n: dict[str, dict[str, int]] = {}
     ns: dict[str, int] = {}
     versions: dict[str, Any] = {}
     mine_by_col: dict[str, list[dict[str, Any]]] = {}
@@ -152,13 +213,21 @@ def _block(
         if not mine:
             continue
         mine_by_col[col] = mine
-        pooled[col], ns[col] = _pool(mine)
+        pooled[col], pooled_n[col] = pool_metrics(mine)
+        ns[col] = sum(int(d.get("n") or 0) for d in mine)
         versions[col] = {
             "model_version": mine[-1].get("model_version"),
             "rules_version": mine[-1].get("rules_version"),
         }
     metrics = sorted({m for col in pooled.values() for m in col})
-    rows = [_row(m, {c: pooled.get(c, {}).get(m) for c in COLUMNS}) for m in metrics]
+    rows = [
+        _row(
+            m,
+            {c: pooled.get(c, {}).get(m) for c in COLUMNS},
+            ns={c: pooled_n.get(c, {}).get(m) for c in COLUMNS},
+        )
+        for m in metrics
+    ]
     if extra and pooled:
 
         def lat(key: str) -> dict[str, float | None]:
@@ -181,6 +250,7 @@ def _block(
                 for c in COLUMNS
             }
 
+        rows.append(_row(ROW_MEDIAN_MS, lat("median_ms_per_request")))
         rows.append(_row(ROW_MS, lat("total_ms_per_request")))
         rows.append(_row(ROW_S1000, lat("seconds_per_1000_requests")))
         rows.append(_row(ROW_COST, cost()))
@@ -195,8 +265,21 @@ def build_summary(docs: list[dict[str, Any]], results_dir: Path | None = None) -
         "columns": {c: {"label": h, "system": s[0], "aliases": s} for c, (h, s) in COLUMNS.items()},
         "main": _block(docs, MAIN_SETS, results_dir, extra=True),
         "sealed": _block(docs, (SEALED_SET,)),
+        # metric_n / metric_counts let the cloud gate pool like pool_metrics (PR-3b)
         "results": [
-            {k: d.get(k) for k in ("system", "set", "run_at", "n", "model_version", "metrics")}
+            {
+                k: d.get(k)
+                for k in (
+                    "system",
+                    "set",
+                    "run_at",
+                    "n",
+                    "model_version",
+                    "metrics",
+                    "metric_n",
+                    "metric_counts",
+                )
+            }
             for d in docs
         ],
     }
@@ -223,7 +306,12 @@ def _table(block: dict[str, Any]) -> list[str]:
             cells.append(f"**{s}**" if c in r["best"] else s)
         arrow = "lower is better" if r["lower_is_better"] else "higher is better"
         flag = "LOSES" if r["ours_loses"] else "ok"
-        lines.append(f"| `{r['metric']}` ({arrow}) | " + " | ".join(cells) + f" | {flag} |")
+        name = (
+            f"{LABELS[r['metric']]} `{r['metric']}`"
+            if r["metric"] in LABELS
+            else f"`{r['metric']}`"
+        )
+        lines.append(f"| {name} ({arrow}) | " + " | ".join(cells) + f" | {flag} |")
     lines.append("")
     return lines
 
