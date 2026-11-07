@@ -51,7 +51,7 @@ SPANISH_WORDS = frozenset(
     }
 )  # fmt: skip
 _WORD = re.compile(r"[a-záéíóúüñ]+")
-# Two hits, so a stray "casa" or "hay" in an English message is not enough on its own.
+# Two hits, so a stray "casa" or "por" in an English message is not enough on its own.
 _MIN_HITS = 2
 
 
