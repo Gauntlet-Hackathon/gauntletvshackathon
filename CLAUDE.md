@@ -54,6 +54,8 @@ The field FastAPI app is `app` in `field/rescue_field/api.py` (the Dockerfile ru
 Field app (read from environment, with these defaults for tests):
 - `DEVICE_ID` (e.g. `laptop-dev-01`), `DEVICE_TOKEN` (bearer token for the cloud), `CLOUD_URL` (e.g. `http://cloud:4000`)
 - `FIELD_DATA_DIR` (directory for the SQLite file; default `./data` locally, `/data` in Docker)
+- `ECC_NAME` (default `ECC 1`), `VOLUNTEER_NAME` (default generated from `DEVICE_ID`, e.g. `Jordan K.`), `VOLUNTEER_ROLE` (default `Volunteer`),
+  `SHELTER_NAMES` (comma-separated; default generated, e.g. `Shelter 1 (Lincoln High)`): demo values for the volunteer app shell
 - `DEMO_MODE` (`1` enables POST /sync/offline-toggle), `ENGINE_CMD` (default `python -m rescue_engine.fallback`)
 - The FastAPI app is `app` in `field/rescue_field/api.py`; it serves on `$PORT` (default 8000).
 Cloud app: standard Phoenix release env (`DATABASE_URL`, `SECRET_KEY_BASE`, `PHX_HOST`, `PORT`). Device tokens must include a dev

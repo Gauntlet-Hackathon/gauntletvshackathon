@@ -27,6 +27,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
+from rescue_field.shell import model_banner
 from rescue_field.status import ORDER, RANK
 from rescue_field.store import EventStore
 from rescue_shared import logic
@@ -217,12 +218,7 @@ async def board(request: Request) -> HTMLResponse:
     events = await run_in_threadpool(snapshot)
     ctx = await run_in_threadpool(build_board_from_events, events)
     ctx["model_version"] = getattr(request.app.state.extractor, "model_version", None) or "unknown"
-    info = getattr(request.app.state, "extractor_info", None) or {}
-    ctx["model_banner"] = (
-        info.get("fallback_reason") or "unknown"
-        if info.get("expected_model") and info.get("extractor") != "hf"
-        else None
-    )
+    ctx["model_banner"] = model_banner(request)
     ctx["demo_mode"] = os.environ.get("DEMO_MODE") == "1"
     # The state /sync/offline-toggle flips, so the button label survives a reload.
     worker = getattr(request.app.state, "sync_worker", None)
