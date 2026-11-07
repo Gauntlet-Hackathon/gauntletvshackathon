@@ -3,7 +3,8 @@
     python -m rescue_evals.baselines --system opus|slm --split dev|test [--mock] [--limit N]
 
 Env: opus uses ANTHROPIC_API_KEY (+ OPUS_MODEL_ID, default claude-opus-5-5, + ANTHROPIC_BASE_URL);
-slm uses SLM_ENDPOINT (OpenAI-compatible chat completions URL), SLM_MODEL_ID, optional SLM_API_KEY.
+slm uses SLM_ENDPOINT (OpenAI-compatible chat completions URL), SLM_MODEL_ID, optional SLM_API_KEY,
+optional SLM_JSON_SCHEMA=1 (schema-constrained decoding, llama.cpp server format).
 Every output is validated against the ``extracted`` contract. Rows go to
 ``<results-dir>/<system>/<model-id>.jsonl`` (id, set, split, model_id, model_version, timestamp,
 raw_output, extracted, valid, error, input_tokens, output_tokens, latency_ms)
@@ -80,6 +81,38 @@ def build_prompt() -> str:
     parts.append("<decision_rubric>\n" + rubric.strip() + "\n</decision_rubric>")
     parts.append("<json_schema>\n" + schema.strip() + "\n</json_schema>")
     return "\n\n".join(parts)
+
+
+SPAN_LABELS = ["LOCATION", "COUNT", "TIME", "HAZARD", "VULNERABLE", "NEED"]
+
+
+def decoding_schema() -> dict[str, Any]:
+    """The ``extracted`` contract as a JSON Schema for constrained decoding (SLM_JSON_SCHEMA=1).
+
+    llama.cpp-style grammar converters ignore ``pattern``, so the free-form span label
+    (``^[A-Z_]+$``) becomes an enum of upper-case labels; spans are not scored. Output is
+    still validated against the real contract by ``parse_output``.
+    """
+    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    common = json.loads((SCHEMA_PATH.parent.parent / "common.schema.json").read_text("utf-8"))
+
+    def inline(node: Any) -> Any:  # grammar converters cannot follow cross-file $refs
+        if isinstance(node, dict):
+            ref = node.get("$ref")
+            if isinstance(ref, str) and ref.startswith("../common.schema.json#/$defs/"):
+                return inline(common["$defs"][ref.rsplit("/", 1)[1]])
+            return {k: inline(v) for k, v in node.items()}
+        if isinstance(node, list):
+            return [inline(v) for v in node]
+        return node
+
+    schema = inline(schema)
+    for key in ("$schema", "$id"):
+        schema.pop(key, None)
+    label = schema["properties"]["spans"]["items"]["properties"]["label"]
+    label.pop("pattern", None)
+    label["enum"] = SPAN_LABELS
+    return schema
 
 
 def parse_output(text: str) -> Extracted:
@@ -167,21 +200,24 @@ def slm_client(env: dict[str, str]) -> tuple[str, Generate]:
     assert endpoint and model
     headers = {"authorization": f"Bearer {env['SLM_API_KEY']}"} if env.get("SLM_API_KEY") else {}
     system = build_prompt()
+    # Optional schema-constrained decoding (llama.cpp / llama-cpp-python server format): the
+    # usual way a small model is deployed for JSON. Same prompt either way.
+    constrain = env.get("SLM_JSON_SCHEMA") == "1"
+    response_format = {"type": "json_object", "schema": decoding_schema()} if constrain else None
 
     def generate(text: str) -> str:
-        out = _post(
-            endpoint,
-            headers,
-            {
-                "model": model,
-                "temperature": 0,
-                "max_tokens": 1024,
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": text},
-                ],
-            },
-        )
+        body: dict[str, Any] = {
+            "model": model,
+            "temperature": 0,
+            "max_tokens": 1024,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": text},
+            ],
+        }
+        if response_format is not None:
+            body["response_format"] = response_format
+        out = _post(endpoint, headers, body)
         generate.last_usage = _usage(out, "prompt_tokens", "completion_tokens")  # type: ignore[attr-defined]
         return out["choices"][0]["message"]["content"]
 

@@ -16,7 +16,48 @@ Baselines are run ahead of time and stored here, never called live (docs/plan/05
 - Re-score the stored outputs without the network:
   `STORED_OUTPUTS=evals/results/opus/claude-opus-5-5.jsonl PYTHONPATH=shared:field:engine:evals python -m rescue_evals.runner --system stored --sets B,C,D --results-dir /tmp/x`
 
-### Re-scored with the PR-3 runner (2026-11-07)
+## Generic small model offline (`slm/qwen2.5-1.5b-instruct-q4_k_m.jsonl`, `slm__B.json`, `slm__C.json`, `slm__D.json`)
+
+The plan's third baseline: "a generic small model offline (similar size, not fine-tuned, same prompt)".
+Ticket #64 names no model, so this uses **Qwen2.5-1.5B-Instruct**, quantized Q4_K_M
+(`Qwen/Qwen2.5-1.5B-Instruct-GGUF@91cad51170dc346986eccefdc2dd33a9da36ead9`, file
+`qwen2.5-1.5b-instruct-q4_k_m.gguf`, sha256 `6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e`).
+Why this one: Apache-2.0, instruction-tuned but not fine-tuned on our task, multilingual (the sets mix in
+Spanish and Vietnamese), and its 1.1 GB file is about the footprint of our tagger (~1.15 GB RSS), so it fits
+the same field laptop. Qwen2.5-0.5B (closer in parameter count to our ~300M encoder) was tried first and
+produced no schema-valid output on the same prompt, which would be a straw man.
+
+- Run 2026-11-07 on the B, C and D test splits (151 cases), main at d80a9c1, fully offline on 4 CPU cores
+  with `llama-cpp-python[server]==0.3.16` (`python -m llama_cpp.server --model <gguf> --n_ctx 8192
+  --chat_format chatml --port 8081`). Median 20 s per request on this CPU (no GPU).
+- Same system prompt as Opus (`build_prompt`: task + full rubric + `extracted` schema), temperature 0.
+  `SLM_JSON_SCHEMA=1` adds schema-constrained decoding (`response_format` with the contract schema,
+  `$ref`s inlined, span labels as an enum because grammars ignore `pattern`). Without it the model's JSON
+  was close but failed validation on every case (lower-case span labels); with it 151/151 are valid.
+  Output is still validated against the real contract.
+- Rerun: start the server as above, then
+  `SLM_JSON_SCHEMA=1 SLM_ENDPOINT=http://127.0.0.1:8081/v1/chat/completions SLM_MODEL_ID=qwen2.5-1.5b-instruct-q4_k_m PYTHONPATH=shared:field:engine:evals python -m rescue_evals.baselines --system slm --split test --sets B,C,D`
+
+| metric (new runner) B / C / D | keyword | generic SLM | Opus + rubric |
+|---|---|---|---|
+| urgent missed per 1,000 urgent (headline) | 762 / 931 / n/a | 95 / 241 / n/a | 0 / 69 / n/a |
+| urgent missed per 1,000 requests | 327 / 443 / 0 | 41 / 115 / 0 | 0 / 33 / 0 |
+| Top-20 accuracy | 0.25 / 0.15 / 0.33 | 0.70 / 0.55 / 0.33 | 1.00 / 0.90 / 1.00 |
+| outcome accuracy | 0.27 / 0.26 / 0.24 | 0.63 / 0.70 / 0.07 | 0.94 / 0.90 / 0.83 |
+| tier accuracy | | 0.54 / 0.54 / 0.00 | 0.90 / 0.86 / 0.33 |
+| is_request accuracy | | 0.76 / 0.77 / 0.93 | 0.98 / 0.98 / 0.90 |
+| location exact | | 0.78 / 0.48 / 0.39 | 0.88 / 0.69 / 0.71 |
+| people count exact | | 0.65 / 0.66 / 0.29 | 0.92 / 0.79 / 0.61 |
+| hazard F1 / vulnerable F1 | | 0.41 / 0.48 / 0.42 ; 0.33 / 0.38 / 0.24 | 0.90 / 0.91 / 0.76 ; 0.84 / 0.93 / 1.00 |
+| abstain recall (D) | | 0.03 | 0.82 |
+| ECE | | 0.34 / 0.30 / 0.42 | 0.11 / 0.08 / 0.18 |
+| works offline | yes | yes | no |
+
+The generic model rarely abstains: it reports high confidence and fills in locations and counts that are not
+there, so Set D (correct answer: ask a follow-up) collapses to 0.07, and it misses many hazards and vulnerable
+people. Keyword numbers are from the PR-3 table above. The trained-model columns need a re-run with the new runner.
+
+## Opus re-scored with the PR-3 runner (2026-11-07)
 
 `opus__{B,C,D}.json` were re-scored from the stored JSONL with `--rescore` (no model calls) after
 the review PR-3 scoring fixes (definitions in `evals/README.md`). The tables below are from before

@@ -195,3 +195,23 @@ def test_mock_replies_follow_case_order_not_text():
     _, generate = llm.mock_client("opus", [case("a", "1 Oak St"), case("b", "99 Elm St")])
     # was the same reply twice (keyed by text)
     assert "1 Oak St" in generate("SOS") and "99 Elm St" in generate("SOS")
+
+
+def test_slm_constrained_decoding_is_opt_in(monkeypatch):
+    sent = []
+
+    def fake_post(url, headers, body):
+        sent.append(body)
+        return {"choices": [{"message": {"content": "{}"}}], "usage": {}}
+
+    monkeypatch.setattr(llm, "_post", fake_post)
+    env = {"SLM_ENDPOINT": "http://x/v1/chat/completions", "SLM_MODEL_ID": "m"}
+    llm.slm_client(env)[1]("help")
+    llm.slm_client({**env, "SLM_JSON_SCHEMA": "1"})[1]("help")
+    assert "response_format" not in sent[0]
+    rf = sent[1]["response_format"]
+    assert rf["type"] == "json_object" and "$schema" not in rf["schema"]
+    label = rf["schema"]["properties"]["spans"]["items"]["properties"]["label"]
+    assert "pattern" not in label and all(x.isupper() for x in label["enum"])
+    assert "$ref" not in json.dumps(rf["schema"])
+    assert sent[0]["messages"] == sent[1]["messages"]  # same prompt either way
