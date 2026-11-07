@@ -1,0 +1,40 @@
+{% extends "app/_shell.html" %}
+{% block title %}Boats · CommunityRescue{% endblock %}
+{% block content %}
+<h1>Boats</h1>
+<p class="muted">Kept on this laptop only.</p>
+{% if error %}<p class="banner" role="alert"><strong>{{ error }}</strong></p>{% endif %}
+{% if boats %}
+<ul class="boats">
+{% for b in boats %}
+<li>
+<form method="post" action="/boats/{{ b.name | urlencode }}">
+<strong>{{ b.name }}</strong>
+<label>Seats <input type="number" name="seats" min="1" max="100" value="{{ b.seats }}"></label>
+<label>Status
+<select name="status">
+{% for key, words in status_words.items() %}<option value="{{ key }}"{% if key == b.status %} selected{% endif %}>{{ words }}</option>
+{% endfor %}
+</select></label>
+<span class="muted">Last check-in {{ b.last_check_in }}</span>
+<button type="submit">Save</button>
+</form>
+<form method="post" action="/boats/{{ b.name | urlencode }}/delete"><button type="submit">Remove {{ b.name }}</button></form>
+</li>
+{% endfor %}
+</ul>
+{% else %}
+<p>No boats yet.</p>
+{% endif %}
+<h2>Add a boat</h2>
+<form method="post" action="/boats">
+<label>Name <input type="text" name="name" required maxlength="60"></label>
+<label>Seats <input type="number" name="seats" min="1" max="100" required></label>
+<label>Status
+<select name="status">
+{% for key, words in status_words.items() %}<option value="{{ key }}">{{ words }}</option>
+{% endfor %}
+</select></label>
+<button type="submit">Add boat</button>
+</form>
+{% endblock %}

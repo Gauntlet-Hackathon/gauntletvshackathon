@@ -47,3 +47,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 engine evals: generic small-model baseline (Qwen2.5-1.5B-Instruct Q4_K_M via llama.cpp, offline, same prompt + opt-in SLM_JSON_SCHEMA constrained decoding) stored for B/C/D test splits in evals/results/slm/
 2026-11-07 engine evals (proposed for Paawan): set C test rows C-050, C-057, C-060 moved to dev so no duplicate group spans splits (leakage, unscorable duplicates); opus__C.json re-scored offline, REVIEW.md and results README updated
 2026-11-07 engine evals/results README + DECISIONS: keyword, gold, v3, laya-s13 re-run on B/C/D with set C at 58 test cases (#290); pooled outcome v3 0.53 vs s13 0.66
+2026-11-07 engine field: boat roster kept on the laptop (UI-4, #295): boats table + /boats screen and JSON routes, seat_warning; never synced
