@@ -14,6 +14,7 @@ from datetime import datetime
 from typing import Any
 
 from rescue_field.shell import _ago
+from rescue_shared import logic
 
 TIER_WORDS = {"P1": "Needs help now", "P2": "Needs help soon", "P3": "Can wait"}
 CHECK_FIRST = "Check first"
@@ -177,3 +178,20 @@ def contact_line(rec: dict[str, Any], now: datetime | None = None) -> str:
     if ago:
         parts.append(ago)
     return " · ".join(parts)
+
+
+def queue_reasons(rec: dict[str, Any], now: datetime | None = None) -> list[str]:
+    """Why a request sits where it does inside its priority level, in the order the queue sorts
+    on (rubric 04, `logic.within_tier_sort_key`): vulnerable people, then people, then age."""
+    e = rec.get("extracted") or {}
+    reasons = []
+    vulnerable = logic.vulnerable_count(e)
+    if vulnerable:
+        reasons.append(f"{vulnerable} vulnerable" if vulnerable > 1 else "1 vulnerable")
+    people = (e.get("people_count") or {}).get("value") or 0
+    if people:
+        reasons.append("1 person" if people == 1 else f"{people} people")
+    ago = _ago(rec.get("received_at"), now)
+    if ago:
+        reasons.append(f"sent {ago}")
+    return reasons

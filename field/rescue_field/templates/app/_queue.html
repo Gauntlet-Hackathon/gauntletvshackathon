@@ -19,7 +19,15 @@
 </section>
 <section id="waiting" aria-labelledby="waiting-heading">
 <h1 id="waiting-heading">Waiting for help</h1>
-{% if waiting %}<ul class="queue-lines">{% for c in waiting %}{% include "app/_line.html" %}{% endfor %}</ul>
+{% if waiting %}<details class="queue-order" data-key="queue-order"><summary>How this queue is ordered</summary>
+<ol>
+<li><strong>Couldn't get there</strong> first: a crew already tried, so these people have waited longest for a boat.</li>
+<li><strong>Needs help now, then soon, then not urgent</strong>: threat to life before urgent before non-urgent.</li>
+<li><strong>Vulnerable people</strong>: more children, older, disabled or medically dependent people first, because they can't wait as long.</li>
+<li><strong>People</strong>: one trip that reaches more people first.</li>
+<li><strong>Sent</strong>: then whoever has waited longest. Next is number 1.</li>
+</ol></details>
+<ol class="queue-lines queue-numbered" start="2">{% for c in waiting %}{% set position = loop.index + 1 %}{% include "app/_line.html" %}{% endfor %}</ol>
 {% else %}<p class="muted">No one else is waiting.</p>{% endif %}
 <h2 id="check-first-heading">Check first ({{ check_first|length }})</h2>
 {% for c in check_first %}{% include "app/_card.html" %}{% else %}<p class="muted">Nothing to check.</p>{% endfor %}

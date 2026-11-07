@@ -7,10 +7,15 @@
 (() => {
   const root = document.getElementById("queue");
   const skipped = new Set();  // the cursor lives here only: skipping writes nothing
+  let picked = null;  // a Waiting line the volunteer tapped: its full card shows in Next
   function showNext() {
     const items = [...root.querySelectorAll(".next-item")];
-    const current = items.find((el) => !skipped.has(el.dataset.requestId));
+    let current = picked && items.find((el) => el.dataset.requestId === picked);
+    if (!current) { picked = null; current = items.find((el) => !skipped.has(el.dataset.requestId)); }
     items.forEach((el) => { el.hidden = el !== current; });
+    root.querySelectorAll("#waiting .queue-line").forEach((li) => {
+      li.classList.toggle("selected-line", !!picked && li.dataset.requestId === picked);
+    });
     const all = document.getElementById("all-skipped");
     const skip = document.getElementById("skip");
     if (all) all.hidden = !!current || !items.length;
@@ -39,14 +44,27 @@
     setTimeout(() => { btn.textContent = "Copy question"; }, 2000);
   }
   root.addEventListener("click", async (ev) => {
+    const open = ev.target.closest("#waiting a.line-open");
+    if (open) {
+      const id = open.closest(".queue-line").dataset.requestId;
+      const item = [...root.querySelectorAll(".next-item")].find((el) => el.dataset.requestId === id);
+      if (item) {  // show its details in place; without JS the link opens Send someone
+        ev.preventDefault();
+        picked = id; showNext();
+        const next = document.getElementById("next");
+        next.scrollIntoView({behavior: "smooth", block: "start"});
+        item.setAttribute("tabindex", "-1"); item.focus({preventScroll: true});
+        return;
+      }
+    }
     const btn = ev.target.closest("button");
     if (!btn) return;
     if (btn.id === "skip") {
       const current = [...root.querySelectorAll(".next-item")].find((el) => !el.hidden);
       if (current) skipped.add(current.dataset.requestId);
-      showNext();
+      picked = null; showNext();
     } else if (btn.id === "skip-reset") {
-      skipped.clear(); showNext();
+      skipped.clear(); picked = null; showNext();
     } else if (btn.classList.contains("copy")) {
       copy(btn.dataset.copy, btn);
     } else if (btn.classList.contains("recheck")) {
