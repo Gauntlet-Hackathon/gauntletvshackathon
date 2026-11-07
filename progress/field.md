@@ -14,3 +14,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 field #65 F9: live sync badge (GET /sync/badge fragment + _sync_badge.html, polled by board); status/offline-toggle/lifespan wiring already from F8; tests/test_sync_status.py
 2026-11-07 field #68 F10: down-sync (rescue_field/downsync.py): worker polls GET /sync/down?since=<cursor> after upload, stores other devices' valid assigned/rescued events without outbox rows, forward-only (skips repeats/backward), cursor + approved rules/model versions (previous kept for rollback) in a store meta table; malformed events skipped, down-sync errors back off
 2026-11-07 field #42 F11: HFExtractor (rescue_field/slm_hf.py): pinned-SHA offline load, JSON output mapped+schema-validated, model_version hf:<repo>@<sha>; mocked unit tests + slow real-model test
+2026-11-07 field #127 F12: ENGINE_CMD path-safe: default engine cmd built as argv list, tests quote with shlex.join, new test with a space in the path

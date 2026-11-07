@@ -1,4 +1,5 @@
 import json
+import shlex
 import sys
 import time
 from pathlib import Path
@@ -25,7 +26,7 @@ C01 = CASES["C01"]["raw_text"]
 
 def fake_engine(mode="ok"):
     """The fake engine as a real subprocess, through the app's default engine wiring."""
-    return default_decide_batch({"ENGINE_CMD": f"{sys.executable} {FAKE} {mode}"})
+    return default_decide_batch({"ENGINE_CMD": shlex.join([sys.executable, FAKE, mode])})
 
 
 class CountingBatch:
