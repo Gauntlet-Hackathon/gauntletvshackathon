@@ -122,3 +122,27 @@ def test_missing_consistency_file_is_null(tmp_path):
     _wl(tmp_path, "ours", "A", {"decision.tier_accuracy": 0.5}, _lat(5.0))
     s = build_summary(load_results(tmp_path), tmp_path)
     assert _rows(s)["consistency.pct_cases_changed"]["values"]["ours"] is None
+
+
+def test_cost_row_and_rendering(tmp_path):
+    _conditions(tmp_path)
+    doc = json.loads((tmp_path / "opus__A.json").read_text())
+    doc["running"] = {"cost_per_1000_usd": 12.5}
+    (tmp_path / "opus__A.json").write_text(json.dumps(doc))
+    s = build_summary(load_results(tmp_path), tmp_path)
+    cost = _rows(s)["running.cost_per_1000_usd"]
+    assert cost["lower_is_better"]
+    assert cost["values"] == {"regex": 0.0, "opus": 12.5, "generic_slm": None, "ours": 0.0}
+    line = next(ln for ln in render_table(s).splitlines() if "running.cost_per_1000_usd" in ln)
+    assert "$0 (local)" in line and "$12.50" in line and "n/a" in line
+
+
+def test_baseline_latency_fills_api_columns_else_null(tmp_path):
+    _conditions(tmp_path)
+    doc = json.loads((tmp_path / "opus__A.json").read_text())
+    doc["baseline_latency"] = {"total_ms_per_request": 900.0, "seconds_per_1000_requests": 900.0}
+    (tmp_path / "opus__A.json").write_text(json.dumps(doc))
+    rows = _rows(build_summary(load_results(tmp_path), tmp_path))
+    assert rows["running.mean_ms_per_request"]["values"]["opus"] == 900.0
+    assert rows["running.mean_ms_per_request"]["values"]["generic_slm"] is None
+    assert rows["running.seconds_per_1000_requests"]["values"]["opus"] == 900.0

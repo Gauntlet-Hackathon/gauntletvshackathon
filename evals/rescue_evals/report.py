@@ -33,11 +33,14 @@ COLUMNS: dict[str, tuple[str, list[str]]] = {
     "generic_slm": ("Generic SLM", ["slm", "generic-slm"]),
     "ours": ("Ours", ["ours"]),
 }
-# stored baselines replay saved outputs, so the runner's latency is not the model's (EV14 fixes it)
+# stored baselines replay saved outputs, so the runner's latency is not the model's; their real
+# model timings live in the result doc's ``baseline_latency`` block (EV14)
 STORED_BASELINES = {"opus", "generic_slm"}
 WORKS_OFFLINE = {"regex": 1, "opus": 0, "generic_slm": 1, "ours": 1}
 ROW_MS = "running.mean_ms_per_request"
 ROW_S1000 = "running.seconds_per_1000_requests"
+ROW_COST = "running.cost_per_1000_usd"
+LOCAL_COLUMNS = ("regex", "ours")
 ROW_OFFLINE = "running.works_offline"
 ROW_CONSISTENCY = "consistency.pct_cases_changed"
 OURS = "ours"
@@ -48,6 +51,7 @@ LOWER_IS_BETTER = {
     "decision.false_alarm_rate",
     ROW_MS,
     ROW_S1000,
+    ROW_COST,
     ROW_CONSISTENCY,
 }
 EPS = 1e-9
@@ -82,6 +86,17 @@ def _pool_latency(docs: list[dict[str, Any]], key: str) -> float | None:
     num = den = 0
     for d in docs:
         v = (d.get("latency") or {}).get(key)
+        n = int(d.get("n") or 0)
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            num += v * n
+            den += n
+    return num / den if den else None
+
+
+def _pool_doc(docs: list[dict[str, Any]], block: str, key: str) -> float | None:
+    num = den = 0
+    for d in docs:
+        v = (d.get(block) or {}).get(key)
         n = int(d.get("n") or 0)
         if isinstance(v, (int, float)) and not isinstance(v, bool):
             num += v * n
@@ -148,13 +163,26 @@ def _block(
         def lat(key: str) -> dict[str, float | None]:
             return {
                 c: None
-                if c in STORED_BASELINES or c not in mine_by_col
+                if c not in mine_by_col
+                else _pool_doc(mine_by_col[c], "baseline_latency", key)
+                if c in STORED_BASELINES
                 else _pool_latency(mine_by_col[c], key)
+                for c in COLUMNS
+            }
+
+        def cost() -> dict[str, float | None]:
+            return {
+                c: 0.0
+                if c in LOCAL_COLUMNS
+                else _pool_doc(mine_by_col[c], "running", "cost_per_1000_usd")
+                if c in mine_by_col
+                else None
                 for c in COLUMNS
             }
 
         rows.append(_row(ROW_MS, lat("total_ms_per_request")))
         rows.append(_row(ROW_S1000, lat("seconds_per_1000_requests")))
+        rows.append(_row(ROW_COST, cost()))
         rows.append(_row(ROW_OFFLINE, dict(WORKS_OFFLINE), rank=False))
         rows.append(_row(ROW_CONSISTENCY, {c: _consistency(results_dir, c) for c in COLUMNS}))
     return {"sets": list(sets), "n": ns, "versions": versions, "rows": rows}
@@ -188,6 +216,9 @@ def _table(block: dict[str, Any]) -> list[str]:
             s = _fmt(r["values"][c])
             if r["metric"] == ROW_OFFLINE:
                 s = "yes" if r["values"][c] else "no"
+            elif r["metric"] == ROW_COST:
+                v = r["values"][c]
+                s = "n/a" if v is None else "$0 (local)" if c in LOCAL_COLUMNS else f"${v:.2f}"
             cells.append(f"**{s}**" if c in r["best"] else s)
         arrow = "lower is better" if r["lower_is_better"] else "higher is better"
         flag = "LOSES" if r["ours_loses"] else "ok"
