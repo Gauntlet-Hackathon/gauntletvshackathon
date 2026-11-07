@@ -81,7 +81,7 @@ def test_board_shows_check_again_button(store):
     add(store, "R-1", output("P2", "R-P2-01"))
     add(store, "R-2", output(None, "R-ABS-REQ", "abstain", question="Is this a request?"))
     with TestClient(create_app(store=store)) as client:
-        html = client.get("/").text
+        html = client.get("/board").text
     assert 'class="recheck-btn" data-request-id="R-1"' in html
     assert 'class="recheck-btn" data-request-id="R-2"' in html
     assert "/recheck" in html  # the click handler
