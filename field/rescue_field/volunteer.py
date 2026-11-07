@@ -63,6 +63,7 @@ def tier_card(row: dict[str, Any]) -> dict[str, Any]:
     card["pill"] = words.tier_pill(row["tier"])
     card["status"] = row["status"]
     card["escalated"] = row["status"] == "escalated"
+    card["reasons"] = words.queue_reasons(row)
     card["why"] = words.sentence_for(row["tier_source"]["decision"].get("rule_id"))
     card["questions"] = [_question(row, q["text"], q["label"]) for q in row.get("questions") or []]
     return card

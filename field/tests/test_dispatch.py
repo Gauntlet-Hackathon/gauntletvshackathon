@@ -375,7 +375,9 @@ def test_waiting_and_out_now_lines_open_send_and_update(store, client):
     assign(client, gone)
     html = client.get("/").text
     assert f'class="line-open" href="/requests/{waiting}/send"' in section(html, "waiting")
-    assert 'aria-label="Number 2 in the queue">2</span>' in section(html, "waiting")
+    assert '<span class="sr-only">Number </span>2</span>' in section(html, "waiting")
+    assert '<span class="reason">3 people</span>' in section(html, "waiting")
+    assert "How this queue is ordered" in section(html, "waiting")
     assert "queue-pos" not in section(html, "out-now")
     assert f'class="line-open" href="/requests/{gone}/update"' in section(html, "out-now")
     assert client.get(f"/requests/{waiting}/send").status_code == 200
