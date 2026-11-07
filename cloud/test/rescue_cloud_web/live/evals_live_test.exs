@@ -82,8 +82,27 @@ defmodule RescueCloudWeb.EvalsLiveTest do
 
   test "empty state", %{conn: conn} do
     {:ok, view, _} = live(conn, ~p"/evals")
-    assert has_element?(view, "#evals-empty")
+    assert has_element?(view, "#evals-empty", "python -m rescue_evals.report")
+    refute has_element?(view, "#evals-invalid")
     assert has_element?(view, "#approved-none")
+  end
+
+  test "a corrupt summary shows an unreadable message, not the missing one", %{
+    conn: conn,
+    dir: dir
+  } do
+    File.write!(Path.join(dir, "summary.json"), "{not json")
+    {:ok, view, _} = live(conn, ~p"/evals")
+    assert has_element?(view, "#evals-invalid", "The eval results file is unreadable")
+    refute has_element?(view, "#evals-empty")
+  end
+
+  test "a summary with no rows shows neither error", %{conn: conn, dir: dir} do
+    File.write!(Path.join(dir, "summary.json"), ~s({"main": {"rows": []}}))
+    {:ok, view, _} = live(conn, ~p"/evals")
+    refute has_element?(view, "#evals-empty")
+    refute has_element?(view, "#evals-invalid")
+    assert has_element?(view, "#main-table-empty")
   end
 
   test "table has metric rows, four columns and a separate sealed column", %{conn: conn, dir: dir} do

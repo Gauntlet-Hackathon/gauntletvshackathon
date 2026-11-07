@@ -111,3 +111,8 @@ summary:focus-visible {
   outline: 3px solid currentColor;
   outline-offset: 2px;
 }
+
+/* "Loading…" shows until the LiveView socket connects (LiveView toggles phx-loading / phx-connected). */
+.loading-indicator { display: none }
+.phx-loading .loading-indicator { display: block }
+.phx-connected .loading-indicator { display: none }

@@ -106,7 +106,7 @@ defmodule RescueCloudWeb.RecordsLive do
           label="Status"
           options={[{"Any status", ""} | Records.statuses()]}
         />
-        <.button>Search</.button>
+        <.button phx-disable-with="Searching…">Search</.button>
       </.form>
 
       <p :if={@requests == []} id="records-empty">No matching requests.</p>
