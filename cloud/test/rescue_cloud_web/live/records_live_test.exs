@@ -84,6 +84,17 @@ defmodule RescueCloudWeb.RecordsLiveTest do
     assert rows(view) == Enum.map(~w(B2 E5), &("record-" <> rid(&1)))
   end
 
+  test "P1 badge shows its word and an alarm icon", %{conn: conn} do
+    {:ok, view, _} = live(conn, ~p"/records")
+
+    assert has_element?(view, "#record-#{rid("A1")} [data-role=tier]", "P1")
+
+    assert has_element?(
+             view,
+             "#record-#{rid("A1")} [data-role=tier] .hero-exclamation-triangle-solid"
+           )
+  end
+
   test "searches by text (case-insensitive, LIKE wildcards are literal)", %{conn: conn} do
     {:ok, view, _} = live(conn, ~p"/records")
 
@@ -154,5 +165,27 @@ defmodule RescueCloudWeb.RecordsLiveTest do
     {:ok, view, _} = live(conn, ~p"/records/#{rid("ZZ")}")
     assert has_element?(view, "#record-missing")
     refute has_element?(view, "#record-detail")
+  end
+
+  test "accessibility: captioned tables with column scopes", %{conn: conn} do
+    {:ok, view, html} = live(conn, ~p"/records/#{rid("C3")}")
+    assert html =~ ~s(href="#main")
+    assert has_element?(view, "main#main")
+    assert has_element?(view, "#records-table")
+    assert has_element?(view, "#record-events")
+    assert_tables_accessible(view)
+  end
+
+  defp assert_tables_accessible(view) do
+    doc = view |> render() |> LazyHTML.from_fragment()
+    tables = doc |> LazyHTML.query("table") |> Enum.to_list()
+    assert tables != []
+
+    for t <- tables do
+      assert t |> LazyHTML.query("caption") |> Enum.count() > 0
+      ths = t |> LazyHTML.query("thead th") |> Enum.to_list()
+      assert ths != []
+      assert Enum.all?(ths, &(LazyHTML.attribute(&1, "scope") == ["col"]))
+    end
   end
 end

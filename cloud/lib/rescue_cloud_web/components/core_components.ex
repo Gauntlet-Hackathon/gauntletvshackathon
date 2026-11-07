@@ -426,6 +426,40 @@ defmodule RescueCloudWeb.CoreComponents do
   end
 
   @doc """
+  A status / tier / outcome badge that never relies on colour alone: it always shows its word,
+  alarm kinds (`:alarm`) add an icon and a dashed-free double border, `:warn` a thick border.
+  The text uses the theme's base-content on base-100 (about 16.7:1 light, 12.5:1 dark); the
+  colour only tints the border.
+
+  ## Examples
+
+      <.status_badge kind={:alarm} data-role="status">offline</.status_badge>
+  """
+  attr :kind, :atom, values: [:ok, :warn, :alarm, :neutral], default: :neutral
+  attr :rest, :global
+  slot :inner_block, required: true
+
+  def status_badge(assigns) do
+    ~H"""
+    <span
+      class={[
+        "badge badge-lg gap-1 bg-base-100 text-base-content font-semibold whitespace-nowrap",
+        @kind == :ok && "border-success border-2",
+        @kind == :warn && "border-warning border-4",
+        @kind == :alarm && "border-error border-4 border-double",
+        @kind == :neutral && "border-base-content/50 border-2"
+      ]}
+      {@rest}
+    >
+      <.icon :if={@kind == :alarm} name="hero-exclamation-triangle-solid" class="size-5" />
+      <.icon :if={@kind == :warn} name="hero-clock-solid" class="size-5" />
+      <.icon :if={@kind == :ok} name="hero-check-circle-solid" class="size-5" />
+      {render_slot(@inner_block)}
+    </span>
+    """
+  end
+
+  @doc """
   Renders a [Heroicon](https://heroicons.com).
 
   Heroicons come in three styles – outline, solid, and mini.

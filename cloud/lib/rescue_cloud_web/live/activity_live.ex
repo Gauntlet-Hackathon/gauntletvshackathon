@@ -29,16 +29,21 @@ defmodule RescueCloudWeb.ActivityLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current="/activity">
-      <h1 id="activity-title" class="text-2xl font-semibold">Field activity since last sync</h1>
+      <h1 id="activity-title" class="text-3xl font-semibold">Field activity since last sync</h1>
       <p :if={@devices == []} id="activity-empty">No devices have synced events yet.</p>
 
-      <section :for={d <- @devices} id={"activity-#{d.device_id}"} class="mt-6 space-y-2">
-        <h2 class="text-xl font-semibold">{d.device_id}</h2>
-        <p class="text-sm">
+      <section
+        :for={d <- @devices}
+        id={"activity-#{d.device_id}"}
+        class="mt-6 space-y-2"
+        aria-live="polite"
+      >
+        <h2 class="text-2xl font-semibold">{d.device_id}</h2>
+        <p class="text-base">
           Latest sync: <span data-role="sync-started">{fmt(d.sync_started_at)}</span>
           to <span data-role="last-synced">{fmt(d.last_synced_at)}</span>
         </p>
-        <dl class="grid grid-cols-4 gap-2 max-w-xl">
+        <dl class="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl">
           <div>
             <dt>Requests logged</dt>
             <dd data-role="requests">{d.requests}</dd>
@@ -56,19 +61,22 @@ defmodule RescueCloudWeb.ActivityLive do
             <dd data-role="escalations">{d.escalations}</dd>
           </div>
         </dl>
-        <table class="table" id={"activity-#{d.device_id}-events"}>
+        <table class="table table-lg" id={"activity-#{d.device_id}-events"}>
+          <caption class="sr-only">Events from {d.device_id} since last sync</caption>
           <thead>
             <tr>
-              <th>Laptop time</th>
-              <th>Event</th>
-              <th>Request</th>
+              <th scope="col">Laptop time</th>
+              <th scope="col">Event</th>
+              <th scope="col">Request</th>
             </tr>
           </thead>
           <tbody>
             <tr :for={e <- d.events} id={"activity-event-#{e.event_id}"}>
               <td data-role="occurred-at">{fmt(e.occurred_at)}</td>
-              <td data-role="type">{label(e)}</td>
-              <td>
+              <td data-role="type">
+                <.status_badge kind={type_kind(label(e))}>{label(e)}</.status_badge>
+              </td>
+              <td class="break-all">
                 <.link navigate={~p"/records/#{e.request_id}"}>{e.request_id}</.link>
               </td>
             </tr>
@@ -78,6 +86,10 @@ defmodule RescueCloudWeb.ActivityLive do
     </Layouts.app>
     """
   end
+
+  defp type_kind("abstain"), do: :warn
+  defp type_kind("escalated"), do: :alarm
+  defp type_kind(_), do: :neutral
 
   defp label(%{type: "received"}), do: "request logged"
   defp label(%{type: "decided"} = e), do: if(Records.abstain?(e), do: "abstain", else: "decided")

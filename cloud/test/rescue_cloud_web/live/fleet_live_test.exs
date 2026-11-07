@@ -49,6 +49,20 @@ defmodule RescueCloudWeb.FleetLiveTest do
     end
   end
 
+  test "alarm states carry an icon, not only a colour; layout is wide", %{conn: conn} do
+    beat("dev-a", DateTime.add(@t0, -10 * 60))
+    beat("dev-b", DateTime.add(@t0, -40 * 60))
+    beat("dev-c", DateTime.add(@t0, -60))
+    {:ok, view, html} = live(conn, ~p"/fleet")
+
+    assert has_element?(view, "#device-dev-a [data-role=status] .hero-clock-solid")
+    assert has_element?(view, "#device-dev-b [data-role=status] .hero-exclamation-triangle-solid")
+    assert has_element?(view, "#device-dev-b [data-role=status]", "offline")
+    refute has_element?(view, "#device-dev-c [data-role=status] .hero-exclamation-triangle-solid")
+    refute html =~ "max-w-2xl"
+    assert html =~ "max-w-7xl"
+  end
+
   test "shows status, last connection, backlog and versions", %{conn: conn} do
     beat("dev-a", DateTime.add(@t0, -10 * 60), 7)
     beat("dev-b", DateTime.add(@t0, -40 * 60))
@@ -91,5 +105,27 @@ defmodule RescueCloudWeb.FleetLiveTest do
   test "empty state", %{conn: conn} do
     {:ok, view, _} = live(conn, ~p"/fleet")
     assert has_element?(view, "#fleet-empty")
+  end
+
+  test "accessibility: skip link, main, live region, captioned table", %{conn: conn} do
+    beat("field-03", @t0)
+    {:ok, view, html} = live(conn, ~p"/fleet")
+    assert html =~ ~s(href="#main")
+    assert has_element?(view, "main#main")
+    assert has_element?(view, "#fleet-table[aria-live=polite]")
+    assert_tables_accessible(view)
+  end
+
+  defp assert_tables_accessible(view) do
+    doc = view |> render() |> LazyHTML.from_fragment()
+    tables = doc |> LazyHTML.query("table") |> Enum.to_list()
+    assert tables != []
+
+    for t <- tables do
+      assert t |> LazyHTML.query("caption") |> Enum.count() > 0
+      ths = t |> LazyHTML.query("thead th") |> Enum.to_list()
+      assert ths != []
+      assert Enum.all?(ths, &(LazyHTML.attribute(&1, "scope") == ["col"]))
+    end
   end
 end

@@ -78,7 +78,7 @@ defmodule RescueCloudWeb.DashboardLive do
         </p>
       </section>
 
-      <section id="replay-summary" class="mt-6 space-y-2">
+      <section id="replay-summary" class="mt-6 space-y-2" aria-live="polite">
         <h2 class="text-xl font-semibold">Replay verifier</h2>
         <p>
           <span
@@ -91,7 +91,7 @@ defmodule RescueCloudWeb.DashboardLive do
           · <span id="replay-missing">{@replay["missing_version"]} missing version</span>
           · <span id="replay-errors">{@replay["error"]} engine errors</span>
         </p>
-        <.button id="replay-verify" phx-click="verify">Verify decisions</.button>
+        <.button id="replay-verify" phx-click="verify" phx-disable-with="Verifying…">Verify decisions</.button>
       </section>
     </Layouts.app>
     """

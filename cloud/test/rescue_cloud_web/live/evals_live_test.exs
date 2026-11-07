@@ -82,8 +82,27 @@ defmodule RescueCloudWeb.EvalsLiveTest do
 
   test "empty state", %{conn: conn} do
     {:ok, view, _} = live(conn, ~p"/evals")
-    assert has_element?(view, "#evals-empty")
+    assert has_element?(view, "#evals-empty", "python -m rescue_evals.report")
+    refute has_element?(view, "#evals-invalid")
     assert has_element?(view, "#approved-none")
+  end
+
+  test "a corrupt summary shows an unreadable message, not the missing one", %{
+    conn: conn,
+    dir: dir
+  } do
+    File.write!(Path.join(dir, "summary.json"), "{not json")
+    {:ok, view, _} = live(conn, ~p"/evals")
+    assert has_element?(view, "#evals-invalid", "The eval results file is unreadable")
+    refute has_element?(view, "#evals-empty")
+  end
+
+  test "a summary with no rows shows neither error", %{conn: conn, dir: dir} do
+    File.write!(Path.join(dir, "summary.json"), ~s({"main": {"rows": []}}))
+    {:ok, view, _} = live(conn, ~p"/evals")
+    refute has_element?(view, "#evals-empty")
+    refute has_element?(view, "#evals-invalid")
+    assert has_element?(view, "#main-table-empty")
   end
 
   test "table has metric rows, four columns and a separate sealed column", %{conn: conn, dir: dir} do
@@ -135,5 +154,32 @@ defmodule RescueCloudWeb.EvalsLiveTest do
 
     view |> element("#main-table-link-decision\\.p1_misses_per_1000") |> render_click()
     assert has_element?(view, "#failing-empty")
+  end
+
+  test "accessibility: captioned tables with column scopes", %{conn: conn, dir: dir} do
+    write_summary(dir)
+    model!(@v1, "approved", %{"reasons" => []})
+    Fleet.record_heartbeat("laptop-dev-01", hb(@v1), ~U[2026-11-07 00:00:00Z])
+    {:ok, view, html} = live(conn, ~p"/evals")
+    assert html =~ ~s(href="#main")
+    assert has_element?(view, "main#main")
+
+    for id <- ~w(main-table sealed-table history-table devices-table),
+        do: assert(has_element?(view, "table##{id}"))
+
+    assert_tables_accessible(view)
+  end
+
+  defp assert_tables_accessible(view) do
+    doc = view |> render() |> LazyHTML.from_fragment()
+    tables = doc |> LazyHTML.query("table") |> Enum.to_list()
+    assert tables != []
+
+    for t <- tables do
+      assert t |> LazyHTML.query("caption") |> Enum.count() > 0
+      ths = t |> LazyHTML.query("thead th") |> Enum.to_list()
+      assert ths != []
+      assert Enum.all?(ths, &(LazyHTML.attribute(&1, "scope") == ["col"]))
+    end
   end
 end

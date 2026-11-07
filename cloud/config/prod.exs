@@ -17,7 +17,8 @@ config :rescue_cloud, RescueCloudWeb.Endpoint,
     exclude: [
       # Platform health probes (Fly checks hit the machine over plain HTTP, no x-forwarded-proto).
       paths: ["/healthz", "/health"],
-      hosts: ["localhost", "127.0.0.1"]
+      # "cloud" is the docker compose service name the field app syncs to over plain HTTP.
+      hosts: ["localhost", "127.0.0.1", "cloud"]
     ]
   ]
 

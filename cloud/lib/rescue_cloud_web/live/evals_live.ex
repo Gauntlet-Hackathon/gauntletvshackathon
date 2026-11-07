@@ -38,12 +38,18 @@ defmodule RescueCloudWeb.EvalsLive do
   def handle_info(_, socket), do: {:noreply, socket}
 
   defp load(socket) do
-    summary = EvalResults.summary()
+    {summary, summary_error} =
+      case EvalResults.summary_status() do
+        {:ok, doc} -> {doc, nil}
+        {:error, reason} -> {nil, reason}
+      end
+
     models = Models.list()
     by_version = Map.new(models, &{&1.model_version, &1})
 
     assign(socket,
       summary: summary,
+      summary_error: summary_error,
       models: models,
       devices: Fleet.list_heartbeats(),
       approved: Enum.find(models, &(&1.status == "approved")),
@@ -73,11 +79,12 @@ defmodule RescueCloudWeb.EvalsLive do
   defp metrics_table(assigns) do
     ~H"""
     <p :if={@block["rows"] in [nil, []]} id={"#{@id}-empty"}>No results yet.</p>
-    <table :if={@block["rows"] not in [nil, []]} id={@id} class="table">
+    <table :if={@block["rows"] not in [nil, []]} id={@id} class="table table-lg">
+      <caption class="sr-only">Eval metrics</caption>
       <thead>
         <tr>
-          <th>Metric</th>
-          <th :for={{key, label} <- @columns} data-col={key}>{label}</th>
+          <th scope="col">Metric</th>
+          <th :for={{key, label} <- @columns} scope="col" data-col={key}>{label}</th>
         </tr>
       </thead>
       <tbody>
@@ -90,7 +97,9 @@ defmodule RescueCloudWeb.EvalsLive do
             >
               {row["metric"]}
             </.link>
-            <span :if={row["ours_loses"]} data-role="loses" class="badge badge-warning">ours loses</span>
+            <.status_badge :if={row["ours_loses"]} kind={:alarm} data-role="loses">
+              ours loses
+            </.status_badge>
           </td>
           <td
             :for={{key, _} <- @columns}
@@ -109,21 +118,26 @@ defmodule RescueCloudWeb.EvalsLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current="/evals">
-      <h1 id="evals-title" class="text-2xl font-semibold">Evals</h1>
-      <p :if={@summary == nil} id="evals-empty">No eval results published yet.</p>
+      <h1 id="evals-title" class="text-3xl font-semibold">Evals</h1>
+      <p :if={@summary_error == :missing} id="evals-empty">
+        No eval results yet: run <code>python -m rescue_evals.report</code>
+      </p>
+      <p :if={@summary_error == :invalid} id="evals-invalid" role="alert">
+        The eval results file is unreadable
+      </p>
 
       <section :if={@summary} id="evals-main">
-        <h2 class="text-xl font-semibold">Development sets A-D</h2>
+        <h2 class="text-2xl font-semibold">Development sets A-D</h2>
         <.metrics_table block={@summary["main"] || %{}} id="main-table" columns={@columns} />
       </section>
 
       <section :if={@summary} id="evals-sealed">
-        <h2 class="text-xl font-semibold">Sealed holdout (set E)</h2>
+        <h2 class="text-2xl font-semibold">Sealed holdout (set E)</h2>
         <.metrics_table block={@summary["sealed"] || %{}} id="sealed-table" columns={@columns} />
       </section>
 
       <section :if={@metric} id="failing-cases">
-        <h2 class="text-xl font-semibold">Failing cases: {@metric}</h2>
+        <h2 class="text-2xl font-semibold">Failing cases: {@metric}</h2>
         <p :if={@failures == []} id="failing-empty">No failing cases recorded for this metric.</p>
         <div :for={f <- @failures} id={"failing-#{f.system}-#{f.set}"}>
           <h3>{f.system} / set {f.set} ({length(f.ids)})</h3>
@@ -134,7 +148,7 @@ defmodule RescueCloudWeb.EvalsLive do
       </section>
 
       <section id="evals-approved">
-        <h2 class="text-xl font-semibold">Approved model</h2>
+        <h2 class="text-2xl font-semibold">Approved model</h2>
         <p :if={@approved == nil} id="approved-none">No approved model.</p>
         <p :if={@approved} id="approved-model">
           <a href={"#model-#{@approved.model_version}"}>{@approved.model_version}</a>
@@ -142,20 +156,23 @@ defmodule RescueCloudWeb.EvalsLive do
       </section>
 
       <section id="evals-history">
-        <h2 class="text-xl font-semibold">Candidate history</h2>
+        <h2 class="text-2xl font-semibold">Candidate history</h2>
         <p :if={@models == []} id="history-empty">No candidates yet.</p>
-        <table :if={@models != []} id="history-table" class="table">
+        <table :if={@models != []} id="history-table" class="table table-lg">
+          <caption class="sr-only">Model candidates and verdicts</caption>
           <thead>
             <tr>
-              <th>Model</th>
-              <th>Verdict</th>
-              <th>Why</th>
+              <th scope="col">Model</th>
+              <th scope="col">Verdict</th>
+              <th scope="col">Why</th>
             </tr>
           </thead>
           <tbody>
             <tr :for={m <- @models} id={"model-#{m.model_version}"}>
-              <td>{m.model_version}</td>
-              <td data-role="verdict">{verdict(m)}</td>
+              <td class="break-all">{m.model_version}</td>
+              <td data-role="verdict">
+                <.status_badge kind={verdict_kind(verdict(m))}>{verdict(m)}</.status_badge>
+              </td>
               <td data-role="reasons">
                 <span :for={r <- reasons(m)} class="block">{r}</span>
               </td>
@@ -165,19 +182,20 @@ defmodule RescueCloudWeb.EvalsLive do
       </section>
 
       <section id="evals-devices">
-        <h2 class="text-xl font-semibold">Devices</h2>
+        <h2 class="text-2xl font-semibold">Devices</h2>
         <p :if={@devices == []} id="devices-empty">No devices have synced yet.</p>
-        <table :if={@devices != []} id="devices-table" class="table">
+        <table :if={@devices != []} id="devices-table" class="table table-lg">
+          <caption class="sr-only">Device model versions and scores</caption>
           <thead>
             <tr>
-              <th>Device</th>
-              <th>Model version</th>
-              <th>Scores</th>
+              <th scope="col">Device</th>
+              <th scope="col">Model version</th>
+              <th scope="col">Scores</th>
             </tr>
           </thead>
           <tbody>
             <tr :for={d <- @devices} id={"device-#{d.device_id}"}>
-              <td>{d.device_id}</td>
+              <td class="break-all">{d.device_id}</td>
               <td data-role="device-model">
                 <a
                   :if={Map.has_key?(@by_version, d.model_version)}
@@ -204,6 +222,10 @@ defmodule RescueCloudWeb.EvalsLive do
     </Layouts.app>
     """
   end
+
+  defp verdict_kind("fail"), do: :alarm
+  defp verdict_kind("pending"), do: :neutral
+  defp verdict_kind(_), do: :ok
 
   defp verdict(%{status: "approved"}), do: "pass (approved)"
   defp verdict(%{status: "superseded"}), do: "pass (superseded)"

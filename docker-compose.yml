@@ -1,0 +1,51 @@
+# Whole system locally: `cp .env.example .env`, set SECRET_KEY_BASE, `docker compose up --build`.
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: rescue_cloud
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d rescue_cloud"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  cloud:
+    build: ./cloud
+    command: ["sh", "-c", "/app/bin/migrate && exec /app/bin/server"]
+    environment:
+      DATABASE_URL: ecto://postgres:postgres@db/rescue_cloud
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:?copy .env.example to .env and set SECRET_KEY_BASE}
+      PHX_HOST: localhost
+      PORT: "4000"
+      DEVICE_TOKENS: laptop-dev-01:dev-token-laptop-dev-01
+    ports:
+      - "4000:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  field:
+    build:
+      context: .
+      dockerfile: field/Dockerfile
+    environment:
+      CLOUD_URL: http://cloud:4000
+      DEVICE_ID: laptop-dev-01
+      DEVICE_TOKEN: dev-token-laptop-dev-01
+      FIELD_DATA_DIR: /data
+      PORT: "8000"
+    ports:
+      - "8000:8000"
+    volumes:
+      - fielddata:/data
+    depends_on:
+      - cloud
+
+volumes:
+  dbdata:
+  fielddata:
