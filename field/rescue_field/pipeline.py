@@ -13,9 +13,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from field_app import engine_client
-from field_app.slm import Extractor, FixtureExtractor
-from field_app.store import EventStore
+from rescue_field import engine_client
+from rescue_field.slm import Extractor, FixtureExtractor
+from rescue_field.store import EventStore
 from rescue_shared import logic
 from rescue_shared.contracts_io import CONTRACTS, validator_for
 from rescue_shared.ulid import new_ulid

@@ -1,6 +1,6 @@
 import pytest
 
-from field_app.store import EventStore
+from rescue_field.store import EventStore
 
 
 def ev(n, request_id="R1"):

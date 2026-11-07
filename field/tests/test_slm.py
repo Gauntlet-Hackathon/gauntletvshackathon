@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from field_app.slm import STUB_MODEL_VERSION, Extractor, FixtureExtractor, validate_extracted
+from rescue_field.slm import STUB_MODEL_VERSION, Extractor, FixtureExtractor, validate_extracted
 from rescue_shared.contracts_io import CONTRACTS
 
 CASES = [
