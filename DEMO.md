@@ -13,6 +13,9 @@ deploy details are in [RUNBOOK.md](RUNBOOK.md). Placeholders `<cloud-app>` and `
 - [ ] Check the demo fleet thresholds `FLEET_STALE_AFTER_S` / `FLEET_OFFLINE_AFTER_S` (defaults 300 s / 1800 s, see
       [cloud/README.md](cloud/README.md)). For a 3-minute demo, set the stale threshold well below 3 minutes so the
       row turns stale while the laptop is offline.
+- [ ] Warm up the field app: paste one throwaway request on the board (or `curl -X POST https://<field-app>.fly.dev/requests -d raw_text=warmup`).
+      The first request after a deploy or restart took about 25 s on Fly while the model and engine warmed up; later ones take about 0.3 s.
+      Reset afterwards (section 2) if the board must start empty.
 - [ ] Open three tabs: the field board (`https://<field-app>.fly.dev/`), the cloud fleet page (`/fleet`) and `/evals`.
 - [ ] Have the backup video ready to play offline.
 
