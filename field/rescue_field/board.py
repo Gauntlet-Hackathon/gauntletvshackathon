@@ -30,12 +30,15 @@ from starlette.concurrency import run_in_threadpool
 from rescue_field.shell import model_banner
 from rescue_field.status import ORDER, RANK
 from rescue_field.store import EventStore
+from rescue_field.words_es import spanish_line
 from rescue_shared import logic
 
 TIERS = ("P1", "P2", "P3")
 # The `possible_hoax` follow-up text (contracts/engine_rules.md, "Follow-up questions").
 Q_HOAX = "Can you confirm this request is real and tell us exactly what help you need?"
 templates = Jinja2Templates(directory=str(Path(__file__).with_name("templates")))
+# "En español" line under a follow-up question on a Spanish request (UI-10).
+templates.env.globals["spanish_line"] = spanish_line
 router = APIRouter()
 
 
@@ -51,6 +54,7 @@ def _requests(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
             rec["received_at"] = ev["occurred_at"]
             rec["raw_text"] = ev["payload"].get("raw_text")
             rec["channel"] = ev["payload"].get("channel")
+            rec["lang_hint"] = ev["payload"].get("lang_hint")
         elif kind == "extracted":
             rec["extracted"] = ev["payload"]
             rec["model_version"] = ev["model_version"]

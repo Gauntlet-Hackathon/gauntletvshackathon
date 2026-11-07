@@ -11,7 +11,8 @@
   </div>
   {% for q in r.questions %}
   <div class="needs-confirmation"><strong class="confirm-label">{{ q.label }}</strong>:
-    <span class="question">{{ q.text }}</span></div>
+    <span class="question">{{ q.text }}</span>
+    {% set es = spanish_line(r, q.text) %}{% if es %}<div class="question-es" lang="es">En español: {{ es }}</div>{% endif %}</div>
   {% endfor %}
   {% set loc = r.extracted.location.text %}
   <form class="status-form" data-request-id="{{ r.request_id }}">

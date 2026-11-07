@@ -10,6 +10,7 @@
   <div class="row" data-request-id="{{ r.request_id }}" data-provisional-tier="{{ r.provisional_tier or '' }}">
     {% if r.provisional_tier %}<span class="provisional-tier tier-{{ r.provisional_tier }}" title="Provisional tier (most cautious reading)">{{ r.provisional_tier }}?</span>{% endif %}
     <strong class="question">{{ r.decision.follow_up_question }}</strong>
+    {% set es = spanish_line(r, r.decision.follow_up_question) %}{% if es %}<div class="question-es" lang="es">En español: {{ es }}</div>{% endif %}
     {% if r.grouped_tier %}<span class="grouped" data-grouped-tier="{{ r.grouped_tier }}">(grouped under a {{ r.grouped_tier }} row on the board)</span>{% endif %}
     <div class="meta">{{ r.decision.abstain_reason }} · {{ r.decision.rule_id }} ·
       rules {{ r.rules_version }} · model {{ r.model_version }} · {{ r.received_at }}</div>
