@@ -33,6 +33,7 @@ from rescue_field import engine_client, freeze
 from rescue_field import status as status_module
 from rescue_field import sync as sync_module
 from rescue_field.pipeline import BatchDecider, IntakeItem, PipelineConfig, process_batch
+from rescue_field.sanitize import clean_text
 from rescue_field.slm import Extractor, FixtureExtractor
 from rescue_field.store import EventStore
 
@@ -40,7 +41,15 @@ CHANNELS = ("sms", "social", "form", "call_note", "csv")
 SINGLE_DEFAULT_CHANNEL = "form"
 BULK_DEFAULT_CHANNEL = "csv"
 MAX_TEXT_CHARS = 5000
+# A contact is a phone number, handle or short note; longer values once wedged the sync outbox
+# (a single event over the cloud's 8 MB body limit, review O-01).
+MAX_CONTACT_CHARS = 200
 MAX_BULK_ROWS = 1000
+# Request body caps (review F-02): bulk uploads may carry MAX_BULK_ROWS rows, every other route
+# takes one small JSON object or form. Read at request time, so tests can lower them.
+MAX_BODY_BYTES = 64 * 1024
+MAX_BULK_BODY_BYTES = 8 * 1024 * 1024
+BULK_PATH = "/requests/bulk"
 DEFAULT_DATA_DIR = "./data"
 DB_FILENAME = "field.db"
 _LANG_RE = re.compile(r"^[a-z]{2}$")
@@ -64,6 +73,63 @@ class InputError(Exception):
         super().__init__(detail)
         self.detail = detail
         self.row = row
+
+
+class _BodyTooLarge(Exception):
+    """Raised from the wrapped `receive` once a streamed body passes the cap (never a
+    ValueError, so no route's own error handling swallows it)."""
+
+
+def _body_limit(path: str) -> int:
+    return MAX_BULK_BODY_BYTES if path == BULK_PATH else MAX_BODY_BYTES
+
+
+class BodySizeLimit:
+    """ASGI middleware: 413 for a request body over the cap, judged by Content-Length when it
+    is sent and by counting the chunks as they arrive otherwise (chunked uploads), so an
+    oversized body is never read into memory whole."""
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        limit = _body_limit(scope.get("path", ""))
+
+        async def too_large() -> None:
+            detail = f"request body is over {limit} bytes"
+            await _error(413, "payload_too_large", detail)(scope, receive, send)
+
+        for name, value in scope.get("headers", []):
+            if name == b"content-length" and value.strip().isdigit() and int(value) > limit:
+                await too_large()
+                return
+        seen = 0
+        started = False
+
+        async def limited_receive() -> Any:
+            nonlocal seen
+            message = await receive()
+            if message["type"] == "http.request":
+                seen += len(message.get("body", b""))
+                if seen > limit:
+                    raise _BodyTooLarge
+            return message
+
+        async def tracking_send(message: Any) -> None:
+            nonlocal started
+            if message["type"] == "http.response.start":
+                started = True
+            await send(message)
+
+        try:
+            await self.app(scope, limited_receive, tracking_send)
+        except _BodyTooLarge:
+            if started:
+                raise
+            await too_large()
 
 
 def data_dir(env: Mapping[str, str] | None = None) -> Path:
@@ -137,11 +203,13 @@ def _optional(fields: Mapping[str, Any], key: str, row: int | None) -> str | Non
         return None
     if not isinstance(value, str):
         raise InputError(f"{key} must be a string", row)
-    return value.strip() or None
+    return clean_text(value).strip() or None
 
 
 def _item(fields: Mapping[str, Any], default_channel: str, row: int | None = None) -> IntakeItem:
     raw = fields.get("raw_text")
+    if isinstance(raw, str):
+        raw = clean_text(raw)  # no NUL or lone surrogate ever reaches the store (H-02)
     if not isinstance(raw, str) or not raw.strip():
         raise InputError("raw_text is required and must be non-empty text", row)
     if len(raw) > MAX_TEXT_CHARS:
@@ -150,6 +218,8 @@ def _item(fields: Mapping[str, Any], default_channel: str, row: int | None = Non
     if channel not in CHANNELS:
         raise InputError(f"channel must be one of {', '.join(CHANNELS)}", row)
     contact = _optional(fields, "contact", row)
+    if contact is not None and len(contact) > MAX_CONTACT_CHARS:
+        raise InputError(f"contact is longer than {MAX_CONTACT_CHARS} characters", row)
     lang_hint = _optional(fields, "lang_hint", row)
     if lang_hint is not None:
         lang_hint = lang_hint.lower()
@@ -397,6 +467,7 @@ def create_app(
     app.state.config = config or PipelineConfig.from_env()
     app.state.intake_lock = threading.Lock()
     app.state.sync_worker = None
+    app.add_middleware(BodySizeLimit)
     app.include_router(router)
     app.include_router(sync_module.router)
     app.include_router(board_module.router)

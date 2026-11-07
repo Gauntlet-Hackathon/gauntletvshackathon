@@ -84,7 +84,7 @@ class EventStore:
                         ev["request_id"],
                         ev["type"],
                         ev["occurred_at"],
-                        json.dumps(ev, separators=(",", ":")),
+                        json.dumps(ev, separators=(",", ":"), allow_nan=False),
                     ),
                 )
                 if cur.rowcount:
