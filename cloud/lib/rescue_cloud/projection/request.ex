@@ -14,6 +14,8 @@ defmodule RescueCloud.Projection.Request do
     field :channel, :string
     field :raw_text, :string
     field :contact, :string
+    field :incident, :string
+    field :sample, :boolean, default: false
     field :extracted, :map
     field :location_text, :string
     field :people_count, :integer
@@ -33,7 +35,7 @@ defmodule RescueCloud.Projection.Request do
     field :last_event_at, :utc_datetime
   end
 
-  @fields ~w(request_id status received_at device_id channel raw_text contact extracted
+  @fields ~w(request_id status received_at device_id channel raw_text contact incident sample extracted
              location_text people_count outcome priority_tier provisional_tier rule_id
              abstain_reason follow_up_question duplicate_of rules_version model_version duplicate_group
              correction_count event_count last_event_seq last_event_at)a

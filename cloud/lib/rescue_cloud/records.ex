@@ -32,7 +32,8 @@ defmodule RescueCloud.Records do
 
   @doc """
   Searches requests. Filters (string keys, blank values ignored):
-    * `"q"`: case-insensitive substring of raw text, location, contact or request id
+    * `"q"`: case-insensitive substring of raw text, location, contact, incident number or
+      request id
     * `"tier"`: `P1` | `P2` | `P3`, matching `priority_tier` or an abstain's `provisional_tier`
     * `"status"`: a request status
   Ordered by tier, where an abstain follow-up counts at its `provisional_tier` (DECISIONS R1),
@@ -60,29 +61,33 @@ defmodule RescueCloud.Records do
 
   @doc """
   Request totals from one grouped query (no row limit):
-  `%{total, p1, p2, p3, follow_up}`. `follow_up` counts requests whose engine outcome is
-  `abstain` (the engine asked a follow-up question instead of ranking).
+  `%{total, p1, p2, p3, follow_up, samples}`. `follow_up` counts requests whose engine outcome
+  is `abstain` (the engine asked a follow-up question instead of ranking). Grader-mode samples
+  (`received.sample` true, #305) are left out of every other count and counted in `samples`.
   """
   @spec counts() :: %{
           total: non_neg_integer(),
           p1: non_neg_integer(),
           p2: non_neg_integer(),
           p3: non_neg_integer(),
-          follow_up: non_neg_integer()
+          follow_up: non_neg_integer(),
+          samples: non_neg_integer()
         }
   def counts do
     rows =
       Repo.all(
         from r in Request,
-          group_by: [r.priority_tier, r.outcome],
-          select: {r.priority_tier, r.outcome, count(r.request_id)}
+          group_by: [r.sample, r.priority_tier, r.outcome],
+          select: {r.sample, r.priority_tier, r.outcome, count(r.request_id)}
       )
 
-    Enum.reduce(rows, %{total: 0, p1: 0, p2: 0, p3: 0, follow_up: 0}, fn {tier, outcome, n},
-                                                                         acc ->
-      acc = %{acc | total: acc.total + n}
+    zero = %{total: 0, p1: 0, p2: 0, p3: 0, follow_up: 0, samples: 0}
+
+    Enum.reduce(rows, zero, fn {sample, tier, outcome, n}, acc ->
+      acc = if sample, do: acc, else: %{acc | total: acc.total + n}
 
       cond do
+        sample -> %{acc | samples: acc.samples + n}
         outcome == "abstain" -> %{acc | follow_up: acc.follow_up + n}
         tier == "P1" -> %{acc | p1: acc.p1 + n}
         tier == "P2" -> %{acc | p2: acc.p2 + n}
@@ -104,7 +109,8 @@ defmodule RescueCloud.Records do
     from r in query,
       where:
         ilike(r.raw_text, ^pattern) or ilike(r.location_text, ^pattern) or
-          ilike(r.contact, ^pattern) or ilike(r.request_id, ^pattern)
+          ilike(r.contact, ^pattern) or ilike(r.incident, ^pattern) or
+          ilike(r.request_id, ^pattern)
   end
 
   defp filter_tier(query, nil), do: query

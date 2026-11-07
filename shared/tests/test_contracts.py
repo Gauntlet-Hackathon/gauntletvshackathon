@@ -41,6 +41,32 @@ def example(key: str, kind: str):
     return load_json(CONTRACTS / "examples" / f"{key}.{kind}.json")
 
 
+# Extra examples for optional properties added later: contracts/examples/extra/<key>.<kind>.json.
+# Each key's main valid example stays the old shape, so it also proves backward compatibility.
+EXTRA = sorted(
+    (p.name.split(".")[0], p.name.split(".")[1])
+    for p in (CONTRACTS / "examples" / "extra").glob("*.json")
+)
+
+
+def test_extra_examples_belong_to_mapped_keys():
+    assert EXTRA and {key for key, _ in EXTRA} <= set(CONTRACT_MAP)
+
+
+@pytest.mark.parametrize(("key", "kind"), EXTRA)
+def test_extra_example_schema_and_model_agree(key, kind):
+    data = load_json(CONTRACTS / "examples" / "extra" / f"{key}.{kind}.json")
+    errors = list(validator_for(CONTRACT_MAP[key][0]).iter_errors(data))
+    model = CONTRACT_MAP[key][1]
+    if kind == "valid":
+        assert errors == []
+        assert model.model_validate(data).model_dump(mode="json") == data
+    else:
+        assert errors != []
+        with pytest.raises(ValidationError):
+            model.model_validate(data)
+
+
 def test_every_schema_is_mapped_and_has_both_examples():
     schemas = {p.relative_to(CONTRACTS).as_posix() for p in CONTRACTS.rglob("*.schema.json")}
     assert schemas - {"common.schema.json"} == {path for path, _ in CONTRACT_MAP.values()}

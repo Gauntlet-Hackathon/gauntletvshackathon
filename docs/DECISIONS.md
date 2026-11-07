@@ -267,3 +267,8 @@ Decisions taken while fixing the three-model review (reviews 01-03; PRs #264, #2
   groups give fewer pairs. Known label issue for the human set review, not fixed in code.
 - **O-05:** the tagger truncates input at 256 tokens (`tagger/model.py` `max_length`, `infer.py` `truncation=True`)
   while intake accepts up to 5,000 characters (`MAX_TEXT_CHARS`); text past the limit is not read by the model.
+- **Incident number and sample flag (#305):** `received` gains two optional properties, `incident`
+  (`^[A-Z0-9]{1,4}-[0-9]{4,6}$`, a per-laptop prefix keeps numbers unique offline) and `sample` (grader-mode samples).
+  Optional means "not in `required`": every older payload stays valid, and the Pydantic model leaves an unset optional
+  out of `model_dump` so old payloads still round-trip. The cloud projects them to `requests.incident` / `sample`; the
+  dashboard request counts leave samples out ("samples hidden: N").

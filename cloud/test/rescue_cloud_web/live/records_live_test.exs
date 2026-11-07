@@ -188,4 +188,32 @@ defmodule RescueCloudWeb.RecordsLiveTest do
       assert Enum.all?(ths, &(LazyHTML.attribute(&1, "scope") == ["col"]))
     end
   end
+
+  describe "incident number and sample flag (#305)" do
+    setup do
+      payload = Map.merge(payload("received"), %{"incident" => "A-0147", "sample" => true})
+      sync!([event("D4", 1, "received", "2026-11-07T14:07:00Z", payload: payload)], @t)
+      :ok
+    end
+
+    test "list and detail show the incident number; search finds it", %{conn: conn} do
+      {:ok, view, _} = live(conn, ~p"/records")
+      assert has_element?(view, "#record-#{rid("D4")} [data-role=incident]", "A-0147")
+      assert has_element?(view, "#record-#{rid("D4")}", "sample")
+      refute has_element?(view, "#record-#{rid("A1")} [data-role=incident]")
+
+      {:ok, view, _} = live(conn, ~p"/records/#{rid("D4")}")
+      assert has_element?(view, "#record-detail [data-role=incident]", "A-0147")
+      assert has_element?(view, "#record-detail [data-role=sample]")
+
+      {:ok, view, _} = live(conn, ~p"/records?q=a-0147")
+      assert rows(view) == ["record-" <> rid("D4")]
+    end
+
+    test "requests without the fields show neither", %{conn: conn} do
+      {:ok, view, _} = live(conn, ~p"/records/#{rid("A1")}")
+      refute has_element?(view, "#record-detail [data-role=incident]")
+      refute has_element?(view, "#record-detail [data-role=sample]")
+    end
+  end
 end
