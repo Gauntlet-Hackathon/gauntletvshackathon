@@ -41,19 +41,18 @@ if config_env() == :dev do
 end
 
 if config_env() == :prod do
-  case System.get_env("DEVICE_TOKENS") do
-    nil ->
-      :ok
+  # DEVICE_TOKENS="id1:token1, id2:token2" -> %{"id1" => "token1", "id2" => "token2"}.
+  # Whitespace is trimmed; empty or malformed entries are skipped; unset/empty keeps the default map.
+  device_tokens =
+    for pair <- String.split(System.get_env("DEVICE_TOKENS") || "", ","),
+        [id, token] <- [String.split(pair, ":", parts: 2)],
+        id = String.trim(id),
+        token = String.trim(token),
+        id != "" and token != "",
+        into: %{},
+        do: {id, token}
 
-    raw ->
-      devices =
-        for pair <- String.split(raw, ",", trim: true),
-            [id, token] = String.split(pair, ":", parts: 2),
-            into: %{},
-            do: {id, token}
-
-      config :rescue_cloud, :devices, devices
-  end
+  if device_tokens != %{}, do: config(:rescue_cloud, :devices, device_tokens)
 
   database_url =
     System.get_env("DATABASE_URL") ||
