@@ -103,3 +103,11 @@
 [data-phx-session], [data-phx-teleported-src] { display: contents }
 
 /* This file is for your main application CSS */
+
+/* Visible keyboard focus on links and buttons (accessibility). */
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 2px;
+}

@@ -113,4 +113,12 @@ defmodule RescueCloudWeb.DashboardLiveTest do
     {:ok, fleet, _} = live(conn, ~p"/fleet")
     assert has_element?(fleet, ~s|nav a[aria-current="page"]|, "Fleet")
   end
+
+  test "accessibility: skip link, main landmark and replay live region", %{conn: conn} do
+    {:ok, view, html} = live(conn, ~p"/")
+    assert html =~ ~s(href="#main")
+    assert html =~ "Skip to content"
+    assert has_element?(view, "main#main")
+    assert has_element?(view, "#replay-summary[aria-live=polite]")
+  end
 end

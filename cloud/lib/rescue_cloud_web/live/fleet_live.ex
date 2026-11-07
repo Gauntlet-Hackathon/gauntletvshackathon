@@ -128,15 +128,16 @@ defmodule RescueCloudWeb.FleetLive do
     <Layouts.app flash={@flash} current="/fleet">
       <h1 id="fleet-title" class="text-3xl font-semibold">Fleet</h1>
       <p :if={@devices == []} id="fleet-empty">No devices have synced yet.</p>
-      <table :if={@devices != []} id="fleet-table" class="table table-lg">
+      <table :if={@devices != []} id="fleet-table" aria-live="polite" class="table table-lg">
+        <caption class="sr-only">Devices and their sync status</caption>
         <thead>
           <tr>
-            <th>Device</th>
-            <th>Status</th>
-            <th>Last connection</th>
-            <th>Backlog</th>
-            <th>Rules</th>
-            <th>Model</th>
+            <th scope="col">Device</th>
+            <th scope="col">Status</th>
+            <th scope="col">Last connection</th>
+            <th scope="col">Backlog</th>
+            <th scope="col">Rules</th>
+            <th scope="col">Model</th>
           </tr>
         </thead>
         <tbody>

@@ -74,10 +74,11 @@ defmodule RescueCloudWeb.EvalsLive do
     ~H"""
     <p :if={@block["rows"] in [nil, []]} id={"#{@id}-empty"}>No results yet.</p>
     <table :if={@block["rows"] not in [nil, []]} id={@id} class="table table-lg">
+      <caption class="sr-only">Eval metrics</caption>
       <thead>
         <tr>
-          <th>Metric</th>
-          <th :for={{key, label} <- @columns} data-col={key}>{label}</th>
+          <th scope="col">Metric</th>
+          <th :for={{key, label} <- @columns} scope="col" data-col={key}>{label}</th>
         </tr>
       </thead>
       <tbody>
@@ -147,11 +148,12 @@ defmodule RescueCloudWeb.EvalsLive do
         <h2 class="text-2xl font-semibold">Candidate history</h2>
         <p :if={@models == []} id="history-empty">No candidates yet.</p>
         <table :if={@models != []} id="history-table" class="table table-lg">
+          <caption class="sr-only">Model candidates and verdicts</caption>
           <thead>
             <tr>
-              <th>Model</th>
-              <th>Verdict</th>
-              <th>Why</th>
+              <th scope="col">Model</th>
+              <th scope="col">Verdict</th>
+              <th scope="col">Why</th>
             </tr>
           </thead>
           <tbody>
@@ -172,11 +174,12 @@ defmodule RescueCloudWeb.EvalsLive do
         <h2 class="text-2xl font-semibold">Devices</h2>
         <p :if={@devices == []} id="devices-empty">No devices have synced yet.</p>
         <table :if={@devices != []} id="devices-table" class="table table-lg">
+          <caption class="sr-only">Device model versions and scores</caption>
           <thead>
             <tr>
-              <th>Device</th>
-              <th>Model version</th>
-              <th>Scores</th>
+              <th scope="col">Device</th>
+              <th scope="col">Model version</th>
+              <th scope="col">Scores</th>
             </tr>
           </thead>
           <tbody>
