@@ -5,6 +5,8 @@
 EVENTS.jsonl holds event envelopes (one JSON per line). Every `decided` event carries the exact
 engine_input, so each request is re-decided by both engines (latest `decided` event per request).
 OLD / NEW are version names under --dist (engine/dist/<rules_version>/) or paths to a version dir.
+A request counts as changed when its priority_tier, outcome or provisional_tier (the tier an
+abstain sorts by on the follow-up board, DECISIONS R1) differs.
 """
 
 from __future__ import annotations
@@ -68,7 +70,11 @@ def run_engine(version_dir: Path, inputs: list[dict]) -> list[dict]:
 
 
 def _brief(out: dict) -> dict:
-    return {k: out.get(k) for k in ("priority_tier", "outcome", "rule_id")}
+    return {k: out.get(k) for k in ("priority_tier", "outcome", "provisional_tier", "rule_id")}
+
+
+def _changed(row: dict) -> bool:
+    return row["tier_changed"] or row["outcome_changed"] or row["provisional_tier_changed"]
 
 
 def diff(events_path: Path, old_dir: Path, new_dir: Path) -> dict:
@@ -81,17 +87,18 @@ def diff(events_path: Path, old_dir: Path, new_dir: Path) -> dict:
     for rid, a, b in zip(ids, old, new, strict=True):
         tier_changed = a.get("priority_tier") != b.get("priority_tier")
         outcome_changed = a.get("outcome") != b.get("outcome")
-        if tier_changed or outcome_changed:
+        provisional_changed = a.get("provisional_tier") != b.get("provisional_tier")
+        row = {
+            "request_id": rid,
+            "before": _brief(a),
+            "after": _brief(b),
+            "tier_changed": tier_changed,
+            "outcome_changed": outcome_changed,
+            "provisional_tier_changed": provisional_changed,
+        }
+        if _changed(row):
             changed += 1
-        rows.append(
-            {
-                "request_id": rid,
-                "before": _brief(a),
-                "after": _brief(b),
-                "tier_changed": tier_changed,
-                "outcome_changed": outcome_changed,
-            }
-        )
+        rows.append(row)
     return {
         "old_version": json.loads((old_dir / "manifest.json").read_text())["rules_version"],
         "new_version": json.loads((new_dir / "manifest.json").read_text())["rules_version"],
@@ -110,16 +117,17 @@ def to_markdown(report: dict) -> str:
         f"- requests: {report['total']}, changed: {report['changed']}",
         "",
     ]
-    changed = [r for r in report["requests"] if r["tier_changed"] or r["outcome_changed"]]
+    changed = [r for r in report["requests"] if _changed(r)]
     if not changed:
         lines.append("No tier or outcome changes.")
     else:
-        lines += ["| request | tier | outcome |", "|---|---|---|"]
+        lines += ["| request | tier | outcome | provisional tier |", "|---|---|---|---|"]
         for r in changed:
             b, a = r["before"], r["after"]
             lines.append(
                 f"| {r['request_id']} | {b['priority_tier']} → {a['priority_tier']} "
-                f"| {b['outcome']} → {a['outcome']} |"
+                f"| {b['outcome']} → {a['outcome']} "
+                f"| {b['provisional_tier']} → {a['provisional_tier']} |"
             )
     return "\n".join(lines) + "\n"
 
