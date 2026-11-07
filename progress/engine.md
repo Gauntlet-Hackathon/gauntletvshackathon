@@ -19,3 +19,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 engine #61 EV9: evals/rescue_evals/systems/ours.py ('ours' system = imported HFExtractor + engine CLI via field engine_client, records model_version/rules_version); tests in evals/tests/test_ours.py (mocked extractor; real model slow)
 2026-11-07 engine #133 E8: fallback CLI catches all errors (exit 1, one stderr line, no traceback); engine/tests/test_malformed_input.py table of malformed/edge inputs
 2026-11-07 engine #134 EV10: evals/rescue_evals/stats.py (Wilson 95% CI, detection floor, paired improved/worsened/unchanged + sign test); runner records intervals, judge_id/version, refuse_sealed guard; tests in evals/tests/test_stats.py
+2026-11-07 engine #135 EV11: evals/rescue_evals/error_analysis.py writes evals/reports/error_analysis.md (dev split only, failures grouped by differing field, counts + 3 examples); tests in evals/tests/test_error_analysis.py
