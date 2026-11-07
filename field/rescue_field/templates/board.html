@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rescue triage board</title>
+<style>
+body { font-family: system-ui, sans-serif; margin: 1rem auto; max-width: 60rem; padding: 0 1rem; }
+.tier-P1 h2 { color: #b00020; } .tier-P2 h2 { color: #b26a00; } .tier-P3 h2 { color: #1b5e20; }
+.row { border: 1px solid #ccc; border-radius: 4px; margin: .4rem 0; padding: .4rem .6rem; }
+.meta { color: #555; font-size: .85rem; }
+.dups { margin: .3rem 0 0 1rem; font-size: .9rem; }
+table { border-collapse: collapse; } td, th { padding: .1rem .6rem .1rem 0; text-align: left; }
+</style>
+</head>
+<body>
+<h1>Rescue triage board</h1>
+<div id="board">{% include "_board.html" %}</div>
+</body>
+</html>
