@@ -1,0 +1,18 @@
+/* Grader mode (UI-8). Loaded only when grader mode is on. */
+.grader-badge { flex: none; padding: .2rem .6rem; border-radius: 1rem; background: #FFD43B; color: var(--ink);
+  border: 2px solid var(--ink); font-weight: 700; font-size: .85rem; }
+.grader-help { flex: none; width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--ink);
+  background: #FFD43B; color: var(--ink); font: inherit; font-weight: 700; font-size: 1.2rem; cursor: pointer; }
+.grader-panel { width: min(30rem, 100%); max-height: 90vh; padding: 1rem; border: 2px solid var(--ink);
+  border-radius: 12px; background: var(--ground); color: var(--ink); }
+.grader-panel::backdrop { background: rgb(0 0 0 / .45); }
+.grader-head { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+.grader-head h2 { margin: 0; }
+.grader-uc { background: var(--white); border: 1px solid var(--line); border-radius: 12px; padding: .75rem; margin: .6rem 0; }
+.grader-uc h3 { margin: 0 0 .4rem; font-size: 1.05rem; }
+.grader-level h4 { margin: .6rem 0 .2rem; font-size: .9rem; color: var(--muted); }
+.grader-level p { margin: .2rem 0; }
+.grader-next { margin-top: .5rem; }
+.grader-sample .btn { margin: .4rem 0; }
+.grader-offline { background: var(--amber-bg); color: var(--amber-ink); border-radius: 8px; padding: .5rem .75rem; }
+.grader-status:empty { display: none; }

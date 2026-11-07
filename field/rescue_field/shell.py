@@ -17,6 +17,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
+from rescue_field import grader as grader_module
 from rescue_field import sync as sync_module
 
 STATIC_DIR = Path(__file__).with_name("static")
@@ -97,6 +98,8 @@ def shell_context(request: Request) -> dict[str, Any]:
     ctx = shell_config()
     ctx["connection"] = connection_line(sync_module._badge_ctx(request))
     ctx["model_banner"] = model_banner(request)
+    ctx["grader_mode"] = grader_module.grader_mode(request.query_params, request.cookies)
+    ctx["grader_forget"] = request.query_params.get("grader") == "0"  # clears the browser cookie
     return ctx
 
 

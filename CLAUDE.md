@@ -57,6 +57,7 @@ Field app (read from environment, with these defaults for tests):
 - `ECC_NAME` (default `ECC 1`), `VOLUNTEER_NAME` (default generated from `DEVICE_ID`, e.g. `Jordan K.`), `VOLUNTEER_ROLE` (default `Volunteer`),
   `SHELTER_NAMES` (comma-separated; default generated, e.g. `Shelter 1 (Lincoln High)`): demo values for the volunteer app shell
 - `DEMO_MODE` (`1` enables POST /sync/offline-toggle), `ENGINE_CMD` (default `python -m rescue_engine.fallback`)
+- `GRADER_MODE` (`1` turns on grader mode: badge, ? hint panel and one-tap samples; a browser can also opt in with `?grader=1`)
 - The FastAPI app is `app` in `field/rescue_field/api.py`; it serves on `$PORT` (default 8000).
 Cloud app: standard Phoenix release env (`DATABASE_URL`, `SECRET_KEY_BASE`, `PHX_HOST`, `PORT`). Device tokens must include a dev
 device `laptop-dev-01` with token `dev-token-laptop-dev-01` in dev and test, and read extra `device_id:token` pairs from env

@@ -33,6 +33,7 @@ from rescue_field import add_page as add_page_module
 from rescue_field import board as board_module
 from rescue_field import boats as boats_module
 from rescue_field import engine_client, freeze
+from rescue_field import grader as grader_module
 from rescue_field import recheck as recheck_module
 from rescue_field import shell as shell_module
 from rescue_field import status as status_module
@@ -509,6 +510,7 @@ def create_app(
     app.include_router(boats_module.router)
     app.include_router(recheck_module.router)
     app.include_router(add_page_module.router)
+    app.include_router(grader_module.router)
     app.mount("/static", StaticFiles(directory=str(shell_module.STATIC_DIR)), name="static")
     return app
 
