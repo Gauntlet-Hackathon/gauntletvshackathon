@@ -87,6 +87,40 @@ defmodule RescueCloud.ReplayTest do
     assert Repo.all(from e in Event, order_by: e.id) == before
   end
 
+  test "a failing chunk only errors its own events; each chunk is one engine run", %{dist: dist} do
+    # Reads stdin to a file, logs the batch size, fails when the poison input (99 people) is in it.
+    ep = ~S(cat > in.json; grep -q '99' in.json && exit 4; elixir engine.exs < in.json)
+    v = "rules@6666666+bin:ffffffff"
+    install_engine(dist, v, ep, :v1)
+
+    sync!([
+      decided("K1", v, 1, "P1", "R-P1-ALL"),
+      decided("K2", v, 2, "P1", "R-P1-ALL"),
+      decided("K3", v, 99, "P1", "R-P1-ALL"),
+      decided("K4", v, 3, "P1", "R-P1-ALL"),
+      decided("K5", v, 4, "P1", "R-P1-ALL")
+    ])
+
+    assert {:ok, %{"match" => 3, "error" => 2}} = Replay.verify(engine_dist: dist, chunk_size: 2)
+
+    assert statuses() == %{
+             rid("K1") => "match",
+             rid("K2") => "match",
+             rid("K3") => "error",
+             rid("K4") => "error",
+             rid("K5") => "match"
+           }
+
+    assert Repo.get_by!(Verification, request_id: rid("K3")).detail =~ "status 4"
+  end
+
+  test "chunk size 2 with 5 events runs the engine 3 times", %{dist: dist} do
+    sync!(for i <- 1..5, do: decided("N#{i}", @v1, i, "P1", "R-P1-ALL"))
+
+    assert {:ok, %{"match" => 5}} = Replay.verify(engine_dist: dist, chunk_size: 2)
+    assert calls(dist, @v1) == ["2", "2", "1"]
+  end
+
   test "a second run only retries missing versions; all: true re-verifies", %{dist: dist} do
     sync!([decided("A1", @v1, 3, "P1", "R-P1-ALL"), decided("MV", @gone, 2, "P1", "R-P1-ALL")])
 
