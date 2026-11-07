@@ -121,12 +121,11 @@ defmodule RescueCloud.ModelsTest do
       assert Models.list() == []
 
       refute File.exists?(
-               Path.join(
+               Path.join([
                  Application.get_env(:rescue_cloud, Models)[:models_dir],
                  "org__slm",
-                 @sha,
                  @sha
-               )
+               ])
              )
     end
 
