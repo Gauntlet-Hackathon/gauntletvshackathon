@@ -5,7 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-# Placeholder until the build pipeline stamps a real git sha + binary hash.
+# Placeholder in the source tree. rescue_engine.build rewrites this line in the copy it
+# publishes to engine/dist/<rules_version>/, so a built engine emits its real version (A2).
 RULES_VERSION = "rules@0000000+bin:00000000"
 
 DEFAULT_THRESHOLDS: dict[str, float] = {
@@ -35,6 +36,12 @@ Q_HAZARD = (
     "Can you confirm what is happening right now: is water rising, is anyone injured, "
     "trapped or in danger?"
 )
+# low_confidence_hazard when the weak signal that would raise the tier is a vulnerable
+# person (R13).
+Q_HAZARD_VULNERABLE = (
+    "Can you confirm what is happening right now: is water rising, is anyone injured, "
+    "trapped or in danger, and is a child, elderly or disabled person with you?"
+)
 Q_CONFIRM = (
     "Please confirm: is anyone in immediate danger (rising water, injury, fire, trapped), "
     "and is a child, elderly or disabled person with you?"
@@ -45,9 +52,25 @@ Q_COUNTS = "We have different counts for this location. How many people need hel
 
 R_ABS_HAZ = "R-ABS-HAZ"
 
-# --- Step 3 (contracts/engine_rules.md "Step 4: tier") -------------------------------------
+# Characters that count as blank in location.text (R11). ASCII only, so the Mercury engine
+# (string.strip) agrees byte for byte.
+BLANK_CHARS = " \t\n\r\f\v"
+
+# --- Contract enums (payloads/extracted.schema.json, common.schema.json) -------------------
+# Values outside them are rejected (A9), as the Mercury engine does.
+
+LOCATION_TYPES = frozenset({"landmark", "address", "coords", "none"})
+HAZARD_KINDS = frozenset(
+    {"rising_water", "on_roof", "injury", "medical_device_no_power", "fire", "trapped"}
+)
+VULNERABLE_KINDS = frozenset({"child", "elderly", "disabled", "medical", "pregnant"})
+NEED_KINDS = frozenset({"food", "water", "meds"})
+REQUEST_KINDS = frozenset({"rescue", "evacuation", "welfare_check", "supply", "other"})
+
+# --- Step 4 (contracts/engine_rules.md "Step 4: tier") -------------------------------------
 
 TIER_RANK = {"P1": 1, "P2": 2, "P3": 3}  # lower rank = more urgent
+TIERS = frozenset(TIER_RANK)
 P1_VULNERABLE = frozenset({"child", "elderly", "disabled"})
 
 
@@ -110,11 +133,20 @@ def _kinds(items: list[dict[str, Any]], min_conf: float) -> set[str]:
     return {i["kind"] for i in items if i["confidence"] >= min_conf}
 
 
-def signals_at(extracted: dict[str, Any], min_conf: float, th: dict[str, float]) -> Signals:
-    """Signals keeping hazards/vulnerable entries with confidence >= min_conf."""
+def signals_at(
+    extracted: dict[str, Any],
+    min_conf: float,
+    th: dict[str, float],
+    vulnerable_min: float | None = None,
+) -> Signals:
+    """Signals keeping hazards with confidence >= min_conf and vulnerable entries with
+    confidence >= vulnerable_min (default: min_conf)."""
     return Signals(
         hazards=_kinds(extracted.get("hazards") or [], min_conf),
-        vulnerable=_kinds(extracted.get("vulnerable") or [], min_conf),
+        vulnerable=_kinds(
+            extracted.get("vulnerable") or [],
+            min_conf if vulnerable_min is None else vulnerable_min,
+        ),
         needs=extracted.get("needs") or [],
         request_kind=extracted.get("request_kind") or "other",
         need_hours_over=th["need_hours_over"],
@@ -126,16 +158,37 @@ def higher(a: str, b: str) -> bool:
     return TIER_RANK[a] < TIER_RANK[b]
 
 
-def assess_tier(extracted: dict[str, Any], th: dict[str, float]) -> dict[str, Any]:
-    """Tier with uncertainty escalation. Never lowers a tier because a signal is uncertain.
+def highest(own: str, others: list[str | None]) -> str:
+    """The most urgent of own and every non-null tier in others."""
+    best = own
+    for tier in others:
+        if tier is not None and higher(tier, best):
+            best = tier
+    return best
 
-    Returns {"abstain": True} when a weak signal would raise the tier (R-ABS-HAZ), else
-    {"abstain": False, "tier", "rule_id", "follow_up_question"}.
+
+def assess_tier(extracted: dict[str, Any], th: dict[str, float]) -> dict[str, Any]:
+    """Step 4 at the three confidence bands. Never lowers a tier because of uncertainty.
+
+    Returns {"firm", "uncertain", "weak", "rule_id", "hazard_question"}:
+    - uncertain / rule_id: the request's tier (firm + uncertain signals) and its rule;
+    - weak: the most cautious reading (firm + uncertain + weak signals), which is the
+      provisional_tier every abstain carries (R1);
+    - hazard_question: set when a weak signal would raise the tier (R-ABS-HAZ, R2): the
+      vulnerable-person text when the raise needs a weak vulnerable entry (R13), else Q_HAZARD.
     """
+    weak_min, uncertain_min = th["hazard_weak_min"], th["hazard_uncertain_min"]
     firm, _ = match_tier(signals_at(extracted, th["hazard_firm_min"], th))
-    uncertain, rule_id = match_tier(signals_at(extracted, th["hazard_uncertain_min"], th))
-    weak, _ = match_tier(signals_at(extracted, th["hazard_weak_min"], th))
+    uncertain, rule_id = match_tier(signals_at(extracted, uncertain_min, th))
+    weak, _ = match_tier(signals_at(extracted, weak_min, th))
+    question = None
     if higher(weak, uncertain):
-        return {"abstain": True}
-    question = Q_CONFIRM if higher(uncertain, firm) else None
-    return {"abstain": False, "tier": uncertain, "rule_id": rule_id, "follow_up_question": question}
+        hazards_only, _ = match_tier(signals_at(extracted, weak_min, th, uncertain_min))
+        question = Q_HAZARD_VULNERABLE if higher(weak, hazards_only) else Q_HAZARD
+    return {
+        "firm": firm,
+        "uncertain": uncertain,
+        "weak": weak,
+        "rule_id": rule_id,
+        "hazard_question": question,
+    }
