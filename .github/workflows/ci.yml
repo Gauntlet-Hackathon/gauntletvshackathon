@@ -1,8 +1,9 @@
-# CI for every lane. Three jobs:
+# CI for every lane. Four jobs:
 #   python  ruff + pytest for shared/ field/ engine/ evals/, plus the night-shift picker tests
 #   cloud   the Phoenix app (format, compile with warnings as errors, mix test) against Postgres 16
 #   test    the one required status check (branch protection requires `test` and `verdict`):
 #           it passes only when `python` and `cloud` both pass
+#   mercury-spike  installs mmc and builds engine/mercury/hello.m (W0-5)
 # The night-shift picker reads this workflow's runs on main to decide whether main is green,
 # so keep the file name (or set the CI_WORKFLOW repo variable to the new name).
 # Tests marked `slow` (real model downloads) are skipped: pyproject.toml sets -m 'not slow'.
@@ -101,3 +102,82 @@ jobs:
         run: |
           echo "python: $PYTHON, cloud: $CLOUD"
           [ "$PYTHON" = "success" ] && [ "$CLOUD" = "success" ]
+
+  # W0-5 go/no-go (#24). Not in `test`'s needs, but a failure here still fails the run, which the picker reads as main red.
+  mercury-spike:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      MERCURY_VERSION: 22.01.8-1~noble
+      # Tip of mercury_json's mercury_22_01 branch; master targets newer compilers.
+      MERCURY_JSON_SHA: 709853063027bc7a8400f205c098bdd5f6c169f9
+      INSTALL_LIMIT_SECONDS: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Mercury
+        run: |
+          set -euo pipefail
+          SECONDS=0
+          # apt rejects this repo: its signing key expired 2026-07-15 (Mercury-Language/packaging#15).
+          # So fetch the exact .debs and pin their hashes. The hashes come from the repo's Packages
+          # index, whose InRelease signature (made 2024-07-18, key B86D5D56...BDF4EAD2) verifies.
+          mkdir debs
+          base=https://dl.mercurylang.org/deb/pool/main/m/mercury
+          for p in gc gc-dev devel tools hlc hlc-dev; do
+            curl -fsSL "$base/mercury-${p}_${MERCURY_VERSION}_amd64.deb" -o "debs/mercury-$p.deb"
+          done
+          sha256sum -c - <<'SUMS'
+          c7ed9b955a354310d3cf1fa2631d9d29fe46043fbefcf51cf42bdf8cc698a6e2  debs/mercury-gc.deb
+          15536783f19d6514a427ad151ff7c3c0eea6565ac7b18da6bd683d37ce079c38  debs/mercury-gc-dev.deb
+          7f952525f091d1255ace35ba096d8b2be665fd0eff6d7880445b42c7c56017c1  debs/mercury-devel.deb
+          aa4bbbf753bfe12d4619c2a86ea9b6ae9ecd6f980b3797cc9e0a725cfb4afa2e  debs/mercury-tools.deb
+          800ecf3607b288eaeac716ba50c034d31dcfd837adbd79dabf7b650ce9167534  debs/mercury-hlc.deb
+          00cbadb18a4b3f8b2a0f3d82d543675d320e9bd03178c4ecc8c7e96ab7587468  debs/mercury-hlc-dev.deb
+          SUMS
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends ./debs/*.deb
+          mmc --version
+          echo "install_seconds=$SECONDS" | tee -a "$GITHUB_ENV"
+          echo "Mercury install: ${SECONDS}s (limit ${INSTALL_LIMIT_SECONDS}s)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build hello with mercury_json
+        run: |
+          set -euo pipefail
+          SECONDS=0
+          git clone -q https://github.com/juliensf/mercury-json.git "$RUNNER_TEMP/mercury-json"
+          git -C "$RUNNER_TEMP/mercury-json" checkout -q "$MERCURY_JSON_SHA"
+          cd engine/mercury
+          mmc -f hello.m "$RUNNER_TEMP"/mercury-json/src/*.m
+          mmc --grade hlc.gc --make -j4 hello
+          echo "hello build (includes mercury_json): ${SECONDS}s" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run hello
+        working-directory: engine/mercury
+        run: |
+          set +e -uo pipefail
+          status=0
+          check() { # check <name> <stdin> <expected exit> <expected stdout>
+            out="$(printf '%s' "$2" | ./hello 2>/dev/null)"
+            code=$?
+            if [ "$code" = "$3" ] && [ "$out" = "$4" ]; then
+              echo "ok   $1"
+            else
+              echo "FAIL $1: exit $code (wanted $3), stdout [$out] (wanted [$4])"
+              status=1
+            fi
+          }
+          check valid     '{"name": "Ada"}'  0 '{"name":"Ada","status":"accepted"}'
+          check unicode   '{"name": "Zoë"}'  0 '{"name":"Zo\u00EB","status":"accepted"}'
+          check no-name   '{"age": 3}'       0 '{"reason":"object has no string name","status":"rejected"}'
+          check non-obj   '[1, 2]'           0 '{"reason":"array","status":"rejected"}'
+          check malformed '{"name": '        1 ''
+          check empty     ''                 1 ''
+          exit "$status"
+
+      - name: Enforce the install time limit
+        run: |
+          if [ "$install_seconds" -ge "$INSTALL_LIMIT_SECONDS" ]; then
+            echo "::error::Mercury install took ${install_seconds}s; the go/no-go limit is ${INSTALL_LIMIT_SECONDS}s"
+            exit 1
+          fi

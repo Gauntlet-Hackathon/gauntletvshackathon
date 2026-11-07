@@ -20,3 +20,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 engine #133 E8: fallback CLI catches all errors (exit 1, one stderr line, no traceback); engine/tests/test_malformed_input.py table of malformed/edge inputs
 2026-11-07 engine #134 EV10: evals/rescue_evals/stats.py (Wilson 95% CI, detection floor, paired improved/worsened/unchanged + sign test); runner records intervals, judge_id/version, refuse_sealed guard; tests in evals/tests/test_stats.py
 2026-11-07 engine #135 EV11: evals/rescue_evals/error_analysis.py writes evals/reports/error_analysis.md (dev split only, failures grouped by differing field, counts + 3 examples); tests in evals/tests/test_error_analysis.py
+2026-11-07 engine #24 W0-5: Mercury spike GO; engine/mercury/hello.m and mercury-spike CI job (pinned 22.01.8 .debs, mercury_json), decision in docs/DECISIONS.md

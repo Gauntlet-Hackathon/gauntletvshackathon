@@ -65,3 +65,11 @@ Made by the integrator while turning the plan into contracts. Reverse any of the
 - Heads and labels: <is_request; request_kind: rescue/evacuation/welfare_check/supply/other; vulnerable: ...; hazards: ...; needs: ...>
 - Sample raw output for "trapped on roof, 3 kids, water rising, near the Shell on 5th": <paste>
 - Repo and revision come from env HF_REPO / HF_REVISION (pinned commit SHA, never main); filled in by H1b. Until then tests mock the model.
+
+## W0-5: Mercury toolchain spike (#24)
+**GO**, decided by the team on the result of PR #73. Cut line 5 does not apply, so E7 stays in.
+- CI run: Mercury installed in 13s (limit 180s), `engine/mercury/hello.m` built with `mercury_json` in about 3s, all 6 test cases passed.
+- Install: the documented apt route is broken because the repo's signing key expired on 2026-07-15 (Mercury-Language/packaging#15). CI downloads the 22.01.8 `.deb` files over https and pins their SHA256 hashes, taken from the repo's signed `Packages` index. Stuck on 22.01.8 unless someone builds from source.
+- JSON: `mercury_json`, pinned to the tip of its `mercury_22_01` branch.
+- E7 parity tests compare parsed JSON, not bytes: the writer emits `ë` where Python's default is `ë`. `mercury_json` stores numbers as floats, so large integers may not match Python.
+- Before E7 gets `night-safe`: the agent job in `night-shift-lane.yml` needs the same install step.
