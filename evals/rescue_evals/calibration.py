@@ -37,14 +37,43 @@ FIELDS = ("location", "people_count", "is_request", "vulnerable", "hazards")
 Samples = dict[str, tuple[list[float], list[bool]]]
 
 
+def case_samples(g: dict[str, Any], p: dict[str, Any]) -> list[tuple[str, float, bool]]:
+    """(field, confidence, correct) for one case, from its gold and predicted extractions
+    (both as JSON dicts)."""
+    out = [
+        (
+            "location",
+            p["location"]["confidence"],
+            M.location_partial(g["location"]["text"], p["location"]["text"]),
+        ),
+        (
+            "people_count",
+            p["people_count"]["confidence"],
+            g["people_count"]["value"] == p["people_count"]["value"],
+        ),
+        (
+            "is_request",
+            p["is_request"]["confidence"],
+            g["is_request"]["value"] == p["is_request"]["value"],
+        ),
+    ]
+    for field in ("vulnerable", "hazards"):
+        gold_kinds = {x["kind"] for x in g[field]}
+        out += [(field, item["confidence"], item["kind"] in gold_kinds) for item in p[field]]
+    return [(f, float(c), bool(ok)) for f, c, ok in out]
+
+
+def pooled_ece(samples: Samples, n_bins: int = 10) -> float | None:
+    """One ECE over every field's samples together (the number the promotion gate reads as
+    ``calibration.ece``); None when there are no samples."""
+    conf = [c for cs, _ in samples.values() for c in cs]
+    ok = [k for _, ks in samples.values() for k in ks]
+    return M.expected_calibration_error(conf, ok, n_bins) if conf else None
+
+
 def collect(system: System, cases: Sequence[EvalCase]) -> Samples:
     """(confidences, correct) per field; cases without a gold extraction or a prediction skip."""
     out: Samples = {f: ([], []) for f in FIELDS}
-
-    def add(field: str, conf: float, ok: bool) -> None:
-        out[field][0].append(float(conf))
-        out[field][1].append(bool(ok))
-
     for c in cases:
         if c.gold_extracted is None:
             continue
@@ -52,26 +81,9 @@ def collect(system: System, cases: Sequence[EvalCase]) -> Samples:
             p = _dump(system.extract(c.raw_text))
         except Exception:
             continue
-        g = c.gold_extracted.model_dump(mode="json")
-        add(
-            "location",
-            p["location"]["confidence"],
-            M.location_partial(g["location"]["text"], p["location"]["text"]),
-        )
-        add(
-            "people_count",
-            p["people_count"]["confidence"],
-            g["people_count"]["value"] == p["people_count"]["value"],
-        )
-        add(
-            "is_request",
-            p["is_request"]["confidence"],
-            g["is_request"]["value"] == p["is_request"]["value"],
-        )
-        for field in ("vulnerable", "hazards"):
-            gold_kinds = {x["kind"] for x in g[field]}
-            for item in p[field]:
-                add(field, item["confidence"], item["kind"] in gold_kinds)
+        for field, conf, ok in case_samples(c.gold_extracted.model_dump(mode="json"), p):
+            out[field][0].append(conf)
+            out[field][1].append(ok)
     return out
 
 
