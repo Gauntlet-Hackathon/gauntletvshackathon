@@ -55,6 +55,44 @@ defmodule RescueCloud.Records do
     |> Repo.all()
   end
 
+  @doc """
+  Request totals from one grouped query (no row limit):
+  `%{total, p1, p2, p3, follow_up}`. `follow_up` counts requests whose engine outcome is
+  `abstain` (the engine asked a follow-up question instead of ranking).
+  """
+  @spec counts() :: %{
+          total: non_neg_integer(),
+          p1: non_neg_integer(),
+          p2: non_neg_integer(),
+          p3: non_neg_integer(),
+          follow_up: non_neg_integer()
+        }
+  def counts do
+    rows =
+      Repo.all(
+        from r in Request,
+          group_by: [r.priority_tier, r.outcome],
+          select: {r.priority_tier, r.outcome, count(r.request_id)}
+      )
+
+    Enum.reduce(rows, %{total: 0, p1: 0, p2: 0, p3: 0, follow_up: 0}, fn {tier, outcome, n},
+                                                                         acc ->
+      acc = %{acc | total: acc.total + n}
+
+      cond do
+        outcome == "abstain" -> %{acc | follow_up: acc.follow_up + n}
+        tier == "P1" -> %{acc | p1: acc.p1 + n}
+        tier == "P2" -> %{acc | p2: acc.p2 + n}
+        tier == "P3" -> %{acc | p3: acc.p3 + n}
+        true -> acc
+      end
+    end)
+  end
+
+  @doc "Server time the newest event was received (`synced_at`), or nil."
+  @spec last_event_at() :: DateTime.t() | nil
+  def last_event_at, do: Repo.one(from e in Event, select: max(e.synced_at))
+
   defp filter_text(query, nil), do: query
 
   defp filter_text(query, text) do

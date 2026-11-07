@@ -121,7 +121,7 @@ defmodule RescueCloudWeb.FleetLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash}>
+    <Layouts.app flash={@flash} current="/fleet">
       <h1 id="fleet-title" class="text-2xl font-semibold">Fleet</h1>
       <p :if={@devices == []} id="fleet-empty">No devices have synced yet.</p>
       <table :if={@devices != []} id="fleet-table" class="table">

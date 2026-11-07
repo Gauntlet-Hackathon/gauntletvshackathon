@@ -28,7 +28,7 @@ defmodule RescueCloudWeb.ActivityLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash}>
+    <Layouts.app flash={@flash} current="/activity">
       <h1 id="activity-title" class="text-2xl font-semibold">Field activity since last sync</h1>
       <p :if={@devices == []} id="activity-empty">No devices have synced events yet.</p>
 

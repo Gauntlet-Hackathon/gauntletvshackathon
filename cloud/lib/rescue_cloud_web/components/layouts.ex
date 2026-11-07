@@ -31,7 +31,18 @@ defmodule RescueCloudWeb.Layouts do
     default: nil,
     doc: "the current [scope](https://phoenix.hexdocs.pm/scopes.html)"
 
+  attr :current, :string, default: nil, doc: "path of the current page, for the nav"
+
   slot :inner_block, required: true
+
+  @nav [
+    {"Dashboard", "/"},
+    {"Fleet", "/fleet"},
+    {"Records", "/records"},
+    {"Activity", "/activity"},
+    {"Corrections", "/corrections"},
+    {"Evals", "/evals"}
+  ]
 
   def app(assigns) do
     ~H"""
@@ -41,6 +52,16 @@ defmodule RescueCloudWeb.Layouts do
           <span class="text-sm font-semibold">Rescue triage cloud</span>
         </a>
       </div>
+      <nav aria-label="Main" class="flex flex-wrap gap-4 text-sm px-4">
+        <.link
+          :for={{label, path} <- nav()}
+          navigate={path}
+          aria-current={@current == path && "page"}
+          class={["link link-hover", @current == path && "font-semibold"]}
+        >
+          {label}
+        </.link>
+      </nav>
       <div class="flex-none">
         <.theme_toggle />
       </div>
@@ -55,6 +76,8 @@ defmodule RescueCloudWeb.Layouts do
     <.flash_group flash={@flash} />
     """
   end
+
+  defp nav, do: @nav
 
   @doc """
   Shows the flash group with standard titles and content.
