@@ -50,3 +50,13 @@ Unchanged: tests stay in `<lane>/tests/`; data stays at `engine/dist/`, `engine/
 Running a module outside pytest needs the lane folders on the path: `PYTHONPATH=shared:field:engine:evals python -m rescue_engine.fallback`.
 The field engine client (F2) runs `ENGINE_CMD` (default `python -m rescue_engine.fallback`) with `PYTHONPATH` set to include `engine/` and `shared/`.
 The field FastAPI app is `app` in `field/rescue_field/api.py` (the Dockerfile runs `uvicorn rescue_field.api:app`).
+
+## Runtime configuration contract (Docker, compose and Fly use exactly these names)
+Field app (read from environment, with these defaults for tests):
+- `DEVICE_ID` (e.g. `laptop-dev-01`), `DEVICE_TOKEN` (bearer token for the cloud), `CLOUD_URL` (e.g. `http://cloud:4000`)
+- `FIELD_DATA_DIR` (directory for the SQLite file; default `./data` locally, `/data` in Docker)
+- `DEMO_MODE` (`1` enables POST /sync/offline-toggle), `ENGINE_CMD` (default `python -m rescue_engine.fallback`)
+- The FastAPI app is `app` in `field/rescue_field/api.py`; it serves on `$PORT` (default 8000).
+Cloud app: standard Phoenix release env (`DATABASE_URL`, `SECRET_KEY_BASE`, `PHX_HOST`, `PORT`). Device tokens must include a dev
+device `laptop-dev-01` with token `dev-token-laptop-dev-01` in dev and test, and read extra `device_id:token` pairs from env
+`DEVICE_TOKENS` (comma-separated) in prod, so deploys need no code change.
