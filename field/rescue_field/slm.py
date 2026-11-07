@@ -59,15 +59,30 @@ _REQUEST_WORDS = (
     "necesit",
     "socorro",
     "auxilio",
+    # SMS shorthand and danger-only phrasing (A15)
+    "please",
+    "send someone",
+    "come get",
+    "save us",
+    "emergency",
+    "por favor",
+    "rescate",
 )
-_STALE_RE = re.compile(
-    r"last year|old post|\b(?:from|in)\s+(?:19|20)\d\d\b"
-    r"|hace (?:un )?año|año pasado|publicación antigua",
-    re.I,
-)
+# Short tokens only count as whole words ("sos" is not "sospecha", "911" not "19112").
+_REQUEST_TOKENS_RE = re.compile(r"\b(?:hlp|plz|pls|sos|911)\b", re.I)
 _STREET_SUFFIX = (
     r"(?:st|street|ave|avenue|rd|road|dr|drive|blvd|boulevard|ln|lane|way|ct|court|pkwy|parkway|"
     r"calle|avenida|av|camino)"
+)
+# A year is a stale marker only when it is not a house number ("in 2014 Elm Street"), and
+# "last year" only when it describes the post itself, not the events ("last year we evacuated").
+_STALE_RE = re.compile(
+    r"old post|\b(?:from|in)\s+(?:19|20)\d\d\b"
+    rf"(?!(?:\s+[A-Za-z][\w'.-]*){{1,4}}?\s+{_STREET_SUFFIX}\b)"
+    r"|\bfrom last year\b"
+    r"|\b(?:posted|post|photo|picture|pic|video|tweet)\s+(?:from\s+|of\s+)?last year\b"
+    r"|publicaci[oó]n antigua|\bdel año pasado\b|\bde hace (?:un )?año\b",
+    re.I,
 )
 _ADDRESS_RE = re.compile(
     rf"\b\d{{1,5}}(?:\s+[A-Za-z][\w'.-]*){{1,4}}?\s+{_STREET_SUFFIX}\b\.?", re.I
@@ -173,7 +188,13 @@ class KeywordExtractor:
         def kinds(table: dict[str, tuple[str, ...]]) -> list[str]:
             return [k for k, words in table.items() if any(w in low for w in words)]
 
-        is_req = any(w in low for w in _REQUEST_WORDS)
+        hazards = _graded(_HAZARDS, low)
+        # A firm (explicit-phrase) hazard is itself a cry for help.
+        is_req = (
+            any(w in low for w in _REQUEST_WORDS)
+            or bool(_REQUEST_TOKENS_RE.search(raw_text))
+            or any(h["confidence"] == HIGH for h in hazards)
+        )
         stale = _STALE_RE.search(raw_text)
         # The contract has no contact field, so a phone number is only recorded as a span.
         spans = []
@@ -183,7 +204,7 @@ class KeywordExtractor:
             "location": _location(raw_text),
             "people_count": _people(low),
             "vulnerable": _graded(_VULNERABLES, low),
-            "hazards": _graded(_HAZARDS, low),
+            "hazards": hazards,
             "time_ref": {
                 "text": stale.group(0) if stale else None,
                 "is_stale_post": bool(stale),

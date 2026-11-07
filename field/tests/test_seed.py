@@ -94,7 +94,9 @@ def test_200_seeded_requests_are_not_all_abstain(tmp_path):
     assert {"P1", "P2", "P3"} <= set(tiers), tiers
     assert any(o["outcome"] == "prioritized" and o["priority_tier"] == "P3" for o in outs)
     assert outcomes["duplicate"] >= 1, outcomes
-    assert len(reasons) >= 2 and reasons["no_usable_location"] >= 1, reasons
+    assert reasons["no_usable_location"] >= 1, reasons
+    # SMS shorthand ("plz hlp") and danger-only rows are requests (A15): none abstains on it.
+    assert reasons["low_confidence_request"] == 0, reasons
     # The no-model keyword extractor reads almost every row; only the dry fixture texts are not.
     models = Counter(e["model_version"] for e in decided)
     assert models[KEYWORD_MODEL_VERSION] >= 180, models

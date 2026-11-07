@@ -124,3 +124,42 @@ def test_prompt_injection_yields_fields_only():
     validate_extracted(p)
     assert not DECISION_KEYS & set(p)
     assert "P1" not in json.dumps(p)
+
+
+# ---- stale false positives (A14) and SMS request words (A15) ---------------------------
+
+NOT_STALE = [
+    "stuck at home in 2014 Elm Street with my grandma, need help",
+    "help, my mom is in a wheelchair at 33 Oak Street, last year we evacuated but now we can't",
+    "trapped in 2015 Westheimer Rd, water rising, please help",
+]
+STILL_STALE = ["this is an old post from 2017, roof flooding", "photo from last year, water rising"]
+SMS_REQUESTS = [
+    "plz hlp the car is flooded & wi cannot get out @ 4699 lakeview court 2 of us including a baby",
+    "SOS 12 Oak Street on the roof water rising",
+    "Water rising fast, we are on the roof at 12 Oak Street, 3 people",
+]
+
+
+@pytest.mark.parametrize("text", NOT_STALE)
+def test_house_numbers_and_past_events_are_not_stale(text):
+    p = KeywordExtractor.payload(text)
+    assert p["time_ref"]["is_stale_post"] is False
+    assert p["is_request"]["value"] is True
+
+
+@pytest.mark.parametrize("text", STILL_STALE)
+def test_old_posts_stay_stale(text):
+    assert KeywordExtractor.payload(text)["time_ref"]["is_stale_post"] is True
+
+
+@pytest.mark.parametrize("text", SMS_REQUESTS)
+def test_sms_and_danger_only_texts_are_requests(text):
+    p = KeywordExtractor.payload(text)
+    assert p["is_request"]["value"] is True
+    assert p["is_request"]["confidence"] >= 0.6
+
+
+def test_short_request_tokens_need_word_boundaries():
+    assert KeywordExtractor.payload("sospecho que llueve")["is_request"]["value"] is False
+    assert KeywordExtractor.payload("SOS")["is_request"]["value"] is True
