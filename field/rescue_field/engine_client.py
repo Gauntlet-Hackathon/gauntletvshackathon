@@ -1,7 +1,8 @@
 """Subprocess client for the decision engine.
 
-ENGINE_CMD is any command that reads one engine_input JSON object on stdin and writes one
-engine_output JSON object on stdout (the Python engine and Mercury are interchangeable).
+ENGINE_CMD is any command that reads one engine_input JSON object (or a list of them, batch
+mode) on stdin and writes the matching engine_output object (or list) on stdout
+(the Python engine and Mercury are interchangeable).
 """
 
 from __future__ import annotations
@@ -35,18 +36,12 @@ def _command(cmd: str | Sequence[str] | None) -> list[str]:
     return argv
 
 
-def decide(
-    engine_input: dict[str, Any],
-    *,
-    cmd: str | Sequence[str] | None = None,
-    timeout: float = DEFAULT_TIMEOUT_S,
-) -> dict[str, Any]:
-    """Run the engine on one input and return the validated engine_output."""
-    argv = _command(cmd)
+def _run(payload: Any, argv: list[str], timeout: float) -> tuple[Any, str]:
+    """Send one JSON document to the engine; return its parsed stdout and stderr."""
     try:
         proc = subprocess.run(
             argv,
-            input=json.dumps(engine_input),
+            input=json.dumps(payload),
             capture_output=True,
             text=True,
             timeout=timeout,
@@ -62,14 +57,28 @@ def decide(
     if proc.returncode != 0:
         raise EngineError(f"engine exited with code {proc.returncode}", proc.stderr)
     try:
-        output = json.loads(proc.stdout)
+        return json.loads(proc.stdout), proc.stderr
     except json.JSONDecodeError as exc:
         raise EngineError(f"engine stdout is not JSON: {exc}", proc.stderr) from exc
+
+
+def _check_output(output: Any, stderr: str) -> dict[str, Any]:
     errors = list(validator_for("engine_output.schema.json").iter_errors(output))
     if errors:
         msg = f"engine output failed schema validation: {errors[0].message}"
-        raise EngineError(msg, proc.stderr)
+        raise EngineError(msg, stderr)
     return output
+
+
+def decide(
+    engine_input: dict[str, Any],
+    *,
+    cmd: str | Sequence[str] | None = None,
+    timeout: float = DEFAULT_TIMEOUT_S,
+) -> dict[str, Any]:
+    """Run the engine on one input and return the validated engine_output."""
+    output, stderr = _run(engine_input, _command(cmd), timeout)
+    return _check_output(output, stderr)
 
 
 def decide_batch(
@@ -78,5 +87,15 @@ def decide_batch(
     cmd: str | Sequence[str] | None = None,
     timeout: float = DEFAULT_TIMEOUT_S,
 ) -> list[dict[str, Any]]:
-    """Decide each input in order; the result list matches the input order."""
-    return [decide(item, cmd=cmd, timeout=timeout) for item in engine_inputs]
+    """Decide all inputs in one engine call (batch mode: a JSON list in, a list out).
+
+    The result list matches the input order. An empty batch does not start the engine.
+    """
+    if not engine_inputs:
+        return []
+    output, stderr = _run(list(engine_inputs), _command(cmd), timeout)
+    if not isinstance(output, list) or len(output) != len(engine_inputs):
+        raise EngineError(
+            f"engine batch output is not a list of {len(engine_inputs)} results", stderr
+        )
+    return [_check_output(item, stderr) for item in output]

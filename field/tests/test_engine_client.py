@@ -59,3 +59,33 @@ def test_batch_preserves_order():
     outs = decide_batch(inputs, cmd=cmd("echo"))
     assert [o["rule_id"] for o in outs] == ["R-P2-3", "R-P2-1", "R-P2-2"]
     assert decide_batch([], cmd=cmd()) == []
+
+
+def test_batch_is_one_engine_call(tmp_path):
+    log = tmp_path / "calls.txt"
+    script = tmp_path / "counting_engine.py"
+    script.write_text(
+        "import pathlib, runpy, sys\n"
+        f"pathlib.Path({str(log)!r}).open('a').write('x')\n"
+        f"sys.argv = [{FAKE!r}, 'ok']\n"
+        f"runpy.run_path({FAKE!r}, run_name='__main__')\n"
+    )
+    outs = decide_batch([EXAMPLE] * 5, cmd=[sys.executable, str(script)])
+    assert len(outs) == 5
+    assert log.read_text() == "x"
+
+
+@pytest.mark.parametrize("mode", ["short", "invalid", "fail"])
+def test_batch_bad_engine_output_raises(mode):
+    with pytest.raises(EngineError):
+        decide_batch([EXAMPLE, EXAMPLE], cmd=cmd(mode))
+
+
+def test_batch_rejects_single_object_answer(tmp_path):
+    script = tmp_path / "single.py"
+    script.write_text(
+        "import json, sys\nsys.stdin.read()\n"
+        "print(json.dumps({'outcome': 'prioritized'}))\n"
+    )
+    with pytest.raises(EngineError, match="batch output"):
+        decide_batch([EXAMPLE], cmd=[sys.executable, str(script)])
