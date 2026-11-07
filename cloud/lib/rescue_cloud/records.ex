@@ -25,7 +25,7 @@ defmodule RescueCloud.Records do
   @default_limit 200
 
   @tiers ~w(P1 P2 P3)
-  @statuses ~w(received extracted decided escalated assigned rescued closed_duplicate)
+  @statuses ~w(received extracted decided assigned escalated rescued closed_duplicate)
 
   def tiers, do: @tiers
   def statuses, do: @statuses

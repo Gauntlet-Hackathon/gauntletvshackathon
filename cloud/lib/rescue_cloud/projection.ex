@@ -7,9 +7,10 @@ defmodule RescueCloud.Projection do
   the incrementally maintained rows.
 
   Fold rules (events in `(occurred_at, sequence)` order, deduplicated on `event_id`):
-    * status only moves forward: received → extracted → decided → escalated → assigned →
-      rescued / closed_duplicate. Events that are not statuses (`corrected`) never move it, and
-      an event with a lower rank than the current status is ignored.
+    * status only moves forward: received → extracted → decided → assigned → escalated →
+      rescued / closed_duplicate (`contracts/logic.md`, "Request status order"). Events that
+      are not statuses (`corrected`) never move it, and an event with a lower rank than the
+      current status is ignored.
     * `extracted` is the latest extraction with every `corrected` event applied on top, in order
       (`field` is a dotted path into the extracted payload, e.g. `people_count.value`).
     * tier, rule_id and the rest of the engine output come from the latest `decided` event.
@@ -29,8 +30,8 @@ defmodule RescueCloud.Projection do
     "received" => 1,
     "extracted" => 2,
     "decided" => 3,
-    "escalated" => 4,
-    "assigned" => 5,
+    "assigned" => 4,
+    "escalated" => 5,
     "rescued" => 6,
     "closed_duplicate" => 6
   }
