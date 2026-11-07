@@ -8,6 +8,7 @@ Design specs for the volunteer app and the Emergency Control Center (ECC) intake
 | `intake-simulator.html` | Intake page for the ECC laptop: creates rescue requests by form or CSV, checks each one with the field app's intake rules, then hands them to a field laptop. |
 | `use-cases.md` | 15 use cases plus the grader hint system: input, contract fields, screen behavior, acceptance checks and gaps. |
 | `assets/` | App icon: SVG master plus 1024, 512, 180, 64 and 32 px PNGs. |
+| `samples/trial-intake.csv` | 7 trial messages for the intake simulator's **Load a CSV** tab or the field board's upload, one of each: P1, P2, P3, check first, not a request, a duplicate of the P1 row, and a hard case. The `scenario` column says what each row exercises; both parsers ignore it. |
 
 ## Where each one runs
 
