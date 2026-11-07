@@ -21,3 +21,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 field #152 F15 re-verify: image rebuilt, GET / 200, POST /requests got fallback-engine decision; added tests/test_dockerfile.py static checks for the Dockerfile/.dockerignore contract
 2026-11-07 field #173 F18: board intake panel (_intake.html: single, paste, CSV forms; fetch script with Processing/Added/alert states, board fragment refresh); tests/test_board_intake.py
 2026-11-07 field #174 F27: rescue_field/loadtest.py surge load test (real engine, optional sync drain, JSON timings); tests/test_loadtest.py
+2026-11-07 field #154 F16: root docker-compose.yml (db+cloud+field), .env.example, RUNBOOK 'Run locally'; verified POST /requests syncs to the cloud db; cloud prod.exs force_ssl now excludes host 'cloud'
