@@ -13,7 +13,7 @@ from rescue_field.board import build_board
 from rescue_field.dispatch import draft_message, find_row
 from rescue_field.store import EventStore
 from rescue_field.volunteer import build_queue
-from rescue_shared.contracts_io import CONTRACTS
+from rescue_shared.contracts_io import CONTRACTS, validator_for
 from rescue_shared.ulid import new_ulid
 
 BASE = json.loads((CONTRACTS / "examples" / "payload-extracted.valid.json").read_text())
@@ -211,7 +211,12 @@ def test_got_everyone_out(store, client):
     assert r.status_code == 200 and "off every list" in confirmation(r.text)
     evs = status_events(store, rid)
     assert [e["type"] for e in evs] == ["assigned", "rescued"]
-    assert evs[1]["payload"] == {"rescued_count": 3, "note": "to: Shelter 2 (Oak Hall)"}
+    assert evs[1]["payload"] == {
+        "rescued_count": 3,
+        "note": None,
+        "outcome": "all",
+        "destination": "Shelter 2 (Oak Hall)",
+    }
     html = client.get("/").text
     assert rid not in html
 
@@ -234,7 +239,7 @@ def test_nobody_there(store, client):
     assert r.status_code == 200
     evs = status_events(store, rid)
     assert [e["type"] for e in evs] == ["assigned", "rescued"]
-    assert evs[1]["payload"] == {"rescued_count": 0, "note": "nobody there"}
+    assert evs[1]["payload"] == {"rescued_count": 0, "note": None, "outcome": "nobody"}
 
 
 def test_couldnt_get_there_keeps_priority_and_goes_to_top(store, client):
@@ -300,7 +305,60 @@ def test_other_posts_closed_too(store, client):
     )
     html = client.get("/").text
     assert root not in html and dup not in html
-    # Nothing is deleted: every event stays, one status event per action on the card.
+    # Nothing is deleted: every event stays, one status event per action on the card, and the
+    # folded post gets one closed_duplicate event pointing at the card (#309).
     assert [e["type"] for e in status_events(store, root)] == ["assigned", "rescued"]
-    assert status_events(store, dup) == []
-    assert len(store.all_events()) == 8
+    closed = [e for e in store.request_events(dup) if e["type"] == "closed_duplicate"]
+    assert [e["payload"] for e in closed] == [{"duplicate_of": root, "note": None}]
+    assert len(store.all_events()) == 9
+
+
+def test_second_crew_after_couldnt_get_there(store, client):
+    """assigned -> escalated -> assigned -> rescued on the laptop (#309)."""
+    rid = add(store, out("P1", "R-P1-01"), ext(people=4))
+    assign(client, rid)
+    assert update(client, rid, outcome="noreach", reason="Bridge under water").status_code == 200
+    page = client.get(f"/requests/{rid}/send")
+    assert page.status_code == 200
+    r = assign(client, rid, crew="Second boat")
+    assert "Second boat is on the way" in confirmation(r.text)
+    q = build_queue(build_board(store))
+    assert [c["request_id"] for c in q["out_now"]] == [rid]
+    r = update(client, rid, outcome="all", rescued_count="4", shelter="Shelter 1 (Lincoln High)")
+    assert r.status_code == 200
+    evs = status_events(store, rid)
+    assert [e["type"] for e in evs] == ["assigned", "escalated", "assigned", "rescued"]
+    assert evs[2]["payload"]["crew"] == "Second boat"
+    assert rid not in client.get("/").text
+
+
+def test_got_some_out_then_second_crew(store, client):
+    rid = add(store, out("P2", "R-P2-01"), ext(people=5))
+    assign(client, rid)
+    assert update(client, rid, outcome="some", got_count="2").status_code == 200
+    assign(client, rid, crew="Second boat")
+    assert update(client, rid, outcome="all", rescued_count="3").status_code == 200
+    assert [e["type"] for e in status_events(store, rid)][-2:] == ["assigned", "rescued"]
+
+
+def test_rescue_with_two_other_posts_writes_two_closed_duplicates(store, client):
+    root = add(store, out("P1", "R-P1-01"), ext("5 Oak St"))
+    dups = [
+        add(store, out("P1", "R-P1-01", "duplicate", dup=root), ext("5 Oak St"), at=at)
+        for at in ("2026-11-07T10:05:00Z", "2026-11-07T10:07:00Z")
+    ]
+    other = add(store, out("P2", "R-P2-01"), ext("9 Elm St"))
+    assign(client, root)
+    assert update(client, root, outcome="nobody").status_code == 200
+    closed = [e for e in store.all_events() if e["type"] == "closed_duplicate"]
+    assert sorted(e["request_id"] for e in closed) == sorted(dups)
+    assert all(e["payload"] == {"duplicate_of": root, "note": None} for e in closed)
+    assert other not in {e["request_id"] for e in closed}
+    validator = validator_for("event.schema.json")
+    written = [e for e in store.all_events() if e["type"] in STATUS_TYPES | {"closed_duplicate"}]
+    assert len(written) == 4
+    for e in written:
+        assert validator.is_valid(e), e
+    # A folded post is closed: its own status can no longer move.
+    r = client.post(f"/requests/{dups[0]}/status", json={"status": "assigned", "crew": "x"})
+    assert r.status_code == 409

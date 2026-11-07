@@ -1,8 +1,15 @@
 """POST /requests/{id}/status: assigned / rescued / escalated, forward only.
 
-Order: (none) < assigned < escalated < rescued. A request's current status is the highest
-status among its events; a move must go strictly up, so repeats and backward moves get 409.
-Skipping ahead (e.g. none -> rescued) is allowed. Each accepted move appends one event.
+Order (contracts/logic.md): (none) < assigned < escalated < rescued, with `closed_duplicate`
+ranked equal to `rescued`. A move must go strictly up, with one exception (#306, #309):
+`escalated -> assigned` is also a move, so a second crew can be sent after "Couldn't get there".
+A request's current status is its status events folded in order with that rule
+(`current_status`); repeats, backward moves and anything after `rescued` / `closed_duplicate`
+get 409. Skipping ahead (e.g. none -> rescued) is allowed. Each accepted move appends one event.
+
+`rescued` takes optional `outcome` (`all` / `some` / `nobody`) and `destination` (#309). Rescuing
+the first request of a duplicate group (the board card) also appends one `closed_duplicate`
+event per other open post folded into that card, in the same write.
 """
 
 from __future__ import annotations
@@ -22,14 +29,31 @@ from rescue_shared.ulid import new_ulid
 
 ORDER = ("assigned", "escalated", "rescued")
 RANK = {s: i for i, s in enumerate(ORDER, 1)}
+# Every status event type with its rank; `closed_duplicate` is terminal like `rescued`.
+STATUS_RANK = RANK | {"closed_duplicate": RANK["rescued"]}
+OUTCOMES = ("all", "some", "nobody")
+MAX_DESTINATION = 200  # contracts/payloads/rescued.schema.json
 # Far above any real rescue, far below the cloud's int4 columns (review L-05).
 MAX_RESCUED_COUNT = 100_000
 router = APIRouter()
 
 
+def moves(now: str | None, new: str) -> bool:
+    """True when a `new` status event changes a request whose status is `now`."""
+    if new not in STATUS_RANK:
+        return False
+    if now is None:
+        return True
+    return STATUS_RANK[new] > STATUS_RANK[now] or (now == "escalated" and new == "assigned")
+
+
 def current_status(events: list[dict[str, Any]]) -> str | None:
-    best = [e["type"] for e in events if e["type"] in RANK]
-    return max(best, key=RANK.__getitem__, default=None)
+    """The status after folding the status events in order (`closed_duplicate` included)."""
+    now: str | None = None
+    for e in events:
+        if moves(now, e["type"]):
+            now = e["type"]
+    return now
 
 
 class StatusError(Exception):
@@ -75,9 +99,42 @@ def _payload(status: str, data: dict[str, Any]) -> dict[str, Any]:
             raise StatusError(422, "invalid_input", "escalated needs a non-empty reason")
         return {"reason": reason, "note": note}
     count = data.get("rescued_count")
-    if count in (None, ""):
-        return {"rescued_count": None, "note": note}
-    return {"rescued_count": _count(count), "note": note}
+    out: dict[str, Any] = {
+        "rescued_count": None if count in (None, "") else _count(count),
+        "note": note,
+    }
+    outcome = data.get("outcome")
+    if outcome not in (None, ""):
+        if outcome not in OUTCOMES:
+            raise StatusError(422, "invalid_input", f"outcome must be one of {', '.join(OUTCOMES)}")
+        out["outcome"] = outcome
+    destination = _text(data.get("destination"))
+    if destination is not None:
+        if len(destination) > MAX_DESTINATION:
+            detail = f"destination must be at most {MAX_DESTINATION} characters"
+            raise StatusError(422, "invalid_input", detail)
+        out["destination"] = destination
+    return out
+
+
+def folded_posts(store: EventStore, request_id: str) -> list[str]:
+    """The other open requests folded into the card headed by `request_id` (the earliest
+    request of its duplicate group, as the board groups them), oldest first. Empty when
+    `request_id` is not a group's first request."""
+    from rescue_field.board import _requests, _root_finder  # board imports this module
+
+    recs = _requests(store.all_events())
+    if request_id not in recs:
+        return []
+    find = _root_finder(recs)
+    if find(request_id) != request_id:
+        return []
+    others = [
+        r for rid, r in recs.items()
+        if rid != request_id and find(rid) == request_id and moves(r["status"], "closed_duplicate")
+    ]
+    others.sort(key=lambda r: (r["received_at"], r["request_id"]))
+    return [r["request_id"] for r in others]
 
 
 def apply_status(
@@ -91,29 +148,43 @@ def apply_status(
     if not decided:
         raise StatusError(404, "not_found", f"unknown request {request_id}")
     now = current_status(events)
-    if now is not None and RANK[status] <= RANK[now]:
+    if not moves(now, status):
         raise StatusError(409, "invalid_transition", f"cannot move {now} -> {status}")
-    event = {
-        "event_id": new_ulid(),
-        "request_id": request_id,
-        "type": status,
-        "device_id": config.device_id,
-        "occurred_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "rules_version": decided[-1]["rules_version"],
-        "model_version": decided[-1]["model_version"],
-        "payload": _payload(status, data),
-    }
-    errors = list(validator_for("event.schema.json").iter_errors(event))
-    if errors:
-        raise StatusError(422, "invalid_input", errors[0].message)
-    store.append_events([event])
-    return {"request_id": request_id, "status": status, "event_id": event["event_id"]}
+    at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def make(rid: str, kind: str, payload: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "event_id": new_ulid(),
+            "request_id": rid,
+            "type": kind,
+            "device_id": config.device_id,
+            "occurred_at": at,
+            "rules_version": decided[-1]["rules_version"],
+            "model_version": decided[-1]["model_version"],
+            "payload": payload,
+        }
+
+    event = make(request_id, status, _payload(status, data))
+    batch = [event]
+    if status == "rescued":
+        payload = {"duplicate_of": request_id, "note": None}
+        batch += [make(rid, "closed_duplicate", payload) for rid in folded_posts(store, request_id)]
+    validator = validator_for("event.schema.json")
+    for ev in batch:
+        errors = list(validator.iter_errors(ev))
+        if errors:
+            raise StatusError(422, "invalid_input", errors[0].message)
+    store.append_events(batch)
+    result = {"request_id": request_id, "status": status, "event_id": event["event_id"]}
+    if len(batch) > 1:
+        result["closed_duplicates"] = [ev["request_id"] for ev in batch[1:]]
+    return result
 
 
 @router.post("/requests/{request_id}/status")
 async def post_status(request_id: str, request: Request) -> Any:
     """JSON or form: status (required); crew (assigned), reason (escalated),
-    rescued_count (rescued, optional), note (optional)."""
+    rescued_count, outcome and destination (rescued, optional), note (optional)."""
     ctype = request.headers.get("content-type", "").split(";")[0].strip().lower()
     try:
         if ctype in ("application/x-www-form-urlencoded", "multipart/form-data"):
