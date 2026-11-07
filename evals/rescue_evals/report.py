@@ -36,7 +36,11 @@ COLUMNS: dict[str, tuple[str, str]] = {
 OURS = "ours"
 MAIN_SETS = ("A", "B", "C", "D")
 SEALED_SET = "E"
-LOWER_IS_BETTER = {"decision.p1_misses_per_1000", "decision.false_alarm_rate"}
+LOWER_IS_BETTER = {
+    "decision.p1_misses_per_1000",
+    "decision.false_alarm_rate",
+    "calibration.ece",
+}
 EPS = 1e-9
 
 

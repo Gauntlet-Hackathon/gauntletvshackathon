@@ -37,7 +37,9 @@ DEFAULT_THRESHOLDS: dict[str, float | int] = {
 }
 DEFAULT_STREETS_PATH = CONTRACTS / "fixtures" / "streets.txt"
 DEFAULT_HOAX_MARKERS_PATH = CONTRACTS / "fixtures" / "hoax_markers.txt"
-DEFAULT_DEVICE_ID = "field-01"
+# The one default device id for the field app (DECISIONS A5): the pipeline stamps it on events
+# and the sync worker authenticates as it, so the two must agree (CLAUDE.md dev device).
+DEFAULT_DEVICE_ID = "laptop-dev-01"
 
 Decider = Callable[[dict[str, Any]], dict[str, Any]]
 BatchDecider = Callable[[Sequence[dict[str, Any]]], list[dict[str, Any]]]
@@ -66,7 +68,7 @@ class PipelineConfig:
         the defaults."""
         env = os.environ if env is None else env
         return cls(
-            device_id=env.get("DEVICE_ID") or env.get("FIELD_DEVICE_ID", DEFAULT_DEVICE_ID),
+            device_id=env.get("DEVICE_ID") or env.get("FIELD_DEVICE_ID") or DEFAULT_DEVICE_ID,
             streets=read_list(env.get("FIELD_STREETS_PATH", DEFAULT_STREETS_PATH)),
             hoax_markers=read_list(env.get("FIELD_HOAX_MARKERS_PATH", DEFAULT_HOAX_MARKERS_PATH)),
         )

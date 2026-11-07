@@ -144,3 +144,55 @@ def test_htmx_request_gets_fragment_only(store):
     add(store, "X", output("P2"), extracted(location="loc-x"))
     r = get(store, headers={"HX-Request": "true"})
     assert "<html" not in r.text and "loc-x" in r.text
+
+
+def abstain(provisional=None, reason="no_usable_location"):
+    out = output(None, "R-ABS-LOC", "abstain", question="Where are you?")
+    out["abstain_reason"] = reason
+    if provisional is not None:
+        out["provisional_tier"] = provisional
+    return out
+
+
+def test_follow_ups_sorted_by_provisional_tier_then_within_tier_key(store):
+    # oldest first by arrival, but P1 must jump the queue (DECISIONS R1)
+    add(store, "OLD3", abstain("P3"), extracted(people=9), at="2026-11-07T08:00:00Z")
+    add(store, "NONE", abstain(None), extracted(people=9), at="2026-11-07T07:00:00Z")
+    add(store, "P2", abstain("P2"), extracted(), at="2026-11-07T09:00:00Z")
+    add(store, "P1B", abstain("P1"), extracted(people=2), at="2026-11-07T10:00:00Z")
+    add(store, "P1A", abstain("P1"), extracted(people=2, vulnerable=1), at="2026-11-07T11:00:00Z")
+    order = [r["request_id"] for r in build_board(store)["follow_ups"]]
+    # within P1: vulnerable first; a missing provisional_tier sorts after P3
+    assert order == ["P1A", "P1B", "P2", "OLD3", "NONE"]
+
+
+def test_follow_ups_without_provisional_tier_keep_within_tier_order(store):
+    add(store, "A", abstain(), extracted(people=1), at="2026-11-07T08:00:00Z")
+    add(store, "B", abstain(), extracted(people=5), at="2026-11-07T09:00:00Z")
+    add(store, "C", abstain(), extracted(people=1), at="2026-11-07T07:00:00Z")
+    order = [r["request_id"] for r in build_board(store)["follow_ups"]]
+    assert order == ["B", "C", "A"]
+
+
+def test_follow_up_card_shows_provisional_tier(store):
+    add(store, "AB", abstain("P1"), extracted(location="loc-ab"))
+    add(store, "NO", abstain(None), extracted(location="loc-no"))
+    text = get(store).text
+    assert 'data-provisional-tier="P1"' in text
+    assert '<span class="provisional-tier tier-P1"' in text and "P1?</span>" in text
+    assert 'data-provisional-tier=""' in text  # no badge without one
+    assert text.count('class="provisional-tier') == 1
+
+
+def test_follow_up_group_takes_highest_provisional_tier(store):
+    add(store, "ORIG", abstain("P3"), extracted(location="loc-orig"), at="2026-11-07T09:00:00Z")
+    dup = abstain("P1")
+    dup["outcome"], dup["duplicate_of"] = "duplicate", "ORIG"
+    dup["abstain_reason"] = None
+    add(store, "DUP", dup, extracted(location="loc-dup"), at="2026-11-07T09:30:00Z")
+    add(store, "OTHER", abstain("P2"), extracted(location="loc-other"), at="2026-11-07T08:00:00Z")
+    follow = build_board(store)["follow_ups"]
+    assert [(r["request_id"], r["provisional_tier"]) for r in follow] == [
+        ("ORIG", "P1"),
+        ("OTHER", "P2"),
+    ]

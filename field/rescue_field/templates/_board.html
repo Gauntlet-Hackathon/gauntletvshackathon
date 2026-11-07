@@ -7,7 +7,8 @@
 <section class="followups" id="follow-ups">
   <h2>Follow-up queue <small>({{ follow_ups|length }})</small></h2>
   {% for r in follow_ups %}
-  <div class="row" data-request-id="{{ r.request_id }}">
+  <div class="row" data-request-id="{{ r.request_id }}" data-provisional-tier="{{ r.provisional_tier or '' }}">
+    {% if r.provisional_tier %}<span class="provisional-tier tier-{{ r.provisional_tier }}" title="Provisional tier (most cautious reading)">{{ r.provisional_tier }}?</span>{% endif %}
     <strong class="question">{{ r.decision.follow_up_question }}</strong>
     <div class="meta">{{ r.decision.abstain_reason }} · {{ r.decision.rule_id }} ·
       rules {{ r.rules_version }} · model {{ r.model_version }} · {{ r.received_at }}</div>

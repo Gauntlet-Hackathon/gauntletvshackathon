@@ -3,7 +3,9 @@
 Everything is derived from the event store. Within a tier the order is
 `rescue_shared.logic.within_tier_sort_key` (04). Requests the engine marked `duplicate` are
 collapsed under the earliest request of their group, which shows the group's highest tier.
-Not-a-request items are left off the board. `GET /` returns the full page, or just the board
+Not-a-request items are left off the board. The follow-up queue is sorted by the engine's
+`provisional_tier` (P1 first; DECISIONS R1), then by the same within-tier key; an abstain
+without one (older engine output) sorts after P3. `GET /` returns the full page, or just the board
 fragment for an HTMX request (`HX-Request` header), so a page can swap it in place.
 """
 
@@ -72,6 +74,18 @@ def _root_finder(recs: dict[str, dict[str, Any]]):
     return find
 
 
+def _provisional_tier(group: list[dict[str, Any]]) -> str | None:
+    """Highest provisional_tier in a follow-up group, or None when no member carries one."""
+    tiers = [m["decision"].get("provisional_tier") for m in group]
+    return min((t for t in tiers if t in TIERS), default=None)
+
+
+def _follow_up_key(r: dict[str, Any]) -> tuple[int, tuple[int, int, str, str]]:
+    tier = r["provisional_tier"]
+    rank = TIERS.index(tier) if tier in TIERS else len(TIERS)  # missing sorts last
+    return rank, logic.within_tier_sort_key(r["extracted"], r["received_at"], r["request_id"])
+
+
 def build_board(store: EventStore) -> dict[str, Any]:
     """{"tiers": [{"tier", "rows"}...], "follow_ups": [...], "counts": {...}}."""
     recs = _requests(store)
@@ -89,7 +103,9 @@ def build_board(store: EventStore) -> dict[str, Any]:
         tier = min(tiers, default=None)  # "P1" < "P2" < "P3"
         outcome = rec["decision"]["outcome"]
         if tier is None and outcome == "abstain":
-            follow_ups.append({**rec, "duplicates": dups})
+            follow_ups.append(
+                {**rec, "duplicates": dups, "provisional_tier": _provisional_tier(group)}
+            )
             continue
         if tier is None:
             continue  # not_a_request
@@ -104,7 +120,7 @@ def build_board(store: EventStore) -> dict[str, Any]:
                 r["extracted"], r["received_at"], r["request_id"]
             )
         )
-    follow_ups.sort(key=lambda r: (r["received_at"], r["request_id"]))
+    follow_ups.sort(key=_follow_up_key)
     return {
         "tiers": [{"tier": t, "rows": by_tier[t]} for t in TIERS],
         "follow_ups": follow_ups,
