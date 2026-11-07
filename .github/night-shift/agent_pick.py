@@ -234,6 +234,10 @@ def handle_open_prs(cfg: Config) -> str | None:
             m = BRANCH_RE.match(pr.get("headRefName") or "")
             if m and "review-error" in label_names(pr):
                 refund_last_attempt(cfg, int(m.group(1)), f"the review gate itself errored on PR #{num}")
+            elif m and conflicted:
+                # Parallel lanes editing the same lines is not the agent's failure: refund the
+                # attempt so conflicts alone never mark an issue blocked (it retries on fresh main).
+                refund_last_attempt(cfg, int(m.group(1)), f"PR #{num} hit a merge conflict with main")
             if m:
                 # No attempt marker here: the worker already counted this attempt when it started.
                 run_gh(["issue", "comment", m.group(1), "-R", cfg.repo, "--body",

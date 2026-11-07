@@ -233,6 +233,15 @@ class PickTests(unittest.TestCase):
         self.assertEqual(ap.decide(cfg())["issue"], "2")
         self.assertTrue(fake.wrote(["pr", "close"]))
 
+    def test_conflicted_pr_refunds_the_attempt(self):
+        comments = {1: [(BOT, ap.ATTEMPT_MARKER)]}
+        fake = self.use(FakeGH(prs=[pr(RUN_OK, mergeable="CONFLICTING")], issues=[issue(2)],
+                               comments=comments))
+        ap.decide(cfg())
+        patch = [c for c in fake.calls if c[:3] == ["api", "-X", "PATCH"]]
+        self.assertEqual(len(patch), 1)
+        self.assertIn(ap.INFRA_MARKER, patch[0][-1])
+
     def test_green_pr_is_merged_and_run_stops(self):
         checks = RUN_OK + [{"__typename": "StatusContext", "state": "SUCCESS"}]
         fake = self.use(FakeGH(prs=[pr(checks)], issues=[issue(1), issue(2)]))
