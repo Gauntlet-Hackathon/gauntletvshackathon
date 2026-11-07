@@ -9,6 +9,10 @@ The drafts stay in `evals/drafts/`. Only `gold_decision` was reviewed; `gold_ext
 context, makes that decision under the named rule. Where it needs the other post to see a duplicate or a count conflict,
 the rubric's label is used.
 
+Drafted labels Paawan accepted were kept even where the engine differs (about 30 rows: duplicates and count conflicts it
+can't see from one post, and the prank rows D-043 to D-052, which it abstains on as `low_confidence_request` rather than
+`possible_hoax`). Those rows measure real engine gaps.
+
 | Case | Drafted | Final | Why |
 | --- | --- | --- | --- |
 | C-078 | prioritized P1 | prioritized P2 | P2, changed from P1. Water is a foot from the door but not inside, and nothing says it is rising fast. They should leave soon, so urgent, but not an immediate threat. |
