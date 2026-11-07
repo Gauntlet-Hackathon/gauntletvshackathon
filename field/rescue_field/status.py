@@ -86,7 +86,7 @@ def apply_status(
     status = data.get("status")
     if status not in RANK:
         raise StatusError(422, "invalid_input", f"status must be one of {', '.join(ORDER)}")
-    events = [e for e in store.all_events() if e["request_id"] == request_id]
+    events = store.request_events(request_id)  # indexed, not a scan of the whole log
     decided = [e for e in events if e["type"] == "decided"]
     if not decided:
         raise StatusError(404, "not_found", f"unknown request {request_id}")

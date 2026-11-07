@@ -6,8 +6,14 @@ collapsed under the earliest request of their group, which shows the group's hig
 Not-a-request items stay off the tiers and the queue (listed newest first in `not_requests`).
 The follow-up queue is sorted by the engine's
 `provisional_tier` (P1 first; DECISIONS R1), then by the same within-tier key; an abstain
-without one (older engine output) sorts after P3. `GET /` returns the full page, or just the board
-fragment for an HTMX request (`HX-Request` header), so a page can swap it in place.
+without one (older engine output) sorts after P3. An abstain whose group a later prioritized
+duplicate lifted onto a tier (review O-08) shows its question on that tier row and keeps its
+follow-up entry, marked with the group's tier (`grouped_tier`). `GET /` returns the full page, or
+just the board fragment for an HTMX request (`HX-Request` header), so a page can swap it in place.
+
+Cost (review M-04): the event log is read once under the intake lock (one SELECT); the board is
+built from that snapshot in one pass and rendered in a worker thread, both outside the lock, so a
+large board never holds up intake, status changes, the sync worker or the health check.
 """
 
 from __future__ import annotations
@@ -21,7 +27,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
-from rescue_field.status import ORDER, RANK, current_status
+from rescue_field.status import ORDER, RANK
 from rescue_field.store import EventStore
 from rescue_shared import logic
 
@@ -32,24 +38,26 @@ templates = Jinja2Templates(directory=str(Path(__file__).with_name("templates"))
 router = APIRouter()
 
 
-def _requests(store: EventStore) -> dict[str, dict[str, Any]]:
-    """One record per request, in arrival order, from its received/extracted/decided events."""
+def _requests(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """One record per request, in arrival order, from its received/extracted/decided events,
+    with its current status (the highest status event, as `status.current_status`). One pass
+    over the events (review M-04: a per-request rescan made the board O(requests x events))."""
     recs: dict[str, dict[str, Any]] = {}
-    evs = store.all_events()
-    for ev in evs:
-        rec = recs.setdefault(ev["request_id"], {"request_id": ev["request_id"]})
-        if ev["type"] == "received":
+    for ev in events:
+        rec = recs.setdefault(ev["request_id"], {"request_id": ev["request_id"], "status": None})
+        kind = ev["type"]
+        if kind == "received":
             rec["received_at"] = ev["occurred_at"]
             rec["raw_text"] = ev["payload"].get("raw_text")
             rec["channel"] = ev["payload"].get("channel")
-        elif ev["type"] == "extracted":
+        elif kind == "extracted":
             rec["extracted"] = ev["payload"]
             rec["model_version"] = ev["model_version"]
-        elif ev["type"] == "decided":
+        elif kind == "decided":
             rec["decision"] = ev["payload"]["engine_output"]
             rec["rules_version"] = ev["rules_version"]
-    for rid, rec in recs.items():
-        rec["status"] = current_status([e for e in evs if e["request_id"] == rid])
+        elif kind in RANK and (rec["status"] is None or RANK[kind] > RANK[rec["status"]]):
+            rec["status"] = kind
     return {
         rid: r for rid, r in recs.items() if {"received_at", "extracted", "decision"} <= r.keys()
     }
@@ -90,17 +98,31 @@ def _follow_up_key(r: dict[str, Any]) -> tuple[int, tuple[int, int, str, str]]:
     return rank, logic.within_tier_sort_key(r["extracted"], r["received_at"], r["request_id"])
 
 
-def _question(members: list[dict[str, Any]]) -> dict[str, str] | None:
-    """The follow-up question to show on a tier row: the first member (the one that set the
-    tier first) whose `prioritized` or `duplicate` decision carries one (DECISIONS R9: a
-    duplicate whose own signal set the group tier keeps its question)."""
+def _label(decision: dict[str, Any]) -> str:
+    q = decision.get("follow_up_question")
+    hoax = decision.get("abstain_reason") == "possible_hoax" or q == Q_HOAX
+    return "Possible hoax" if hoax else "Needs confirmation"
+
+
+def _questions(rec: dict[str, Any], members: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """The follow-up questions to show on a tier row headed by `rec`.
+
+    First the root's own question when it abstained (review O-08: the row is headed by its
+    text, so a suspected hoax or a count conflict must stay flagged there). Then the first
+    member (the one that set the tier first) whose `prioritized` or `duplicate` decision carries
+    one (DECISIONS R9: a duplicate whose own signal set the group tier keeps its question)."""
+    out: list[dict[str, str]] = []
+    d = rec["decision"]
+    if d["outcome"] == "abstain" and d.get("follow_up_question"):
+        out.append({"text": d["follow_up_question"], "label": _label(d)})
     for m in members:
         d = m["decision"]
         if d["outcome"] in ("prioritized", "duplicate") and d.get("follow_up_question"):
-            q = d["follow_up_question"]
-            label = "Possible hoax" if q == Q_HOAX else "Needs confirmation"
-            return {"text": q, "label": label}
-    return None
+            q = {"text": d["follow_up_question"], "label": _label(d)}
+            if q not in out:
+                out.append(q)
+            break
+    return out
 
 
 def allowed_statuses(current: str | None) -> list[str]:
@@ -111,7 +133,12 @@ def allowed_statuses(current: str | None) -> list[str]:
 
 def build_board(store: EventStore) -> dict[str, Any]:
     """{"tiers": [{"tier", "rows"}...], "follow_ups": [...], "counts": {...}}."""
-    recs = _requests(store)
+    return build_board_from_events(store.all_events())
+
+
+def build_board_from_events(events: list[dict[str, Any]]) -> dict[str, Any]:
+    """`build_board` from a snapshot of the event log (store order)."""
+    recs = _requests(events)
     find = _root_finder(recs)
     members: dict[str, list[dict[str, Any]]] = {}
     for rid, rec in recs.items():
@@ -138,16 +165,28 @@ def build_board(store: EventStore) -> dict[str, Any]:
         shown = next(
             (m for m in [rec, *dups] if m["decision"]["priority_tier"] == tier), rec
         )
+        questions = _questions(rec, [shown, rec, *dups])
         by_tier[tier].append(
             {
                 **rec,
                 "tier": tier,
                 "tier_source": shown,
-                "question": _question([shown, rec, *dups]),
+                "question": questions[0] if questions else None,
+                "questions": questions,
                 "duplicates": dups,
                 "allowed": allowed_statuses(rec["status"]),
             }
         )
+        # An abstain lifted onto a tier by a duplicate still needs its callback (O-08).
+        for m in (m for m in [rec, *dups] if m["decision"]["outcome"] == "abstain"):
+            follow_ups.append(
+                {
+                    **m,
+                    "duplicates": [x for x in [rec, *dups] if x is not m],
+                    "provisional_tier": _provisional_tier([m]),
+                    "grouped_tier": tier,
+                }
+            )
     for rows in by_tier.values():
         rows.sort(
             key=lambda r: logic.within_tier_sort_key(
@@ -171,11 +210,12 @@ async def board(request: Request) -> HTMLResponse:
         raise RuntimeError("event store is not open (app lifespan not running)")
     lock = request.app.state.intake_lock
 
-    def read() -> dict[str, Any]:
-        with lock:  # the store connection is shared across threads
-            return build_board(store)
+    def snapshot() -> list[dict[str, Any]]:
+        with lock:  # one SELECT; building and rendering happen outside the lock
+            return store.all_events()
 
-    ctx = await run_in_threadpool(read)
+    events = await run_in_threadpool(snapshot)
+    ctx = await run_in_threadpool(build_board_from_events, events)
     ctx["model_version"] = getattr(request.app.state.extractor, "model_version", None) or "unknown"
     info = getattr(request.app.state, "extractor_info", None) or {}
     ctx["model_banner"] = (
@@ -188,4 +228,6 @@ async def board(request: Request) -> HTMLResponse:
     worker = getattr(request.app.state, "sync_worker", None)
     ctx["sync_paused"] = bool(getattr(worker, "paused", False))
     name = "_board.html" if request.headers.get("HX-Request") else "board.html"
-    return templates.TemplateResponse(request, name, ctx)
+    # Rendering a large board takes a while: do it in a worker thread, never on the event loop
+    # (which would stall every other request, /healthz included).
+    return await run_in_threadpool(templates.TemplateResponse, request, name, ctx)

@@ -10,8 +10,10 @@ import logging
 import math
 import os
 import secrets
+import threading
 import time
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -196,6 +198,63 @@ def _extract(extractor: Extractor, raw: str) -> Extraction:
         return KeywordExtractor().extract(raw)
 
 
+class FairLock:
+    """A first-come, first-served mutex (a ticket lock). With a plain `threading.Lock` the bulk
+    upload that releases it between rows usually takes it straight back, so a single request
+    waiting for the model would still sit behind the whole upload."""
+
+    def __init__(self) -> None:
+        self._cond = threading.Condition(threading.Lock())
+        self._next = 0  # next ticket to hand out
+        self._serving = 0  # ticket that holds the lock
+
+    def __enter__(self) -> None:
+        with self._cond:
+            ticket = self._next
+            self._next += 1
+            self._cond.wait_for(lambda: self._serving == ticket)
+
+    def __exit__(self, *exc: object) -> None:
+        with self._cond:
+            self._serving += 1
+            self._cond.notify_all()
+
+    def locked(self) -> bool:
+        with self._cond:
+            return self._serving != self._next
+
+
+def extract_items(
+    items: Sequence[IntakeItem],
+    extractor: Extractor | None = None,
+    *,
+    lock: AbstractContextManager[Any] | None = None,
+) -> list[Extraction]:
+    """The extractor's reading of each item, in order (the model step of `process_batch`).
+
+    It needs no store access, so the API runs it before taking the intake lock (review O-02:
+    a bulk paste ran the model on every row while holding it). `lock`, held for one row at a
+    time, keeps the model to one caller at a time without making a single request wait for a
+    whole bulk upload to finish."""
+    extractor = extractor or FixtureExtractor()
+    lock = lock if lock is not None else nullcontext()
+    out = []
+    for item in items:
+        with lock:
+            out.append(_extract(extractor, item.raw))
+    return out
+
+
+def _relevant_prior(
+    prior: list[dict[str, Any]], records: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """The earlier requests that can be a duplicate candidate of any record: a candidate needs
+    the same non-empty normalised location, so the rest cannot change the result and are left
+    out (`logic.duplicate_candidates` compares every pair; review M-04)."""
+    locs = {logic.normalize_location(r["location_text"]) for r in records} - {""}
+    return [p for p in prior if logic.normalize_location(p["location_text"]) in locs]
+
+
 def _ordered_ids(n: int) -> list[str]:
     """n ULIDs that sort in the given order (plain ULIDs made in the same ms do not)."""
     ms = int(time.time() * 1000)
@@ -211,9 +270,10 @@ def process_batch(
     decide_batch: BatchDecider | None = None,
     config: PipelineConfig | None = None,
     now: str | None = None,
+    extractions: Sequence[Extraction] | None = None,
 ) -> list[list[dict[str, Any]]]:
     """Extract, decide and store many requests, in order. Returns [received, extracted,
-    decided] per item.
+    decided] per item. `extractions` (from `extract_items`, one per item) skips the model step.
 
     Earlier items are duplicate candidates for later ones, exactly as if each had been
     submitted on its own. The engine is called in batch mode: one call per "wave", where a
@@ -227,15 +287,21 @@ def process_batch(
     config = config or PipelineConfig()
     extractor = extractor or FixtureExtractor()
     decide_batch = decide_batch or engine_client.decide_batch
+    if extractions is None:
+        extractions = extract_items(items, extractor)
+    elif len(extractions) != len(items):
+        raise ValueError(f"{len(extractions)} extractions for {len(items)} items")
+    # Stamped after extraction, under the caller's intake lock: arrival order and store order
+    # must agree, or two concurrent intakes would miss each other as duplicates.
     received_at = now or _now()
     ids = _ordered_ids(len(items))
 
-    extractions = [_extract(extractor, item.raw) for item in items]
     records = [
         _record(rid, received_at, item.contact, ex.payload)
         for rid, item, ex in zip(ids, items, extractions, strict=True)
     ]
-    prior = _known_requests(store)  # ids are fresh, so none of these is in the batch
+    # ids are fresh, so none of these is in the batch
+    prior = _relevant_prior(_known_requests(store), records)
     window = config.thresholds["duplicate_window_hours"]
     all_candidates = logic.duplicate_candidates([*prior, *records], window)
 

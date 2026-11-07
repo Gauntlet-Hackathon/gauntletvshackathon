@@ -56,3 +56,9 @@ def test_model_pin_is_org_repo_at_full_commit_sha():
     assert args["HF_REPO"].count("/") == 1
     rev = args["HF_REVISION"]
     assert len(rev) == 40 and all(c in "0123456789abcdef" for c in rev)
+
+
+def test_health_check_uses_lock_free_healthz():
+    """Review M-04/O-02: /sync/status waits behind the intake lock (board renders, bulk
+    uploads), so the Fly check uses /healthz, which never takes it."""
+    assert [c["path"] for c in CFG["http_service"]["checks"]] == ["/healthz"]

@@ -224,11 +224,36 @@ def test_worker_down_sync_off_by_default(store):
     w.client.close()
 
 
-def test_worker_down_sync_failure_backs_off(store):
-    w = make_worker(store, DownCloud([500]), down_sync=True)
+def test_worker_down_sync_failure_backs_off_only_down_sync(store):
+    """Review F-06: a failing /sync/down after a good upload kept the device offline, never set
+    last_sync_at and backed uploads off to 300 s. Now the upload counts as a sync; only the
+    down-sync step backs off, on its own counter, and status() reports its error."""
+    now = [1000.0]
+    cloud = DownCloud([500, 500, page(9)])
+    w = make_worker(store, cloud, down_sync=True, idle_interval=10.0, clock=lambda: now[0])
+    store.append_events([local(1, "assigned", request_id="01JCB00000000000000000RQ05")])
     delay = w.run_cycle()
-    assert w.online is False and w.failures == 1 and delay > 0
-    assert "/sync/down" in w.last_error
+    assert w.online is True and w.failures == 0 and delay == 10.0
+    assert w.last_sync_at is not None and w.last_error is None
+    assert cloud.uploaded == [local(1, "assigned")["event_id"]] and store.outbox_count() == 0
+    assert "/sync/down" in w.last_down_error and w.down_failures == 1
+    st = w.status()
+    assert st["online"] is True and st["last_down_error"] == w.last_down_error
+    assert st["down_sync_failures"] == 1
+
+    # Within the down-sync backoff (about 2 s): uploads go on, /sync/down is not called.
+    now[0] += 1.0
+    store.append_events([local(2, "assigned", request_id="01JCB00000000000000000RQ06")])
+    assert w.run_cycle() == 10.0
+    assert cloud.calls.count("/sync/down") == 1 and len(cloud.uploaded) == 2
+
+    now[0] += 10.0  # past it: tried again, fails again, backs off longer
+    assert w.run_cycle() == 10.0 and w.online is True
+    assert cloud.calls.count("/sync/down") == 2 and w.down_failures == 2
+    now[0] += 1000.0  # recovers: error cleared, cursor stored
+    w.run_cycle()
+    assert w.last_down_error is None and w.down_failures == 0
+    assert downsync.cursor(store) == 9
     w.client.close()
 
 

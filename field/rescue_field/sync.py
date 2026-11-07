@@ -17,6 +17,10 @@ rejected; otherwise the batch is halved, and a single event of normal size that 
 backs off like any other failure (a proxy that answers 413 to everything rejects nothing).
 Other 4xx answers are not event-specific in the sync API (400 is a malformed envelope, 401/403
 are auth) and keep backing off, so a cloud-side problem never rejects the whole outbox.
+
+A failing down-sync (`GET /sync/down`) is not an upload failure (review F-06): the cycle still
+counts as a successful sync (online, `last_sync_at` set, uploads at the idle interval). The error
+is kept in `last_down_error` and only the down-sync step backs off, on its own counter.
 """
 
 from __future__ import annotations
@@ -103,6 +107,7 @@ class SyncResult:
     acked: int = 0
     rejected: int = 0
     pulled: int = 0
+    down_error: str | None = None
 
 
 def _utc_now() -> str:
@@ -125,6 +130,7 @@ class SyncWorker:
         batch_size: int = BATCH_SIZE,
         down_sync: bool = False,
         oversize_bytes: int = OVERSIZE_EVENT_BYTES,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.store = store
         self.device_id = device_id
@@ -145,6 +151,10 @@ class SyncWorker:
         self.online = False
         self.last_sync_at: str | None = None
         self.last_error: str | None = None
+        self.clock = clock
+        self.down_failures = 0
+        self.last_down_error: str | None = None
+        self._down_retry_at = 0.0  # clock() time before which down-sync is skipped
         self._paused = threading.Event()
         self._stop = threading.Event()
         self._wake = threading.Event()  # cuts a backoff/idle wait short (resume)
@@ -252,13 +262,26 @@ class SyncWorker:
             if not acked and not marked:
                 break  # no progress this round (partial failure): back off rather than spin
         if self.down_sync and not self._stop.is_set() and not self._paused.is_set():
-            try:
-                result.pulled = len(
-                    downsync.pull(self.client, self.store, self.lock, device_id=self.device_id)
-                )
-            except downsync.DownSyncError as exc:
-                raise SyncError(str(exc)) from exc
+            self._down_sync(result)
         return result
+
+    def _down_sync(self, result: SyncResult) -> None:
+        """Pull other sites' events, unless a down-sync failure is still backing off. A
+        DownSyncError is recorded, never raised: the upload already succeeded (F-06)."""
+        if self.clock() < self._down_retry_at:
+            return
+        try:
+            result.pulled = len(
+                downsync.pull(self.client, self.store, self.lock, device_id=self.device_id)
+            )
+        except downsync.DownSyncError as exc:
+            self.down_failures += 1
+            self.last_down_error = result.down_error = str(exc)
+            self._down_retry_at = self.clock() + backoff_delay(self.down_failures, self.rng)
+            return
+        self.down_failures = 0
+        self.last_down_error = None
+        self._down_retry_at = 0.0
 
     # ---- loop -------------------------------------------------------------------------
 
@@ -319,6 +342,7 @@ class SyncWorker:
         """Go back online and retry now, even if a long backoff wait is running."""
         self._paused.clear()
         self.failures = 0
+        self._down_retry_at = 0.0
         self._wake.set()
 
     def status(self) -> dict[str, Any]:
@@ -331,6 +355,8 @@ class SyncWorker:
             "last_sync_at": self.last_sync_at,
             "last_error": self.last_error,
             "consecutive_failures": self.failures,
+            "last_down_error": self.last_down_error,
+            "down_sync_failures": self.down_failures,
         }
 
 
