@@ -52,7 +52,9 @@ Step 4's tiers (below) are computed for every input first, because several earli
      Its `provisional_tier` is the highest of the request's `weak_tier` and every candidate's non-null `priority_tier` (changed 2026-11-07, see DECISIONS; R4).
    - else `outcome = duplicate`, `duplicate_of` = the first candidate (oldest), `priority_tier` = the highest of the request's own tier and every candidate's non-null `priority_tier` (P1 > P2 > P3), rule `R-DUP-01`.
      `follow_up_question`: the request's own question (confirm, `low_confidence_hazard` or `possible_hoax` text) is kept when the request's own tier is higher
-     than every candidate's non-null tier, because then its own signals set the group tier; otherwise null (changed 2026-11-07, see DECISIONS; R9).
+     than every candidate's non-null tier, because then its own signals set the group tier, **or** when the request's `weak_tier` is higher than the
+     group `priority_tier`, because then the question asks about a raise above the group tier (a weak P1 hint on a P2 duplicate keeps the
+     `low_confidence_hazard` text); otherwise null (changed 2026-11-07, see DECISIONS; R9).
 6. Otherwise the output of steps 4–4a.
 
 Equality at a boundary counts as passing the minimum (`≥`): confidence 0.6 is enough for a request or a location. Confidence strictly below the minimum fails.
@@ -104,7 +106,7 @@ Fixture C25 shows it. `R-P1-04` stays as the plan states it (child, elderly, dis
 | outcome | priority_tier | provisional_tier | duplicate_of | abstain_reason | follow_up_question |
 |---|---|---|---|---|---|
 | `prioritized` | P1/P2/P3 | null | null | null | null, or: the confirm text when step 4 raised the tier on an uncertain signal; the `low_confidence_hazard` text when a weak signal would raise a P2 (R2); the `possible_hoax` text for a P1 possible hoax (R3) |
-| `duplicate` | highest of the group (kept) | null | request_id of the oldest candidate | null | null, or the request's own question when its own tier sets the group tier (R9) |
+| `duplicate` | highest of the group (kept) | null | request_id of the oldest candidate | null | null, or the request's own question when its own tier sets the group tier or its `weak_tier` is above the group tier (R9) |
 | `abstain` | null | **required**: P1/P2/P3 (R1) | null | the reason | required (text below) |
 | `not_a_request` | null | null | null | null | null |
 

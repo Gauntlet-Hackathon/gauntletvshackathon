@@ -535,11 +535,13 @@ check_duplicates(Ex, A, OwnTier, OwnQuestion, First, Rest) = Out :-
     else
         GroupTier = list.foldl(group_tier, Candidates, OwnTier),
         Earliest = list.foldl(earlier, Rest, First),
-        % R9: keep the request's own question when its own signals set the group tier.
+        % R9: keep the request's own question when its own signals set the group
+        % tier, or when its weak signals would raise it above the group tier.
         ( if
             list.member(C, Candidates),
             C ^ cand_tier = yes(T),
-            not higher(OwnTier, T)
+            not higher(OwnTier, T),
+            not higher(A ^ a_weak, GroupTier)
         then
             Question = no
         else

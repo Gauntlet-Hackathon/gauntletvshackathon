@@ -255,6 +255,7 @@ def load_review_inputs() -> list[dict]:
         m.signals("C08", hazards=[("fire", 0.3)], vulnerable=[("elderly", 0.3)]),
         m.signals("C11", hazards=[("rising_water", 0.8), ("on_roof", 0.3)]),
         *(m._c04_with(t) for t in ("P1", "P2", "P3", None)),
+        *(m._weak_p1_dup(t) for t in ("P1", "P2", "P3", None)),
     ]
     for text in (None, "", "   ", "\t\n", " 4410 Bissonnet St "):
         for loc_type in ("address", "coords", "landmark"):

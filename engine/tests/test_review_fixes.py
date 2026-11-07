@@ -270,6 +270,25 @@ def test_duplicate_drops_confirm_when_group_already_has_the_tier():
     assert (out["priority_tier"], out["follow_up_question"]) == ("P1", None)
 
 
+def _weak_p1_dup(candidate_tier):
+    item = signals("C05", hazards=[("trapped", 0.95), ("rising_water", 0.3)])  # P2, weak P1
+    item["context"]["duplicate_candidates"] = [cand(tier=candidate_tier)]
+    return item
+
+
+def test_duplicate_keeps_hazard_question_when_weak_tier_is_above_group_tier():
+    # The P2 group does not hold the weak P1 raise, so the hazard question must survive.
+    out = decide(_weak_p1_dup("P2"))
+    assert (out["outcome"], out["priority_tier"], out["follow_up_question"]) == (
+        "duplicate", "P2", Q_HAZARD)
+
+
+def test_duplicate_drops_hazard_question_when_group_already_is_p1():
+    out = decide(_weak_p1_dup("P1"))
+    assert (out["outcome"], out["priority_tier"], out["follow_up_question"]) == (
+        "duplicate", "P1", None)
+
+
 def test_duplicate_fixtures_unchanged():
     for case_id in ("C22", "C23", "C24"):
         assert decide(inp(case_id))["follow_up_question"] is None

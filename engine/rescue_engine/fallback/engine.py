@@ -158,13 +158,17 @@ def check_duplicates(
         provisional = dedupe.group_tier(tier["weak"], candidates)
         return _abstain(rules.R_ABS_CNT, "conflicting_counts", rules.Q_COUNTS, provisional)
     own_tier = own["priority_tier"]
-    # R9: keep the request's own question when its own signals set the group tier.
-    question = own["follow_up_question"] if dedupe.sets_group_tier(own_tier, candidates) else None
+    group = dedupe.group_tier(own_tier, candidates)
+    # R9: keep the request's own question when its own signals set the group tier, or when
+    # its weak signals would raise it above the group tier (a weak P1 on a P2 group keeps
+    # the hazard question, so a human still asks it).
+    keep = dedupe.sets_group_tier(own_tier, candidates) or rules.higher(tier["weak"], group)
+    question = own["follow_up_question"] if keep else None
     out = _output(
         "duplicate",
         rules.R_DUP,
         follow_up_question=question,
-        priority_tier=dedupe.group_tier(own_tier, candidates),
+        priority_tier=group,
     )
     out["duplicate_of"] = dedupe.earliest(candidates)
     return out
