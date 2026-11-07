@@ -48,6 +48,7 @@ log = logging.getLogger("rescue_evals.baselines")
 DEFAULT_OPUS_MODEL = "claude-opus-5-5"
 SYSTEMS = ("opus", "slm")
 SCHEMA_PATH = REPO_ROOT / "contracts" / "payloads" / "extracted.schema.json"
+RUBRIC_PATH = REPO_ROOT / "docs" / "plan" / "04-decision-rubric.md"
 
 
 class ConfigError(Exception):
@@ -55,13 +56,27 @@ class ConfigError(Exception):
 
 
 def build_prompt() -> str:
-    """Same task and output contract as the field SLM: one JSON object matching the schema."""
+    """Same task and output contract as the field SLM, plus the full decision rubric.
+
+    The plan (05-evals.md) asks for Opus "with a well-structured prompt that includes the full
+    rubric": the model sees how its extraction will be decided, but still only extracts; the
+    decision is made by the same engine as every other system.
+    """
     schema = SCHEMA_PATH.read_text(encoding="utf-8") if SCHEMA_PATH.exists() else "{}"
-    return (
+    if not RUBRIC_PATH.exists():  # a baseline without the rubric is not the planned comparison
+        raise ConfigError(f"decision rubric not found at {RUBRIC_PATH}")
+    rubric = RUBRIC_PATH.read_text(encoding="utf-8")
+    parts = [
         "You read one messy rescue request and extract structured facts. Reply with ONE JSON "
-        "object and nothing else, matching this JSON Schema exactly (no extra keys). Use "
-        "confidences between 0 and 1. Do not decide priority; only extract.\n\n" + schema
-    )
+        "object and nothing else, matching the JSON Schema below exactly (no extra keys). Use "
+        "confidences between 0 and 1. Do not decide priority; only extract. A deterministic "
+        "engine applies the decision rubric below to your extraction, so extract every fact "
+        "the rubric depends on (request or not, location and its type, people, vulnerable "
+        "people, hazards, needs) and set confidences honestly.",
+    ]
+    parts.append("<decision_rubric>\n" + rubric.strip() + "\n</decision_rubric>")
+    parts.append("<json_schema>\n" + schema.strip() + "\n</json_schema>")
+    return "\n\n".join(parts)
 
 
 def parse_output(text: str) -> Extracted:
@@ -85,7 +100,13 @@ def _post(url: str, headers: dict[str, str], body: dict[str, Any]) -> dict[str, 
         with urllib.request.urlopen(req, timeout=120) as resp:  # noqa: S310
             return json.loads(resp.read())
     except urllib.error.HTTPError as e:
-        raise RuntimeError(f"HTTP {e.code} from {url}") from e
+        detail = ""
+        try:
+            err = json.loads(e.read()).get("error", {})
+            detail = f": {str(err.get('message', ''))[:200]}" if isinstance(err, dict) else ""
+        except (ValueError, OSError, AttributeError):
+            pass
+        raise RuntimeError(f"HTTP {e.code} from {url}{detail}") from e
     except (urllib.error.URLError, TimeoutError) as e:
         raise RuntimeError(f"cannot reach {url}: {e}") from e
 
@@ -123,8 +144,8 @@ def opus_client(env: dict[str, str]) -> tuple[str, Generate]:
             {"x-api-key": key, "anthropic-version": "2023-06-01"},
             {
                 "model": model,
-                "max_tokens": 1024,
-                "temperature": 0,
+                "max_tokens": 2048,
+                # no temperature: current Opus models reject it (HTTP 400 "deprecated")
                 "system": system,
                 "messages": [{"role": "user", "content": text}],
             },

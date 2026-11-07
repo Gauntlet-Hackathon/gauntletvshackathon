@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from rescue_evals.baselines import llm
 from rescue_evals.baselines.llm import main, parse_output
 from rescue_evals.baselines.regex_baseline import extract
 
@@ -135,3 +136,20 @@ def test_run_baseline_records_none_usage_and_latency(tmp_path):
     rows = _rows_of(out)
     assert all(r["input_tokens"] is None and r["output_tokens"] is None for r in rows)
     assert all(r["latency_ms"] >= 0 for r in rows)
+
+
+def test_opus_prompt_has_rubric_and_schema_and_no_temperature(monkeypatch):
+    prompt = llm.build_prompt()
+    assert "<decision_rubric>" in prompt and "Step 3" in prompt and "R-ABS-LOC" in prompt
+    assert "<json_schema>" in prompt and '"people_count"' in prompt
+    sent = {}
+
+    def fake_post(url, headers, body):
+        sent.update(body)
+        return {"content": [{"type": "text", "text": "{}"}], "usage": {}}
+
+    monkeypatch.setattr(llm, "_post", fake_post)
+    _, generate = llm.opus_client({"ANTHROPIC_API_KEY": "k"})
+    generate("help")
+    assert sent["system"] == prompt
+    assert "temperature" not in sent  # current Opus models reject it
