@@ -1,0 +1,1 @@
+- 2026-11-07: same CommunityRescue logo + favicon on /board and /intake; test_brand_icons checks every field page.

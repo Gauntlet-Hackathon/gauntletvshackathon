@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rescue triage board</title>
+<link rel="icon" type="image/png" sizes="32x32" href="/static/icons/communityrescue-icon-32.png">
+<link rel="icon" type="image/svg+xml" href="/static/icons/communityrescue-icon.svg">
+<link rel="apple-touch-icon" href="/static/icons/communityrescue-icon-180.png">
 <style>
 /* Projector-readable, WCAG AA. Colour pairs (text on background, contrast ratio):
    #1a1a1a on #ffffff 17.4:1 (body), #4a4a4a on #ffffff 8.86:1 (meta),
@@ -33,12 +36,13 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
 textarea:focus-visible, [tabindex]:focus-visible { outline: 3px solid #0b57d0; outline-offset: 2px; }
 .skip-link { position: absolute; left: -999rem; top: .5rem; padding: .4rem .8rem; background: #ffffff; color: #0b57d0; }
 .skip-link:focus { left: .5rem; }
+.brand-title { display: flex; align-items: center; gap: .5rem; }
 </style>
 </head>
 <body>
 <a class="skip-link" href="#board">Skip to board</a>
 <header>
-<h1>Rescue triage board</h1>
+<h1 class="brand-title"><img src="/static/icons/communityrescue-icon-64.png" width="40" height="40" alt="CommunityRescue"> Rescue triage board</h1>
 <p id="model-version">Model: {{ model_version }}</p>
 <div id="sync-badge" role="status" aria-live="polite"></div>
 {% if demo_mode %}<p><button type="button" id="offline-toggle">{{ "Go back online" if sync_paused else "Simulate offline" }}</button> <span id="offline-toggle-msg" role="alert"></span></p>
