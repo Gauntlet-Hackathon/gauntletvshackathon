@@ -38,6 +38,7 @@ jobs:
           pip install -c constraints.txt --group dev \
             -r shared/requirements.txt -r field/requirements.txt \
             -r engine/requirements.txt -r evals/requirements.txt
+      - uses: ./.github/actions/install-mercury
       - name: Lint (ruff)
         run: ruff check shared field engine evals
       - name: Tests (pytest)

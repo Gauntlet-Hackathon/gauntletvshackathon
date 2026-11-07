@@ -72,4 +72,4 @@ Made by the integrator while turning the plan into contracts. Reverse any of the
 - Install: the documented apt route is broken because the repo's signing key expired on 2026-07-15 (Mercury-Language/packaging#15). `.github/actions/install-mercury` installs the 22.01.8 `.deb` files from this repo's `mercury-debs-22.01.8` release and pins their SHA256 hashes, taken from the upstream repo's signed `Packages` index. The release also holds the matching source. Stuck on 22.01.8 unless someone builds from source.
 - JSON: `mercury_json`, pinned to the tip of its `mercury_22_01` branch.
 - E7 parity tests compare parsed JSON, not bytes: the writer emits `ë` where Python's default is `ë`. `mercury_json` stores numbers as floats, so large integers may not match Python.
-- The `engine` agent job has `mmc` on PATH and `$MERCURY_JSON_SRC` set; other lanes skip the install. `mmc` is not in the `python` CI job yet, so E7's `pytest engine` parity tests need it added there.
+- The `engine` agent job has `mmc` on PATH and `$MERCURY_JSON_SRC` set; other lanes skip the install. The `python` CI job has them too, so `pytest engine` parity tests can use `mmc`.
