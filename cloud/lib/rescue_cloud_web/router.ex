@@ -42,6 +42,7 @@ defmodule RescueCloudWeb.Router do
     live "/records", RecordsLive
     live "/records/:request_id", RecordsLive
     live "/activity", ActivityLive
+    live "/corrections", CorrectionsLive
   end
 
   # The sync API (/sync/*) goes in an :api scope behind the device-auth plug (ticket C2).
