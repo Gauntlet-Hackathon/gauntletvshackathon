@@ -71,3 +71,11 @@ The trained models have not been run on Set B yet.
 
 Opus is from the stored files here. Keyword is `python -m rescue_evals.runner --system regex-baseline --sets C,D` on the same commit (not committed: it is deterministic and reruns in seconds). v3, laya-s13 and gold come from the 2026-11-07 model validation on the same sets (not in the repo; the trained-model runs need an HF token).
 Offline: Opus does not work offline; keyword and the trained model do.
+
+### Set C split change (2026-11-07, proposed)
+
+C-050, C-057 and C-060 moved from `test` to `dev` (`evals/sets/REVIEW.md`, "Split change"). `opus__C.json` was
+re-scored from the stored JSONL with `--rescore` (no model calls); set C now has 58 test cases. Opus + rubric on C:
+outcome accuracy 0.90 -> 0.93, tier accuracy 0.86 -> 0.85, urgent missed per 1,000 urgent 69 -> 74 (2 of 27 instead of
+2 of 29), per 1,000 requests 33 -> 34, duplicate pairwise F1 0.67 (unchanged), Top-20 0.90 (unchanged). The C rows in
+the tables above are from before the change; keyword, gold extraction, v3 and laya-s13 need a re-run on the new split.

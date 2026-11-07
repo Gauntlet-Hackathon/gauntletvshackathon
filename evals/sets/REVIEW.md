@@ -47,3 +47,23 @@ Paawan's calls the frozen engine does not make (kept at the engine's P2, as with
 
 B-061 and B-062 had no review entry and were kept as drafted. B-078 and B-082 are duplicates the runner cannot detect from
 one post, so they score as misses even with gold extraction.
+
+## Split change: duplicate groups kept in one split (proposed for Paawan, 2026-11-07)
+
+Three set C duplicate groups had a member in `test` and another in `train` or `dev`. If the trained model saw the
+train/dev rows, it has effectively seen the matching test message (leakage). Also, the runner scores the `test` split
+alone, so a test row whose group root is in another split can never be found as a duplicate: its gold `duplicate`
+always scores as a miss for every system.
+
+The test rows moved to `dev` (the train/dev rows stay where they are, because a model may already have trained on
+them). Labels are unchanged.
+
+| Group | Stays | Moved test -> dev |
+| --- | --- | --- |
+| C-dup-1 | C-049 (train) | C-050 |
+| C-dup-5 | C-058 (dev) | C-057 |
+| C-dup-6 | C-059 (train) | C-060 |
+
+Set C splits are now 58 test, 23 dev, 20 train. No duplicate group in B, C or D has a member in `test` and another
+outside it. Three C groups (C-dup-1, C-dup-3, C-dup-6) still span `train` and `dev`; neither split is scored, so that
+does not affect results.
