@@ -30,6 +30,7 @@ from starlette.datastructures import UploadFile
 
 from rescue_field import board as board_module
 from rescue_field import engine_client, freeze
+from rescue_field import intake_page as intake_page_module
 from rescue_field import status as status_module
 from rescue_field import sync as sync_module
 from rescue_field.pipeline import (
@@ -500,6 +501,7 @@ def create_app(
     app.include_router(sync_module.router)
     app.include_router(board_module.router)
     app.include_router(status_module.router)
+    app.include_router(intake_page_module.router)
     return app
 
 
