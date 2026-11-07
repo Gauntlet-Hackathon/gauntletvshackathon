@@ -174,3 +174,21 @@ def test_hoax_marker_with_a_location_still_gets_the_hoax_check(client):
 def test_negated_hoax_word_keeps_a_clear_request():
     p = KeywordExtractor().payload("need help at 12 Oak Street, this is not fake")
     assert p["is_request"]["confidence"] >= 0.85
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "help, send a boat, 5 of us at 9 Elm Street, not trolling",
+        "we need rescue 9 Elm Street, this is not a test post, water at chest",
+        "need help at 40 Bay Lane, nothing fake about this, water in the house",
+        "ayuda en 9 Elm Street, no es fake, el agua sube",
+    ],
+)
+def test_denied_hoax_marker_keeps_a_clear_request(text):
+    assert KeywordExtractor().payload(text)["is_request"]["confidence"] >= 0.85
+
+
+def test_this_is_from_a_year_is_not_a_stale_post_by_itself(client):
+    out = post(client, "this is from 2019 but we are trapped again now at 3 Oak Street, help")
+    assert out["outcome"] != "not_a_request"

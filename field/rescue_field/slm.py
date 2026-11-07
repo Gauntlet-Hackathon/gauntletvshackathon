@@ -99,7 +99,7 @@ _STREET_SUFFIX = (
 # A year or "last year" is a stale marker only when it describes the post itself ("photo from
 # 2017", "this is from last year"), never the events or a house number ("in 2019 we flooded too",
 # "from 2008 Ike to now", "in 2014 Elm Street", "last year we evacuated").
-_POST_WORD = r"(?:posted|post|photo|picture|pic|video|tweet|footage|image|this is|this was)"
+_POST_WORD = r"(?:posted|post|photo|picture|pic|video|tweet|footage|image)"
 _STALE_RE = re.compile(
     rf"old post|\b{_POST_WORD}\s+(?:from|in|of)\s+(?:19|20)\d\d\b"
     r"|\bfrom last year\b"
@@ -219,15 +219,18 @@ def _request_confidence(
     return None
 
 
-_NEGATED_HOAX_RE = re.compile(
-    r"\b(?:not|no|isn't|nada de)\s+(?:a\s+)?(?:fake|joke|prank|broma)"
-)
+_NEGATION = r"(?:not|no|isn't|nothing|never|no es|nada de|ni)"
 
 
 def _hoax_hint(low: str, markers: tuple[str, ...]) -> bool:
-    """True when a hoax marker appears outside a negation such as "not fake" / "no joke"."""
-    rest = _NEGATED_HOAX_RE.sub(" ", low)
-    return any(re.search(rf"\b{re.escape(m.lower())}\b", rest) for m in markers)
+    """True when a hoax marker appears outside a negation ("not fake", "not trolling", "this is
+    not a test post", "nothing fake about this", "no es broma")."""
+    for m in markers:
+        word = re.escape(m.lower())
+        rest = re.sub(rf"\b{_NEGATION}\s+(?:a\s+|an\s+)?{word}\b", " ", low)
+        if re.search(rf"\b{word}\b", rest):
+            return True
+    return False
 
 
 @cache
