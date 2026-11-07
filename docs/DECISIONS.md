@@ -73,3 +73,51 @@ Made by the integrator while turning the plan into contracts. Reverse any of the
 - JSON: `mercury_json`, pinned to the tip of its `mercury_22_01` branch.
 - E7 parity tests compare parsed JSON, not bytes: the writer emits `ë` where Python's default is `ë`. `mercury_json` stores numbers as floats, so large integers may not match Python.
 - The `engine` agent job has `mmc` on PATH and `$MERCURY_JSON_SRC` set; other lanes skip the install. The `python` CI job has them too, so `pytest engine` parity tests can use `mmc`.
+
+## Dataset licenses (H2)
+Checked 2026-11-07 for #44. Not legal advice. "Unverified" means no primary source could be reached.
+
+**For the model trainer**
+- Do not train the model published on Hugging Face on HumAID or any other CrisisNLP data. The [CrisisNLP Terms of Use](https://crisisnlp.qcri.org/terms-of-use.html) say "use the data only for research on humanitarian computing", "keep the contents of these dataset(s) confidential (you can always share the tweet-ids)" and delete the data "upon completion of the research (you can always keep the tweet-ids)" or on request (again keeping tweet IDs). A generative model can repeat tweet text, and a public model outlives "completion of the research".
+- If a HumAID-trained model is published anyway: weights under CC BY-NC-SA 4.0, card marked non-commercial and research-only, HF gated access, HumAID cited, no training data shipped, and a check that it does not regurgitate training tweets.
+- The repo is public. Never commit tweet text anywhere in git; only tweet IDs plus labels (and our own annotations keyed by ID).
+- No later commercial use of any CrisisNLP/QCRI data or a model trained on it. A commercial version needs a model retrained on data we own or license.
+- Publishing the model also depends on the base model's license and on the terms of whichever model generates synthetic golden set B (`docs/plan/05-evals.md`, row B). Those are not dataset licenses, but they affect HF publishing and commercial use; check both before H1b.
+
+Where the CrisisNLP Terms of Use apply: the [CrisisNLP home page](https://crisisnlp.qcri.org/) says "Please carefully read our Terms of use before using resources available on this site."; QCRI's own HF loading script sets `_LICENSE = "https://crisisnlp.qcri.org/terms-of-use.html"` ([HumAID.py](https://huggingface.co/datasets/QCRI/HumAID-all/blob/main/HumAID.py)); and HumAID was collected by QCRI's AIDR system. The [HumAID page](https://crisisnlp.qcri.org/humaid_dataset) itself links only Twitter's terms, not the ToU. Where sources conflict (the [QCRI HF card](https://huggingface.co/datasets/QCRI/HumAID-all) says CC BY-NC-SA 4.0 in its YAML and CC BY-NC 4.0 in its text; the [Mendeley record](https://data.mendeley.com/datasets/zppcyk2fdt) says CC BY 4.0 but holds metadata only), the most restrictive one applies: the ToU.
+
+Impact columns: (a) hackathon demo, (b) publishing a trained model on HF, (c) later commercial use.
+
+| Dataset | License (name + version) | Commercial | Derivatives / training | Attribution | Redistribution (raw vs IDs) | NC/SA impact | Verdict | Sources |
+|---|---|---|---|---|---|---|---|---|
+| HumAID | CrisisNLP ToU (no version or date); HF copy CC BY-NC-SA 4.0 | No | Research only; publishing a trained model not addressed | Yes, ICWSM'21 paper | IDs only; download includes text | (a) OK if text stays private, cited (b) not recommended (c) no | **OK with conditions** (eval only); **do not use** for the published model | [ToU](https://crisisnlp.qcri.org/terms-of-use.html), [page](https://crisisnlp.qcri.org/humaid_dataset), [HF](https://huggingface.co/datasets/QCRI/HumAID-all), [paper](https://www.arxiv.org/pdf/2104.03090) |
+| Other CrisisNLP resources | CrisisNLP ToU | No | Research only | Yes, per-resource paper | IDs only | (a) OK if private (b) not recommended (c) no | **OK with conditions** (eval only) | [home](https://crisisnlp.qcri.org/), [ToU](https://crisisnlp.qcri.org/terms-of-use.html) |
+| CrisisMMD | None on page; ToU site-wide; HF copy CC BY-NC-SA 4.0 | No | Research only, NC-SA | Yes, ICWSM'18 | IDs only (v2.0 ships text and images) | as HumAID | **OK with conditions**; not needed | [page](https://crisisnlp.qcri.org/crisismmd), [HF](https://huggingface.co/datasets/QCRI/CrisisMMD/blame/main/README.md) |
+| CrisisLex T6/T26 | None stated (all rights reserved by default) | Unverified | Unverified | Yes, ICWSM'14 / CSCW'15 | Unverified; T6 ships text | (a)(b)(c) no grant | **Do not use** without author permission | [data page](https://www.crisislex.chato.cl/data-collections.html) |
+| TREC-IS | Not found (unverified) | Unverified | Unverified | Unverified | Unverified (IDs, hydrate via paid X API) | (a)(b)(c) no grant | **Do not use** | [NIST](https://trec.nist.gov/data/incident.html), [Glasgow](https://www.dcs.gla.ac.uk/~richardm/TREC_IS) |
+| X/Twitter content terms | X Developer Agreement (updated 2026-04-27) §III.A(d),(k); X Developer Policy | Not separately | No redistributing or derivative works "except as expressly permitted"; no training "a foundation or frontier model" (undefined) | n/a | Post IDs only; ≤1.5M IDs / 30 days; academic exception "solely for the purposes of non-commercial research on behalf of an academic institution, and that has been approved by X in writing, or peer review or validation of such research" | (a) IDs only (b) avoid X-derived training (c) no | Constraint on all rows above | [agreement](https://docs.x.com/developer-terms/agreement), [policy](https://docs.x.com/developer-terms/policy), [OTA memo](https://opentermsarchive.org/en/memos/x-ban-using-its-content-or-api-to-fine-tune-or-train-large-ai-models/) |
+| `contracts/fixtures/streets.txt` | None needed: 50 hand-typed public street names, not OSM-derived | Yes | Yes | No | Yes | none | **OK**; if ever built from OSM, ODbL 1.0 applies (unverified, check first) | `contracts/fixtures/README.md`, [OSM copyright](https://www.openstreetmap.org/copyright) |
+
+Notes: the CC BY-NC-SA 4.0 NonCommercial definition is §1(k) of the [legal code](https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode.en); a prize demo is not clearly "primarily intended for commercial advantage", and is in any case "research on humanitarian computing". The ToU confidentiality and deletion clauses are contract terms, so they bind us whether or not weights count as "Adapted Material". The HumAID paper says the authors "share dataset, code, and data splits" and "provide classification benchmark results", and "The annotated dataset can be used to develop a model for humanitarian response tasks" ([arXiv](https://www.arxiv.org/pdf/2104.03090)); it does not address publishing trained models.
+
+### Required citations
+HumAID (required by ToU clause "cite the corresponding paper in derived publications"; BibTeX from the QCRI HF script, title, volume, pages and DOI from Crossref):
+```bibtex
+@inproceedings{humaid2020,
+  Author = {Firoj Alam, Umair Qazi, Muhammad Imran, Ferda Ofli},
+  booktitle = {Proceedings of the Fifteenth International AAAI Conference on Web and Social Media},
+  series = {ICWSM~'21},
+  Title = {HumAID: Human-Annotated Disaster Incidents Data from Twitter with Deep Learning Benchmarks},
+  Year = {2021},
+  publisher = {AAAI},
+  address = {Online},
+  volume = {15}, pages = {933--942}, doi = {10.1609/icwsm.v15i1.18116}
+}
+```
+- CrisisMMD (only if used): Alam, Ofli, Imran, "CrisisMMD: Multimodal Twitter Datasets from Natural Disasters", ICWSM 2018 ([arXiv:1805.00713](https://arxiv.org/abs/1805.00713)).
+- CrisisLex (only with permission): Olteanu, Castillo, Diaz, Vieweg, "CrisisLex: A Lexicon for Collecting and Filtering Microblogged Communications in Crises", ICWSM 2014 (T6); Olteanu, Vieweg, Castillo, "What to Expect When the Unexpected Happens: Social Media Communications Across Crises", CSCW 2015 (T26) ([data page](https://www.crisislex.chato.cl/data-collections.html)).
+
+### Decision for Set A (#44)
+- Keep HumAID as an internal, research-only eval Set A: tweet IDs plus labels in git under `evals/sets/A/`; tweet text downloaded locally under the ToU and git-ignored; HumAID cited on the evals panel. Only aggregate scores and IDs are shown anywhere public.
+- Never use Set A for training or put it in the corrections export.
+- If nobody runs the local-text setup, drop Set A and note it here (`docs/plan/08-risks-and-open-questions.md` risk row).
