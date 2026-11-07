@@ -151,3 +151,9 @@ Findings R1–R13 (engine rules) and A1–A12 (agent assumptions) are in the ste
 - A8: env names in use beyond the CLAUDE.md runtime contract: cloud `ENGINE_DIST`; field `RULES_VERSION`, `HF_REPO`, `HF_REVISION`.
 - A9: the Python fallback rejects enum values outside the contract with exit 1, like Mercury.
 - A10 (EV5 draft labels) is for the H4 hand-check; A11 (`POST /corrections`) stays deferred; A12 resolves with H1b #104.
+
+## Rules freeze for the demo (H12, #178)
+- **Engine kind:** the Mercury build (Paawan, 2026-11-07), because the pitch is "a Mercury rules engine decides". The Python fallback stays in the repo as the backup and for parity tests.
+- **Frozen version:** `rules@a4dbac566db96b00951930ad9da941e85c1b2429+bin:36c2f7f7da6998e5`, built with `python -m rescue_engine.build --kind mercury` from the commit that last changed `engine/mercury/` (`a4dbac5`).
+- **How it ships (option a):** the build is committed at `engine/dist/rules@a4dbac566db96b00951930ad9da941e85c1b2429+bin:36c2f7f7da6998e5/` (`.gitignore` re-includes `engine/dist/`). The field image (F23, #180) and the cloud image (C26a, #207) copy that folder; the binary is linked statically against the Mercury runtime (`--mercury-linkage static`), so the images need no Mercury toolchain and no Python to run it. It needs glibc 2.38 or newer (both images are Debian trixie).
+- **Freeze:** no rule changes in `engine/mercury/`, `engine/rescue_engine/fallback/` or `contracts/engine_rules.md` after this, unless Paawan lifts the freeze. A change means a new build, a new folder and a new entry here. Tag: `rules-freeze-a4dbac5`.
