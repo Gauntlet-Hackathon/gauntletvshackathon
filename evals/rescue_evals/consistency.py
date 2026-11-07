@@ -24,23 +24,25 @@ from rescue_evals.runner import (
     _dump,
     _set_files,
     default_context,
+    extract_for,
 )
 
 
-def _once(system: System, text: str) -> str:
+def _once(system: System, case: EvalCase) -> str:
+    """One run of one case, alone (no duplicate candidates: consistency is per case)."""
     try:
-        ex = _dump(system.extract(text))
+        ex = _dump(extract_for(system, case))
     except Exception as e:
         return f"extract-error:{type(e).__name__}"
     try:
-        out = system.decide({"extracted": ex, "context": default_context(text, ex)})
+        out = system.decide({"extracted": ex, "context": default_context(case.raw_text, ex)})
     except Exception as e:
         return f"decide-error:{type(e).__name__}"
     return json.dumps({"extracted": ex, "decision": out}, sort_keys=True, default=str)
 
 
 def run_consistency(system: System, cases: Sequence[EvalCase], runs: int = 10) -> dict[str, Any]:
-    changed = [c.id for c in cases if len({_once(system, c.raw_text) for _ in range(runs)}) > 1]
+    changed = [c.id for c in cases if len({_once(system, c) for _ in range(runs)}) > 1]
     n = len(cases)
     return {
         "system": system.name,

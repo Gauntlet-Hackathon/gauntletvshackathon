@@ -68,10 +68,19 @@ class StoredSystem:
         self._case_ids = {c.id for c in cases}
         self._missing: set[str] = set()
 
+    def extract_case(self, case: EvalCase) -> Extracted:
+        """The stored row of this case, by id (the runner calls this; review F-04)."""
+        return self._row(case.id)
+
     def extract(self, raw_text: str) -> Extracted:
+        """By text, for callers that only have the text. Two cases with the same text map to
+        the last one; the runner uses ``extract_case`` instead."""
         cid = self._by_text.get(raw_text)
         if cid is None:
             raise LookupError("text is not a known case")
+        return self._row(cid)
+
+    def _row(self, cid: str) -> Extracted:
         if cid in self._bad:
             raise ValueError(f"malformed stored row for {cid}: {self._bad[cid]}")
         if cid not in self._good:

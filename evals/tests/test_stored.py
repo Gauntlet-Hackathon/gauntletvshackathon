@@ -11,6 +11,8 @@ TEXT = "HELP trapped on the roof at 12 Oak St, water rising fast. 3 people incl.
 def _case(cid, text=TEXT):
     return {
         "id": cid,
+        # a day apart: the same household text within the 12 h window would be a duplicate
+        "received_at": f"2026-11-{ord(cid) - ord('a') + 1:02d}T09:00:00Z",
         "raw_text": text,
         "gold_extracted": extract(TEXT).model_dump(mode="json"),
         "gold_decision": {"outcome": "prioritized", "priority_tier": "P1"},

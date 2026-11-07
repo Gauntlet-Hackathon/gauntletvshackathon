@@ -31,6 +31,7 @@ from rescue_evals.runner import (
     System,
     _dump,
     _set_files,
+    extract_for,
 )
 
 FIELDS = ("location", "people_count", "is_request", "vulnerable", "hazards")
@@ -78,7 +79,7 @@ def collect(system: System, cases: Sequence[EvalCase]) -> Samples:
         if c.gold_extracted is None:
             continue
         try:
-            p = _dump(system.extract(c.raw_text))
+            p = _dump(extract_for(system, c))
         except Exception:
             continue
         for field, conf, ok in case_samples(c.gold_extracted.model_dump(mode="json"), p):
