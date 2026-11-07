@@ -1,7 +1,8 @@
 """Sync worker: drain the outbox to the cloud whenever it is reachable (contracts/sync_api.md).
 
 Cycle: `GET /health`; on success `POST /sync/heartbeat` (backlog + versions), then
-`POST /sync/events` in batches of 200, oldest first. Only event ids the cloud *acked* leave
+`POST /sync/events` in batches of 200, oldest first, then (when `down_sync` is on)
+`GET /sync/down` via `rescue_field.downsync`. Only event ids the cloud *acked* leave
 the outbox. Rejected events stay (they are skipped for the rest of this process, so they do
 not block newer events); unacked events stay and are retried. Any failure (connection error,
 non-2xx, bad body) backs off exponentially with jitter, 2 s, 4 s, ... capped at 300 s.
@@ -25,6 +26,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
+from rescue_field import downsync
 from rescue_field.store import EventStore
 
 BATCH_SIZE = 200
@@ -53,6 +55,7 @@ class SyncResult:
     sent: int = 0
     acked: int = 0
     rejected: int = 0
+    pulled: int = 0
 
 
 def _utc_now() -> str:
@@ -73,6 +76,7 @@ class SyncWorker:
         rng: random.Random | None = None,
         idle_interval: float = IDLE_INTERVAL_S,
         batch_size: int = BATCH_SIZE,
+        down_sync: bool = False,
     ) -> None:
         self.store = store
         self.device_id = device_id
@@ -81,6 +85,7 @@ class SyncWorker:
         self.rng = rng or random.Random()
         self.idle_interval = idle_interval
         self.batch_size = batch_size
+        self.down_sync = down_sync
         self.client = httpx.Client(
             base_url=cloud_url.rstrip("/"),
             headers={"Authorization": f"Bearer {token}"},
@@ -160,6 +165,13 @@ class SyncWorker:
             if not acked and not any(i in self.rejected_ids for i in sent_ids):
                 break  # no progress this round (partial failure): back off rather than spin
         result.rejected = len(self.rejected_ids)
+        if self.down_sync and not self._stop.is_set() and not self._paused.is_set():
+            try:
+                result.pulled = len(
+                    downsync.pull(self.client, self.store, self.lock, device_id=self.device_id)
+                )
+            except downsync.DownSyncError as exc:
+                raise SyncError(str(exc)) from exc
         return result
 
     # ---- loop -------------------------------------------------------------------------
@@ -247,6 +259,7 @@ def worker_from_env(
         versions=lambda: (rules, model_version),
         lock=lock,
         transport=transport,
+        down_sync=True,
     )
 
 
