@@ -217,8 +217,8 @@ jobs:
           set -uo pipefail
           OUT="$RUNNER_TEMP/out"; mkdir -p "$OUT"
           TASK_FILE="$RUNNER_TEMP/task/task.md"
-          git config user.name "night-shift ($LANE)"
-          git config user.email "night-shift@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$BRANCH"
           PROMPT="$(sed -e "s|__LANE__|$LANE|g" -e "s|__TASK_FILE__|$TASK_FILE|g" .github/night-shift/worker-prompt.md)"
           SCHEMA='{"type":"object","properties":{"status":{"type":"string","enum":["done","stuck"]},"summary":{"type":"string"},"assumptions":{"type":"array","items":{"type":"string"}},"tests_passed":{"type":"boolean"}},"required":["status","summary","assumptions","tests_passed"]}'
