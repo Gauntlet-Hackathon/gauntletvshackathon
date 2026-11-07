@@ -82,7 +82,12 @@ defmodule RescueCloudWeb.SyncEventsTest do
     assert again == first
     assert length(first["acked"]) == 2
     assert length(Events.read_since(0)) == 2
-    refute_receive {:event, _}, 50
+
+    # The "events" topic is global and other async tests broadcast on it, so only
+    # refute broadcasts of this batch's own events.
+    for %{"event_id" => id} <- body["events"] do
+      refute_receive {:event, %{event_id: ^id}}, 50
+    end
   end
 
   test "empty, oversized or missing events gives 400", %{conn: conn} do
