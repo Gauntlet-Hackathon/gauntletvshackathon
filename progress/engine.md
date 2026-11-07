@@ -17,3 +17,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 engine #60 EV8: evals/rescue_evals/calibration.py (reliability PNG + ECE per field, numpy/zlib PNG) and consistency.py (N reruns, % cases changed); tests in evals/tests/test_calibration.py
 2026-11-07 engine #54 E6: engine/rescue_engine/replay_diff.py re-decides the log's decided events with two engine versions, emits per-request tier/outcome diff as JSON + markdown; tests in engine/tests/test_replay_diff.py
 2026-11-07 engine #61 EV9: evals/rescue_evals/systems/ours.py ('ours' system = imported HFExtractor + engine CLI via field engine_client, records model_version/rules_version); tests in evals/tests/test_ours.py (mocked extractor; real model slow)
+2026-11-07 engine #133 E8: fallback CLI catches all errors (exit 1, one stderr line, no traceback); engine/tests/test_malformed_input.py table of malformed/edge inputs
