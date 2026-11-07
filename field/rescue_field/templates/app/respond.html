@@ -1,0 +1,94 @@
+{% extends "app/_shell.html" %}
+{% block title %}Respond · CommunityRescue{% endblock %}
+{% block content %}
+{% set b = boat|urlencode %}
+{% if not boat %}
+<section id="pick-boat" aria-labelledby="pick-boat-h">
+<h1 id="pick-boat-h">Pick your boat</h1>
+{% if boats %}<p class="boat-chips">
+{% for x in boats %}<a class="chip" href="/respond?boat={{ x.name|urlencode }}">{{ x.name }}</a>
+{% endfor %}</p>
+{% else %}<p class="muted">No boats on the roster. <a href="/boats">Add a boat</a> or type your crew name.</p>
+{% endif %}
+<form method="get" action="/respond" class="dispatch-form">
+<label class="choice-text">Crew name <input type="text" name="boat" maxlength="200" required></label>
+<button type="submit" class="btn btn-primary">This is my boat</button>
+</form>
+</section>
+{% else %}
+<p id="my-boat"><strong>{{ boat }}</strong> · <a href="/respond?pick=1" id="change-boat">Change boat</a></p>
+{% if not job %}
+<section id="no-job" aria-live="polite">
+<h1>No job right now</h1>
+<p>Dispatch will send your next job here. Stay near the launch and keep your radio on.</p>
+</section>
+{% else %}
+<section id="job" data-request-id="{{ job.request_id }}">
+<article class="card queue-card" aria-label="Incident {{ job.incident }}">
+<p class="card-top">
+{% if job.pill %}<span class="pill {{ job.pill.cls }}">{{ job.pill.text }}</span>{% endif %}
+<span class="incident">{{ job.incident }}</span>
+{% if job.other_posts %}<span class="other-posts">{{ job.other_posts }}</span>{% endif %}
+</p>
+<h1 class="headline">{{ job.headline }}</h1>
+{% if job.address %}<p class="address">{{ job.address }}</p>{% else %}<p class="address address-missing">No address yet</p>{% endif %}
+{% if job.details %}<ul class="details">
+{% for d in job.details %}<li>{{ d }}</li>
+{% endfor %}</ul>{% endif %}
+{% if job.call %}<p class="call"><strong>{{ job.call }}</strong></p>{% endif %}
+</article>
+</section>
+<section id="osm" aria-labelledby="osm-label">
+<h2 id="osm-label">Operational Status Messages (OSM)</h2>
+<p role="group" aria-labelledby="osm-label">
+{% for key, label in steps %}<a class="chip{% if step == key %} selected{% endif %}" aria-pressed="{{ 'true' if step == key else 'false' }}" href="/respond?boat={{ b }}&amp;step={{ key }}">{{ label }}</a>
+{% endfor %}</p>
+{% if step %}
+<p class="muted">Tell dispatch (radio or text). Not saved here.</p>
+<pre id="radio-line" class="draft">{{ job.radio[step] }}</pre>
+<button type="button" class="btn-small copy" data-copy="{{ job.radio[step] }}">Copy</button>
+{% endif %}
+</section>
+<p id="respond-error" class="banner" role="alert" hidden></p>
+<p id="respond-saved" role="status" aria-live="polite" hidden></p>
+{% if show_outcomes %}
+<section id="outcomes" aria-labelledby="outcomes-h">
+<h2 id="outcomes-h">How did it go?</h2>
+<form class="dispatch-form status-form" data-outcome="all" method="post" action="/requests/{{ job.request_id }}/status">
+<input type="hidden" name="status" value="rescued">
+<label>How many people <input type="number" name="rescued_count" min="0" max="100000" required value="{{ job.people if job.people is not none else '' }}"></label>
+<label>Taken to
+<select name="note">
+{% for s in shelters %}<option value="to: {{ s }}">{{ s }}</option>
+{% endfor %}
+</select></label>
+<button type="submit" class="btn btn-primary">Got everyone out</button>
+</form>
+<form class="dispatch-form status-form" data-outcome="some" method="post" action="/requests/{{ job.request_id }}/status">
+<input type="hidden" name="status" value="escalated">
+<label>How many did you get out <input type="number" name="got_count" min="1" max="100000" required></label>
+<button type="submit" class="btn">Got some out</button>
+</form>
+<form class="dispatch-form status-form" data-outcome="nobody" method="post" action="/requests/{{ job.request_id }}/status">
+<input type="hidden" name="status" value="rescued">
+<input type="hidden" name="rescued_count" value="0">
+<input type="hidden" name="note" value="nobody there">
+<button type="submit" class="btn">Nobody there</button>
+</form>
+<form class="dispatch-form status-form" data-outcome="noreach" method="post" action="/requests/{{ job.request_id }}/status">
+<input type="hidden" name="status" value="escalated">
+<label>Why <input type="text" name="reason" maxlength="500" required></label>
+<button type="submit" class="btn">Couldn't get there</button>
+</form>
+</section>
+{% endif %}
+<form class="status-form" data-outcome="cant" method="post" action="/requests/{{ job.request_id }}/status">
+<input type="hidden" name="status" value="escalated">
+<input type="hidden" name="reason" value="{{ job.crew }} can't take this one">
+<button type="submit" class="btn-small">I can't take this one</button>
+</form>
+{% endif %}
+{% endif %}
+<script id="respond-config" type="application/json">{{ {"boat": boat}|tojson }}</script>
+<script src="/static/respond.js" defer></script>
+{% endblock %}
