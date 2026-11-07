@@ -15,7 +15,8 @@ config :rescue_cloud, RescueCloudWeb.Endpoint,
   force_ssl: [
     rewrite_on: [:x_forwarded_proto],
     exclude: [
-      # paths: ["/health"],
+      # Platform health probes (Fly checks hit the machine over plain HTTP, no x-forwarded-proto).
+      paths: ["/healthz", "/health"],
       hosts: ["localhost", "127.0.0.1"]
     ]
   ]

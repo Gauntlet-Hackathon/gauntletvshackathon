@@ -71,7 +71,8 @@ defmodule RescueCloud.MixProject do
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
-      {:req, "~> 0.5"}
+      {:req, "~> 0.5"},
+      {:toml, "~> 0.7", only: :test}
     ]
   end
 
