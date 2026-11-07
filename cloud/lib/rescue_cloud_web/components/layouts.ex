@@ -46,6 +46,12 @@ defmodule RescueCloudWeb.Layouts do
 
   def app(assigns) do
     ~H"""
+    <a
+      href="#main"
+      class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 focus:rounded focus:bg-base-100 focus:p-3 focus:underline"
+    >
+      Skip to content
+    </a>
     <header class="navbar px-4 sm:px-6 lg:px-8">
       <div class="flex-1">
         <a href="/" class="flex-1 flex w-fit items-center gap-2">
@@ -67,7 +73,7 @@ defmodule RescueCloudWeb.Layouts do
       </div>
     </header>
 
-    <main class="px-4 py-8 text-lg sm:px-6 lg:px-8">
+    <main id="main" tabindex="-1" class="px-4 py-8 text-lg sm:px-6 lg:px-8">
       <div class="mx-auto max-w-7xl space-y-4">
         {render_slot(@inner_block)}
       </div>

@@ -128,4 +128,26 @@ defmodule RescueCloudWeb.RecordsLiveTest do
     assert has_element?(view, "#record-missing")
     refute has_element?(view, "#record-detail")
   end
+
+  test "accessibility: captioned tables with column scopes", %{conn: conn} do
+    {:ok, view, html} = live(conn, ~p"/records/#{rid("C3")}")
+    assert html =~ ~s(href="#main")
+    assert has_element?(view, "main#main")
+    assert has_element?(view, "#records-table")
+    assert has_element?(view, "#record-events")
+    assert_tables_accessible(view)
+  end
+
+  defp assert_tables_accessible(view) do
+    doc = view |> render() |> LazyHTML.from_fragment()
+    tables = doc |> LazyHTML.query("table") |> Enum.to_list()
+    assert tables != []
+
+    for t <- tables do
+      assert t |> LazyHTML.query("caption") |> Enum.count() > 0
+      ths = t |> LazyHTML.query("thead th") |> Enum.to_list()
+      assert ths != []
+      assert Enum.all?(ths, &(LazyHTML.attribute(&1, "scope") == ["col"]))
+    end
+  end
 end

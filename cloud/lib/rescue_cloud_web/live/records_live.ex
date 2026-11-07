@@ -111,14 +111,15 @@ defmodule RescueCloudWeb.RecordsLive do
 
       <p :if={@requests == []} id="records-empty">No matching requests.</p>
       <table :if={@requests != []} id="records-table" class="table table-lg">
+        <caption class="sr-only">Rescue requests</caption>
         <thead>
           <tr>
-            <th>Request</th>
-            <th>Tier</th>
-            <th>Status</th>
-            <th>Location</th>
-            <th>Device</th>
-            <th>Received (laptop)</th>
+            <th scope="col">Request</th>
+            <th scope="col">Tier</th>
+            <th scope="col">Status</th>
+            <th scope="col">Location</th>
+            <th scope="col">Device</th>
+            <th scope="col">Received (laptop)</th>
           </tr>
         </thead>
         <tbody>
@@ -190,15 +191,16 @@ defmodule RescueCloudWeb.RecordsLive do
 
         <h3 class="text-xl font-semibold">Event history</h3>
         <table id="record-events" class="table table-lg">
+          <caption class="sr-only">Events for this request</caption>
           <thead>
             <tr>
-              <th>Occurred (laptop)</th>
-              <th>Type</th>
-              <th>Device</th>
-              <th>Rules</th>
-              <th>Model</th>
-              <th>Synced (cloud)</th>
-              <th>Replay</th>
+              <th scope="col">Occurred (laptop)</th>
+              <th scope="col">Type</th>
+              <th scope="col">Device</th>
+              <th scope="col">Rules</th>
+              <th scope="col">Model</th>
+              <th scope="col">Synced (cloud)</th>
+              <th scope="col">Replay</th>
             </tr>
           </thead>
           <tbody>

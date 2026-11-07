@@ -136,4 +136,31 @@ defmodule RescueCloudWeb.EvalsLiveTest do
     view |> element("#main-table-link-decision\\.p1_misses_per_1000") |> render_click()
     assert has_element?(view, "#failing-empty")
   end
+
+  test "accessibility: captioned tables with column scopes", %{conn: conn, dir: dir} do
+    write_summary(dir)
+    model!(@v1, "approved", %{"reasons" => []})
+    Fleet.record_heartbeat("laptop-dev-01", hb(@v1), ~U[2026-11-07 00:00:00Z])
+    {:ok, view, html} = live(conn, ~p"/evals")
+    assert html =~ ~s(href="#main")
+    assert has_element?(view, "main#main")
+
+    for id <- ~w(main-table sealed-table history-table devices-table),
+        do: assert(has_element?(view, "table##{id}"))
+
+    assert_tables_accessible(view)
+  end
+
+  defp assert_tables_accessible(view) do
+    doc = view |> render() |> LazyHTML.from_fragment()
+    tables = doc |> LazyHTML.query("table") |> Enum.to_list()
+    assert tables != []
+
+    for t <- tables do
+      assert t |> LazyHTML.query("caption") |> Enum.count() > 0
+      ths = t |> LazyHTML.query("thead th") |> Enum.to_list()
+      assert ths != []
+      assert Enum.all?(ths, &(LazyHTML.attribute(&1, "scope") == ["col"]))
+    end
+  end
 end

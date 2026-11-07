@@ -125,4 +125,27 @@ defmodule RescueCloudWeb.ActivityLiveTest do
     {:ok, view, _} = live(conn, ~p"/activity")
     assert has_element?(view, "#activity-empty")
   end
+
+  test "accessibility: skip link, main, live region, captioned tables", %{conn: conn} do
+    first_sync()
+    {:ok, view, html} = live(conn, ~p"/activity")
+    assert html =~ ~s(href="#main")
+    assert html =~ "Skip to content"
+    assert has_element?(view, "main#main")
+    assert has_element?(view, "#activity-field-03[aria-live=polite]")
+    assert_tables_accessible(view)
+  end
+
+  defp assert_tables_accessible(view) do
+    doc = view |> render() |> LazyHTML.from_fragment()
+    tables = doc |> LazyHTML.query("table") |> Enum.to_list()
+    assert tables != []
+
+    for t <- tables do
+      assert t |> LazyHTML.query("caption") |> Enum.count() > 0
+      ths = t |> LazyHTML.query("thead th") |> Enum.to_list()
+      assert ths != []
+      assert Enum.all?(ths, &(LazyHTML.attribute(&1, "scope") == ["col"]))
+    end
+  end
 end

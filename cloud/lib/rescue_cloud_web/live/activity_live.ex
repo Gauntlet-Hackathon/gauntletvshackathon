@@ -32,7 +32,12 @@ defmodule RescueCloudWeb.ActivityLive do
       <h1 id="activity-title" class="text-3xl font-semibold">Field activity since last sync</h1>
       <p :if={@devices == []} id="activity-empty">No devices have synced events yet.</p>
 
-      <section :for={d <- @devices} id={"activity-#{d.device_id}"} class="mt-6 space-y-2">
+      <section
+        :for={d <- @devices}
+        id={"activity-#{d.device_id}"}
+        class="mt-6 space-y-2"
+        aria-live="polite"
+      >
         <h2 class="text-2xl font-semibold">{d.device_id}</h2>
         <p class="text-base">
           Latest sync: <span data-role="sync-started">{fmt(d.sync_started_at)}</span>
@@ -57,11 +62,12 @@ defmodule RescueCloudWeb.ActivityLive do
           </div>
         </dl>
         <table class="table table-lg" id={"activity-#{d.device_id}-events"}>
+          <caption class="sr-only">Events from {d.device_id} since last sync</caption>
           <thead>
             <tr>
-              <th>Laptop time</th>
-              <th>Event</th>
-              <th>Request</th>
+              <th scope="col">Laptop time</th>
+              <th scope="col">Event</th>
+              <th scope="col">Request</th>
             </tr>
           </thead>
           <tbody>

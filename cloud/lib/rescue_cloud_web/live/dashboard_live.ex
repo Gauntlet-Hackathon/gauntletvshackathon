@@ -78,7 +78,7 @@ defmodule RescueCloudWeb.DashboardLive do
         </p>
       </section>
 
-      <section id="replay-summary" class="mt-6 space-y-2">
+      <section id="replay-summary" class="mt-6 space-y-2" aria-live="polite">
         <h2 class="text-xl font-semibold">Replay verifier</h2>
         <p>
           <span
