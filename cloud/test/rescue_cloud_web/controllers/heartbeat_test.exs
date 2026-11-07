@@ -56,6 +56,15 @@ defmodule RescueCloudWeb.HeartbeatTest do
     assert Fleet.list_heartbeats() == []
   end
 
+  test "outbox_backlog above the int4 column is 400, not a database error (L-06)", %{conn: conn} do
+    body = %{example("sync-heartbeat_request.valid.json") | "outbox_backlog" => 2_147_483_648}
+
+    assert %{"error" => "bad_request"} =
+             conn |> auth() |> post(~p"/sync/heartbeat", body) |> json_response(400)
+
+    assert Fleet.list_heartbeats() == []
+  end
+
   test "body device_id differing from token's device gives 403", %{conn: conn} do
     body = %{example("sync-heartbeat_request.valid.json") | "device_id" => "someone-else"}
 

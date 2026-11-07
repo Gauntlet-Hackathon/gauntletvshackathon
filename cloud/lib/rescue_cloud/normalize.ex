@@ -3,9 +3,17 @@ defmodule RescueCloud.Normalize do
   Elixir port of the shared logic in `contracts/logic.md` (Python: `shared/rescue_shared/logic.py`):
   `location/1`, `contact/1`, `duplicate_candidates/2` and `duplicate_groups/2`.
   Both implementations must pass `contracts/vectors/*.json`.
+
+  Unicode digits, whitespace and combining marks are classified with Python's tables
+  (`RescueCloud.Normalize.Unicode`), so the two implementations agree on every input, not only
+  on ASCII: `"٣٠.٠٤٤٤, ٣١.٢٣٥٧"` is `"geo:30.0444,31.2357"` and `"٧١٣-٥٥٥-٠١٠٠"` keeps its digits,
+  as in Python. These functions never raise on a binary.
   """
 
-  @coords ~r/^\s*(-?\d{1,3}\.\d+)\s*[,;\s]\s*(-?\d{1,3}\.\d+)\s*$/u
+  import Bitwise
+
+  alias RescueCloud.Normalize.Unicode
+
   @non_alnum ~r/[^a-z0-9]+/
 
   # Smallest people count that matches on its own, without a shared contact (contracts/logic.md).
@@ -50,20 +58,25 @@ defmodule RescueCloud.Normalize do
   def location(nil), do: ""
 
   def location(text) when is_binary(text) do
-    case Regex.run(@coords, text, capture: :all_but_first) do
-      [lat, lon] -> "geo:#{four_dp(lat)},#{four_dp(lon)}"
+    case coords(text) do
+      {lat, lon} -> "geo:#{four_dp(lat)},#{four_dp(lon)}"
       nil -> text |> tokens() |> Enum.sort() |> Enum.join(" ")
     end
   end
 
-  @doc "Digits only; an 11-digit number starting with 1 loses the 1. `\"\"` means no contact."
+  @doc """
+  Digits only (every character Python's `str.isdigit` accepts, kept as written); an 11-digit
+  number starting with an ASCII 1 loses the 1. `""` means no contact.
+  """
   @spec contact(String.t() | nil) :: String.t()
   def contact(nil), do: ""
 
   def contact(text) when is_binary(text) do
-    case String.replace(text, ~r/[^0-9]/, "") do
-      "1" <> rest = digits when byte_size(digits) == 11 -> rest
-      digits -> digits
+    digits = for <<cp::utf8 <- text>>, Unicode.digit?(cp), do: cp
+
+    case digits do
+      [?1 | rest] when length(rest) == 10 -> List.to_string(rest)
+      _ -> List.to_string(digits)
     end
   end
 
@@ -165,16 +178,96 @@ defmodule RescueCloud.Normalize do
     DateTime.to_unix(dt)
   end
 
+  # Python: _COORDS_RE = r"^\s*(-?\d{1,3}\.\d+)\s*[,;\s]\s*(-?\d{1,3}\.\d+)\s*$" with `re.match`,
+  # where \d is any Unicode decimal digit and \s is `str.isspace`. Hand-written so that both
+  # classes are Python's (`Unicode`), not this PCRE's. The numbers come back as ASCII strings.
+  defp coords(text) do
+    with {:ok, cps} <- codepoints(text),
+         {:ok, lat, rest} <- number(skip_space(cps)),
+         {:ok, rest} <- separator(rest),
+         {:ok, lon, rest} <- number(rest),
+         [] <- skip_space(rest) do
+      {lat, lon}
+    else
+      _ -> nil
+    end
+  end
+
+  defp codepoints(text) do
+    case :unicode.characters_to_list(text) do
+      list when is_list(list) -> {:ok, list}
+      _ -> :error
+    end
+  end
+
+  defp skip_space([cp | rest] = cps), do: if(Unicode.space?(cp), do: skip_space(rest), else: cps)
+  defp skip_space([]), do: []
+
+  # [,;\s] between two runs of \s*: whitespace only, or one comma/semicolon in it.
+  defp separator(cps) do
+    rest = skip_space(cps)
+
+    case rest do
+      [sep | after_sep] when sep in [?,, ?;] -> {:ok, skip_space(after_sep)}
+      _ when rest != cps -> {:ok, rest}
+      _ -> :error
+    end
+  end
+
+  defp number([?- | rest]) do
+    with {:ok, n, rest} <- unsigned(rest), do: {:ok, "-" <> n, rest}
+  end
+
+  defp number(cps), do: unsigned(cps)
+
+  defp unsigned(cps) do
+    {int, rest} = take_digits(cps, [])
+
+    with true <- length(int) in 1..3,
+         [?. | rest] <- rest,
+         {[_ | _] = frac, rest} <- take_digits(rest, []) do
+      {:ok, "#{int}.#{frac}", rest}
+    else
+      _ -> :error
+    end
+  end
+
+  defp take_digits([cp | rest] = cps, acc) do
+    case Unicode.decimal_value(cp) do
+      nil -> {Enum.reverse(acc), cps}
+      d -> take_digits(rest, [?0 + d | acc])
+    end
+  end
+
+  defp take_digits([], acc), do: {Enum.reverse(acc), []}
+
+  # Python: f"{float(number):.4f}". The number is ASCII `-?[0-9]{1,3}.[0-9]+`, which Float.parse
+  # always reads in full. Python rounds the exact value of the double half to even ("840.90625"
+  # gives 840.9062), where :erlang.float_to_binary/2 rounds half away from zero, so round here.
   defp four_dp(number) do
     {f, ""} = Float.parse(number)
-    :erlang.float_to_binary(f, decimals: 4)
+    <<sign::1, exp::11, frac::52>> = <<f::float>>
+    # f = mantissa * 2^-shift exactly (normal and subnormal doubles; no inf/nan from 3 digits).
+    {mantissa, shift} = if exp == 0, do: {frac, 1074}, else: {frac + (1 <<< 52), 1075 - exp}
+    scaled = mantissa * 10_000
+
+    {q, r} =
+      if shift > 0,
+        do: {scaled >>> shift, scaled &&& (1 <<< shift) - 1},
+        else: {scaled <<< -shift, 0}
+
+    half = if shift > 0, do: 1 <<< (shift - 1), else: 1
+    q = if r > half or (r == half and rem(q, 2) == 1), do: q + 1, else: q
+    sign = if sign == 1, do: "-", else: ""
+
+    "#{sign}#{div(q, 10_000)}.#{q |> rem(10_000) |> Integer.to_string() |> String.pad_leading(4, "0")}"
   end
 
   defp tokens(text) do
     folded =
       text
       |> :unicode.characters_to_nfkd_binary()
-      |> String.replace(~r/\p{Mn}/u, "")
+      |> drop_combining()
       |> String.downcase()
       |> String.replace("ß", "ss")
       |> String.replace(["'", "’"], "")
@@ -186,4 +279,11 @@ defmodule RescueCloud.Normalize do
     |> Enum.map(&Map.get(@token_map, &1, &1))
     |> Enum.reject(&MapSet.member?(@stopwords, &1))
   end
+
+  # Python drops `unicodedata.combining(c) != 0` (canonical combining class), not category Mn.
+  defp drop_combining(text) when is_binary(text) do
+    for <<cp::utf8 <- text>>, not Unicode.combining?(cp), into: "", do: <<cp::utf8>>
+  end
+
+  defp drop_combining(_invalid), do: ""
 end

@@ -21,6 +21,8 @@ defmodule RescueCloud.Projection do
   """
   import Ecto.Query
 
+  require Logger
+
   alias RescueCloud.Events.Event
   alias RescueCloud.Normalize
   alias RescueCloud.Projection.Request
@@ -44,34 +46,105 @@ defmodule RescueCloud.Projection do
 
   @doc """
   Updates the read model for the requests touched by `events` (event structs or maps with a
-  `request_id`), then recomputes duplicate groups. Returns `{:ok, request_ids}`.
+  `request_id`), then recomputes duplicate groups. See `project_requests/1`.
   """
   @spec apply_events([%{request_id: String.t()}]) :: {:ok, [String.t()]}
-  def apply_events([]), do: {:ok, []}
+  def apply_events(events) when is_list(events),
+    do: events |> Enum.map(& &1.request_id) |> project_requests()
 
-  def apply_events(events) when is_list(events) do
-    request_ids = events |> Enum.map(& &1.request_id) |> Enum.uniq()
+  @doc """
+  Re-folds each request in `request_ids` from all of its stored events, then recomputes
+  duplicate groups. Idempotent, so the sync API calls it for every request id of a batch, also
+  for events that were already stored (a retry after a failed projection repairs the rows).
 
-    {:ok, _} =
-      Repo.transaction(fn ->
-        Enum.each(request_ids, &project/1)
-        regroup()
-      end)
+  One transaction, serialised across processes by a PostgreSQL advisory lock, so two devices'
+  batches never fold or regroup on stale snapshots of each other (review O-04).
 
-    {:ok, request_ids}
+  Failures are isolated per request: a request whose fold or row write raises (a value the
+  column cannot hold, a bug in a fold rule) is logged with its id and left as it was, and every
+  other request is still projected; a failing regroup is logged, and the next sync or
+  `rebuild/0` recomputes the groups.
+  Connection loss, deadlocks and other transient database errors still raise, which rolls the
+  whole projection back; the caller answers 500 and the device's retry projects again.
+  Returns `{:ok, projected_request_ids}` (without the ones that failed).
+  `rebuild/0` repairs everything once the cause of a logged failure is fixed.
+  """
+  @spec project_requests([String.t()]) :: {:ok, [String.t()]}
+  def project_requests([]), do: {:ok, []}
+
+  def project_requests(request_ids) when is_list(request_ids) do
+    ids = Enum.uniq(request_ids)
+
+    Repo.transaction(fn ->
+      lock()
+      projected = Enum.filter(ids, &project_isolated/1)
+      isolated(&regroup/0, "regroup")
+      projected
+    end)
   end
 
-  @doc "Drops the read model and rebuilds it from the events table."
+  @doc """
+  Drops the read model and rebuilds it from the events table: the recovery tool when rows are
+  missing or stale (for example after a logged projection failure has been fixed). Same
+  isolation as `project_requests/1`. Returns `{:ok, number_of_requests_projected}`.
+
+  On a release: `bin/rescue_cloud eval 'RescueCloud.Release.rebuild_projection()'`.
+  """
   @spec rebuild() :: {:ok, non_neg_integer()}
   def rebuild do
     Repo.transaction(fn ->
+      lock()
       Repo.delete_all(Request)
       ids = Repo.all(from e in Event, distinct: true, select: e.request_id)
-      Enum.each(ids, &project/1)
-      regroup()
-      length(ids)
+      projected = Enum.count(ids, &project_isolated/1)
+      isolated(&regroup/0, "regroup")
+      projected
     end)
   end
+
+  # Any constant works; it only has to differ from other advisory locks in this database.
+  @lock_key 0x52_45_53_43_55_45_01
+
+  @doc false
+  def advisory_lock_key, do: @lock_key
+
+  # Off only in tests (config/test.exs): sandbox transactions last a whole test.
+  defp lock do
+    if Application.get_env(:rescue_cloud, :projection_lock, true) do
+      Repo.query!("SELECT pg_advisory_xact_lock($1)", [@lock_key])
+    end
+  end
+
+  defp project_isolated(request_id),
+    do: isolated(fn -> project(request_id) end, "project #{request_id}")
+
+  # Runs `fun` inside the projection transaction; true when it succeeded. Row writes run with
+  # `mode: :savepoint`, so a database error in one of them leaves the transaction usable.
+  defp isolated(fun, what) do
+    fun.()
+    true
+  rescue
+    e ->
+      if transient?(e), do: reraise(e, __STACKTRACE__)
+
+      Logger.error(
+        "projection: #{what} failed, left unchanged (fix the cause, then run " <>
+          "RescueCloud.Projection.rebuild/0): " <> Exception.format(:error, e, __STACKTRACE__)
+      )
+
+      false
+  end
+
+  # Connection exceptions, deadlocks/serialisation failures (40), insufficient resources (53),
+  # operator intervention (57) and an already-aborted transaction (25P02) are not about one
+  # request: they abort the whole transaction and must reach the caller.
+  defp transient?(%DBConnection.ConnectionError{}), do: true
+
+  defp transient?(%Postgrex.Error{postgres: %{pg_code: code}}) when is_binary(code),
+    do: String.starts_with?(code, ["08", "25", "40", "53", "57"])
+
+  defp transient?(%Postgrex.Error{}), do: true
+  defp transient?(_), do: false
 
   @doc "All requests, ordered by request_id."
   def list_requests, do: Repo.all(from r in Request, order_by: r.request_id)
@@ -107,7 +180,8 @@ defmodule RescueCloud.Projection do
 
         Repo.insert_all(Request, [row],
           on_conflict: {:replace, Request.fields() -- [:request_id, :duplicate_group]},
-          conflict_target: :request_id
+          conflict_target: :request_id,
+          mode: :savepoint
         )
     end
   end
@@ -222,9 +296,14 @@ defmodule RescueCloud.Projection do
 
     Map.merge(row, %{
       location_text: if(is_map(location), do: stringish(location["text"])),
-      people_count: if(is_map(people) and is_integer(people["value"]), do: people["value"])
+      people_count: if(is_map(people), do: int4(people["value"]))
     })
   end
+
+  # The schema puts no maximum on people_count (only >= 0), the column is int4. A count it
+  # cannot hold is no real count: keep it in `extracted`, treat it as unknown here (review F-01).
+  defp int4(n) when is_integer(n) and n in -2_147_483_648..2_147_483_647, do: n
+  defp int4(_), do: nil
 
   defp stringish(v) when is_binary(v), do: v
   defp stringish(_), do: nil
@@ -265,8 +344,10 @@ defmodule RescueCloud.Projection do
           do: {rid, oldest}
 
     for r <- rows, (new = group_of[r.request_id]) != r.duplicate_group do
-      Repo.update_all(from(x in Request, where: x.request_id == ^r.request_id),
-        set: [duplicate_group: new]
+      Repo.update_all(
+        from(x in Request, where: x.request_id == ^r.request_id),
+        [set: [duplicate_group: new]],
+        mode: :savepoint
       )
     end
 

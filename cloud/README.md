@@ -55,6 +55,28 @@ The gate **fails closed** until `evals/results/summary.json` (with `calibration.
 `../evals/results/summary.json` relative to the release's working directory; override it with
 `config :rescue_cloud, RescueCloud.Models, summary_path: ...`.
 
+## Rebuild the dashboard (requests read model)
+
+The dashboard reads the `requests` table, which is derived only from the `events` table
+(`RescueCloud.Projection`). Each sync projects every request of the batch, also on a retry, and one
+request that cannot be projected is skipped and logged (`projection: project <request_id> failed`)
+instead of hiding the rest of the batch. When the logs show such a failure, or the dashboard misses
+requests whose events are stored, fix the cause and rebuild:
+
+```sh
+bin/rescue_cloud eval 'RescueCloud.Release.rebuild_projection()'
+
+# on Fly (replace <app>)
+fly ssh console --app <app> -C "/app/bin/rescue_cloud eval 'RescueCloud.Release.rebuild_projection()'"
+
+# locally, from cloud/
+mix run -e 'RescueCloud.Projection.rebuild()'
+```
+
+It deletes and re-folds only derived rows (`requests`), never events, and prints how many requests it
+projected. It is safe while devices sync: it takes the same advisory lock as the sync projection. A
+request that still fails is logged again and left out; the others are rebuilt.
+
 ## Reset a demo stack
 
 Between rehearsals, wipe the hosted demo stack with an explicit release command (it is never run by

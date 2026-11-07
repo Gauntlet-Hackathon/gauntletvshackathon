@@ -15,6 +15,9 @@ defmodule RescueCloud.Events do
   Valid events are inserted in one `insert_all` with `on_conflict: :nothing`; every valid
   event_id is acked, including ids that were already stored (retries are harmless).
   `inserted` lists the newly stored events (not duplicates), for broadcasting.
+  `request_ids` lists the request ids of every acked event, also of the already-stored ones,
+  for re-projecting (`RescueCloud.Projection.project_requests/1`): a retry whose events were
+  stored by an attempt that failed afterwards must still project them.
   Every stored row gets `synced_at` = `opts[:synced_at]` (default: now, seconds precision);
   a retried event keeps the `synced_at` of the sync that first delivered it.
   Invalid events are returned in `rejected` as `%{event_id: id | nil, error: "invalid_payload"}`
@@ -22,7 +25,12 @@ defmodule RescueCloud.Events do
   """
   @spec append_batch([map()], keyword()) ::
           {:ok,
-           %{acked: [String.t()], rejected: [%{event_id: String.t() | nil, error: String.t()}]}}
+           %{
+             acked: [String.t()],
+             rejected: [%{event_id: String.t() | nil, error: String.t()}],
+             inserted: [struct()],
+             request_ids: [String.t()]
+           }}
   def append_batch(events, opts \\ []) when is_list(events) do
     synced_at =
       Keyword.get_lazy(opts, :synced_at, fn -> DateTime.utc_now() end)
@@ -56,7 +64,8 @@ defmodule RescueCloud.Events do
      %{
        acked: Enum.map(rows, & &1.event_id),
        rejected: Enum.reverse(rejected),
-       inserted: inserted
+       inserted: inserted,
+       request_ids: rows |> Enum.map(& &1.request_id) |> Enum.uniq()
      }}
   end
 

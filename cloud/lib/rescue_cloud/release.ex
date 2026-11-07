@@ -25,6 +25,26 @@ defmodule RescueCloud.Release do
     {:ok, _, _} = Ecto.Migrator.with_repo(repo, &Ecto.Migrator.run(&1, :down, to: version))
   end
 
+  @doc """
+  Rebuilds the `requests` read model (the dashboard) from the events table with
+  `RescueCloud.Projection.rebuild/0`. Safe to run at any time, also while devices sync: it
+  deletes nothing but derived rows and takes the projection lock.
+
+  `bin/rescue_cloud eval 'RescueCloud.Release.rebuild_projection()'`.
+  """
+  def rebuild_projection do
+    load_app()
+
+    for repo <- repos() do
+      {:ok, {:ok, n}, _} =
+        Ecto.Migrator.with_repo(repo, fn _repo -> RescueCloud.Projection.rebuild() end)
+
+      IO.puts("Rebuilt the requests read model in #{inspect(repo)}: #{n} requests")
+    end
+
+    :ok
+  end
+
   @reset_confirm "yes-delete-all-demo-data"
   @keep_tables ~w(schema_migrations models)
 

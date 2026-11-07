@@ -83,6 +83,18 @@ defmodule RescueCloudWeb.DownsyncTest do
              conn |> auth() |> get("/sync/down?since=abc") |> json_response(400)
   end
 
+  test "since above the bigint range is 400, the largest bigint is fine (L-06)", %{conn: conn} do
+    for since <- ["9223372036854775808", "99999999999999999999"] do
+      assert %{"error" => "bad_request"} =
+               conn |> auth() |> get("/sync/down?since=#{since}") |> json_response(400)
+    end
+
+    max = 9_223_372_036_854_775_807
+
+    assert %{"events" => [], "next_since" => ^max} =
+             conn |> auth() |> get("/sync/down?since=#{max}") |> json_response(200)
+  end
+
   test "matches the contract example shape", %{conn: conn} do
     example =
       @examples |> Path.join("sync-down_response.valid.json") |> File.read!() |> Jason.decode!()

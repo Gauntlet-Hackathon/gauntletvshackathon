@@ -61,3 +61,8 @@ config :rescue_cloud, :devices, %{
   "demo-field-01" => "test-token-field-01",
   "field-03" => "test-token-field-03"
 }
+
+# The projection's advisory lock (RescueCloud.Projection) is a transaction lock, and in the SQL
+# sandbox a transaction lasts the whole test: async tests would wait for each other's lock while
+# holding row locks, and deadlock. RescueCloud.ProjectionLockTest turns it on for its own test.
+config :rescue_cloud, :projection_lock, false
