@@ -1,5 +1,5 @@
 # Fly.io config for the cloud app (sync API + LiveView dashboard).
-# "rescue-cloud-demo" is a PLACEHOLDER app name: replace it (or let `fly launch --copy-config --no-deploy` rename it)
+# "rescue-cloud-demo" is a PLACEHOLDER app name: replace it (or let `fly launch --copy-config --no-deploy --config cloud/fly.toml` rename it)
 # before deploying. Deploy steps: RUNBOOK.md, section "Deploy cloud to Fly".
 # Secrets (never in this file): DATABASE_URL (set by `fly postgres attach`), SECRET_KEY_BASE, DEVICE_TOKENS, PHX_HOST.
 
@@ -8,7 +8,7 @@ primary_region = "iad"
 kill_signal = "SIGTERM"
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = "cloud/Dockerfile"
 
 [deploy]
   # Runs once per deploy in a temporary machine before the new release starts.

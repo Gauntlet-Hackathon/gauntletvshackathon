@@ -34,3 +34,4 @@ One line per merged change: date, lane, issue, what changed.
 - cloud #205 C24: evals panel readable metric labels, headline row, yes/no and $ formats, rubric/HumAID/sealed notes, tests in evals_live_test
 - cloud #206 C25: RescueCloud.Release.reset_demo/1 (guarded TRUNCATE of all public tables except schema_migrations and models), README section, release_test
 cloud #207 C26a: cloud/Dockerfile builds from repo root and ships the frozen Mercury engine build with ENGINE_DIST; .dockerignore trimmed
+cloud #208 C26b: fly.toml, compose and RUNBOOK deploy build cloud/Dockerfile from repo root; fly_toml_test resolves path from repo root
