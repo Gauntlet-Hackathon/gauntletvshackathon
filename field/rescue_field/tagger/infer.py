@@ -16,6 +16,7 @@ logits before the sigmoid/softmax.
 from __future__ import annotations
 
 import json
+import logging
 import math
 from pathlib import Path
 from typing import Any
@@ -86,6 +87,7 @@ class Extractor:
         self.model = model.eval()
         self.tok = tokenizer
         self.t = temperatures
+        self.calibrated = bool(temperatures)  # local change to the vendored file (F37)
         self.model_version = model_version
 
     @classmethod
@@ -94,7 +96,13 @@ class Extractor:
         model, tok = RescueTagger.load(model_dir)
         cal = model_dir / "calibration.json"
         temps = json.loads(cal.read_text())["temperatures"] if cal.exists() else {}
-        return cls(model, tok, temps, model_version, threads)
+        if not cal.exists():  # local change to the vendored file (F37): be loud
+            logging.getLogger(__name__).error(
+                "uncalibrated: calibration.json missing in %s", model_dir
+            )
+        out = cls(model, tok, temps, model_version, threads)
+        out.calibrated = cal.exists()
+        return out
 
     def _T(self, head: str) -> float:
         return float(self.t.get(head, 1.0))

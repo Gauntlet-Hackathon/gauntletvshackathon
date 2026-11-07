@@ -65,6 +65,12 @@ class HFExtractor:
             else _load_vendored(folder, self.model_version)
         )
 
+    @property
+    def calibrated(self) -> bool | None:
+        """True/False when the loaded extractor reports it; None if it does not."""
+        value = getattr(self._extractor, "calibrated", None)
+        return value if isinstance(value, bool) else None
+
     def extract(self, raw_text: str) -> Extraction:
         payload = self._extractor.extract(raw_text)
         validate_extracted(payload)

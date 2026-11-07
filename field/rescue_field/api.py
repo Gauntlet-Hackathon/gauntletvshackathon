@@ -78,24 +78,42 @@ def open_store(env: Mapping[str, str] | None = None) -> EventStore:
     return EventStore(directory / DB_FILENAME, check_same_thread=False)
 
 
-def select_extractor(env: Mapping[str, str] | None = None) -> Extractor:
+def _info(extractor: Extractor, expected: str | None, reason: str | None) -> dict[str, Any]:
+    return {
+        "extractor": "fixture" if isinstance(extractor, FixtureExtractor) else "hf",
+        "model_version": getattr(extractor, "model_version", "unknown"),
+        "expected_model": expected,
+        "fallback_reason": reason,
+    }
+
+
+def select_extractor_with_info(
+    env: Mapping[str, str] | None = None,
+) -> tuple[Extractor, dict[str, Any]]:
     """HFExtractor when HF_REPO and HF_REVISION are both set and it loads; else the fixture
-    extractor. Never raises: the app must start whatever the model does. Logs one line."""
+    extractor. Never raises: the app must start whatever the model does. Also returns what was
+    chosen and why (`app.state.extractor_info`), so a silent fallback is visible (F37)."""
     env = os.environ if env is None else env
     if not (env.get("HF_REPO") and env.get("HF_REVISION")):
         log.info("extractor: FixtureExtractor (HF_REPO/HF_REVISION not both set)")
-        return FixtureExtractor()
+        fixture = FixtureExtractor()
+        return fixture, _info(fixture, None, None)
+    expected = f"hf:{env['HF_REPO']}@{env['HF_REVISION']}"
     try:
         from rescue_field.slm_hf import HFExtractor
 
         chosen = HFExtractor()
     except Exception as exc:  # incl. ImportError when torch is not installed
-        log.warning(
-            "extractor: FixtureExtractor (HFExtractor failed: %s: %s)", type(exc).__name__, exc
-        )
-        return FixtureExtractor()
+        reason = f"{type(exc).__name__}: {exc}"
+        log.error("extractor: FixtureExtractor (HFExtractor failed: %s)", reason)
+        fixture = FixtureExtractor()
+        return fixture, _info(fixture, expected, reason)
     log.info("extractor: HFExtractor %s", chosen.model_version)
-    return chosen
+    return chosen, _info(chosen, expected, None)
+
+
+def select_extractor(env: Mapping[str, str] | None = None) -> Extractor:
+    return select_extractor_with_info(env)[0]
 
 
 def default_decide_batch(env: Mapping[str, str] | None = None) -> BatchDecider:
@@ -337,7 +355,9 @@ def create_app(
         if app.state.store is None:
             opened = app.state.store = open_store()
         if extractor is None:  # none passed: pick at startup, never at import
-            app.state.extractor = await run_in_threadpool(select_extractor)
+            app.state.extractor, app.state.extractor_info = await run_in_threadpool(
+                select_extractor_with_info
+            )
         cloud_url = os.environ.get("CLOUD_URL")
         worker = None
         if cloud_url:
@@ -365,6 +385,14 @@ def create_app(
     app = FastAPI(title="Rescue triage field app", lifespan=lifespan)
     app.state.store = store
     app.state.extractor = extractor or FixtureExtractor()  # replaced in the lifespan if none passed
+    _env = os.environ
+    app.state.extractor_info = _info(
+        app.state.extractor,
+        f"hf:{_env['HF_REPO']}@{_env['HF_REVISION']}"
+        if _env.get("HF_REPO") and _env.get("HF_REVISION")
+        else None,
+        None,
+    )
     app.state.decide_batch = decide_batch or default_decide_batch()
     app.state.config = config or PipelineConfig.from_env()
     app.state.intake_lock = threading.Lock()
