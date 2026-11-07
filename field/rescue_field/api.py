@@ -14,7 +14,6 @@ import io
 import json
 import os
 import re
-import shlex
 import sys
 import threading
 from collections.abc import AsyncIterator, Callable, Mapping
@@ -81,7 +80,7 @@ def default_decide_batch(env: Mapping[str, str] | None = None) -> BatchDecider:
     """The engine subprocess in batch mode: `$ENGINE_CMD`, default `python -m
     rescue_engine.fallback` with engine/ and shared/ on PYTHONPATH."""
     env = dict(os.environ if env is None else env)
-    cmd = env.get("ENGINE_CMD") or f"{shlex.quote(sys.executable)} -m rescue_engine.fallback"
+    cmd: str | list[str] = env.get("ENGINE_CMD") or [sys.executable, "-m", "rescue_engine.fallback"]
     paths = [str(_REPO_ROOT / "engine"), str(_REPO_ROOT / "shared")]
     if env.get("PYTHONPATH"):
         paths.append(env["PYTHONPATH"])
