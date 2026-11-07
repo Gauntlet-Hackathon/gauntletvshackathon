@@ -1,5 +1,6 @@
 {% set s = r.tier_source %}
 <div class="row" data-request-id="{{ r.request_id }}" data-tier="{{ r.tier }}" data-status="{{ r.status or 'new' }}">
+  <span class="tier-label tier-{{ r.tier }}">{{ r.tier }}</span>
   <strong>{{ r.extracted.location.text }}</strong>
   <span class="status">[{{ r.status or "new" }}]</span>
   · {{ r.extracted.people_count.value if r.extracted.people_count.value is not none else "?" }} people

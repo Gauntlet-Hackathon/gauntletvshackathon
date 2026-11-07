@@ -1,11 +1,11 @@
 {% for t in tiers %}
-<section class="tier tier-{{ t.tier }}" id="tier-{{ t.tier }}">
-  <h2>{{ t.tier }} <small>({{ t.rows|length }})</small></h2>
+<section class="tier tier-{{ t.tier }}" id="tier-{{ t.tier }}" aria-labelledby="tier-{{ t.tier }}-heading">
+  <h2 id="tier-{{ t.tier }}-heading">{{ t.tier }} <small>({{ t.rows|length }})</small></h2>
   {% for r in t.rows %}{% include "_row.html" %}{% else %}<p class="meta">None.</p>{% endfor %}
 </section>
 {% endfor %}
-<section class="followups" id="follow-ups">
-  <h2>Follow-up queue <small>({{ follow_ups|length }})</small></h2>
+<section class="followups" id="follow-ups" aria-labelledby="follow-ups-heading">
+  <h2 id="follow-ups-heading">Follow-up queue <small>({{ follow_ups|length }})</small></h2>
   {% for r in follow_ups %}
   <div class="row" data-request-id="{{ r.request_id }}" data-provisional-tier="{{ r.provisional_tier or '' }}">
     {% if r.provisional_tier %}<span class="provisional-tier tier-{{ r.provisional_tier }}" title="Provisional tier (most cautious reading)">{{ r.provisional_tier }}?</span>{% endif %}
@@ -20,7 +20,7 @@
   </div>
   {% else %}<p class="meta">Nothing to follow up.</p>{% endfor %}
 </section>
-<section class="not-requests" id="not-requests">
+<section class="not-requests" id="not-requests" aria-label="Not a request">
   <details>
     <summary>Not a request ({{ not_requests|length }})</summary>
     {% for r in not_requests %}
