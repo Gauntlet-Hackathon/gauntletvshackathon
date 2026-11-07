@@ -29,6 +29,7 @@ defmodule RescueCloud.Events.Payload do
   defp str, do: {:string, 0}
   defp text, do: {:string, 1}
   defp conf, do: {:number, 0, 1}
+  defp people_count, do: {:integer, 0, 100_000}
 
   defp spec("received") do
     obj(%{
@@ -49,7 +50,7 @@ defmodule RescueCloud.Events.Payload do
           "type" => enum(~w(landmark address coords none)),
           "confidence" => conf()
         }),
-      "people_count" => obj(%{"value" => nullable({:integer, 0}), "confidence" => conf()}),
+      "people_count" => obj(%{"value" => nullable(people_count()), "confidence" => conf()}),
       "vulnerable" => kinded.(~w(child elderly disabled medical pregnant)),
       "hazards" => kinded.(~w(rising_water on_roof injury medical_device_no_power fire trapped)),
       "time_ref" =>
@@ -121,7 +122,7 @@ defmodule RescueCloud.Events.Payload do
               obj(%{
                 "request_id" => {:pattern, @ulid},
                 "received_at" => {:pattern, @timestamp},
-                "people_count" => nullable({:integer, 0}),
+                "people_count" => nullable(people_count()),
                 "contact_match" => :boolean,
                 "priority_tier" => nullable(enum(@tiers))
               })
@@ -230,6 +231,14 @@ defmodule RescueCloud.Events.Payload do
 
   defp check({:pattern, re}, v, path) when is_binary(v),
     do: if(Regex.match?(re, v), do: [], else: ["#{path} has invalid format"])
+
+  defp check({:integer, min, max}, v, path) when is_integer(v) do
+    cond do
+      v < min -> ["#{path} must be >= #{min}"]
+      v > max -> ["#{path} must be <= #{max}"]
+      true -> []
+    end
+  end
 
   defp check({:integer, min}, v, path) when is_integer(v),
     do: if(v >= min, do: [], else: ["#{path} must be >= #{min}"])

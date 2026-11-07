@@ -38,3 +38,4 @@ cloud #207 C26a: cloud/Dockerfile builds from repo root and ships the frozen Mer
 cloud #208 C26b: fly.toml, compose and RUNBOOK deploy build cloud/Dockerfile from repo root; fly_toml_test resolves path from repo root
 2026-11-07 cloud PR-2 (review M-01/M-02/F-01/O-04/L-06): sync re-projects every request of a batch (retries repair), per-request projection isolation with logging, advisory-locked projection, people_count beyond int4 is unknown, Normalize matches Python on Unicode digits/spaces/combining marks/rounding, U+0000 payloads rejected per event, since/outbox_backlog bounds, Release.rebuild_projection/0 + README/RUNBOOK
 2026-11-07 cloud #274 C27: replay verifies each rules version in chunks of conf(:chunk_size, 500); a failing chunk only errors its own events
+2026-11-07 cloud #276 C28: Payload enforces the people_count_value maximum (100000) for extracted, duplicate candidates; tests for max and max+1

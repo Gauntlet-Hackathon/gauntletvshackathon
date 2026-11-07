@@ -121,18 +121,16 @@ defmodule RescueCloudWeb.SyncProjectionTest do
     assert length(Projection.list_requests()) == 2
   end
 
-  test "a people_count above int4 is projected as unknown and the batch is projected (F-01)" do
-    events =
-      request_events(rid("06"), people: 3_000_000_000) ++
-        request_events(rid("07"), location: "9 Elm Dr")
+  test "people_count above the contract maximum is rejected, the maximum itself is accepted (F-01)" do
+    over = request_events(rid("06"), people: 100_001)
+    max = request_events(rid("07"), location: "9 Elm Dr", people: 100_000)
 
-    assert %{"acked" => acked, "rejected" => []} = sync(events)
-    assert length(acked) == 4
-
-    req = Projection.get_request(rid("06"))
-    assert req.people_count == nil
-    assert req.extracted["people_count"]["value"] == 3_000_000_000
-    assert %{people_count: 3} = Projection.get_request(rid("07"))
+    assert %{"acked" => acked, "rejected" => [rej]} = sync(over ++ max)
+    assert rej["event_id"] == eid("06", 2) and rej["error"] == "invalid_payload"
+    assert eid("06", 2) not in acked
+    assert eid("07", 2) in acked
+    assert Repo.get_by(Event, event_id: eid("06", 2)) == nil
+    assert %{people_count: 100_000} = Projection.get_request(rid("07"))
   end
 
   test "coordinates written with non-ASCII digits are projected and grouped like ASCII ones (M-02)" do
