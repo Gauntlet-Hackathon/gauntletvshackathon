@@ -2,7 +2,7 @@ defmodule RescueCloudWeb.SyncController do
   @moduledoc "Device sync API (behind `RescueCloudWeb.Plugs.DeviceAuth`)."
   use RescueCloudWeb, :controller
 
-  alias RescueCloud.{Events, Fleet}
+  alias RescueCloud.{Events, Fleet, Projection}
 
   def heartbeat(conn, params) do
     device_id = conn.assigns.device_id
@@ -37,6 +37,8 @@ defmodule RescueCloudWeb.SyncController do
         else
           {:ok, %{acked: acked, rejected: rejected, inserted: inserted}} =
             Events.append_batch(events)
+
+          Projection.apply_events(inserted)
 
           Enum.each(
             inserted,
