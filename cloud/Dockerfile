@@ -1,3 +1,6 @@
+# Build from the repo root (the context must include engine/dist):
+#   docker build -f cloud/Dockerfile .
+#
 # This file is based on these images:
 #
 #   - https://hub.docker.com/r/hexpm/elixir/tags - for the builder image
@@ -20,6 +23,8 @@
 ARG ELIXIR_VERSION=1.20.5
 ARG OTP_VERSION=29.1.2
 ARG DEBIAN_VERSION=trixie-20261104-slim
+# frozen Mercury engine build replayed by RescueCloud.Replay (no Python needed)
+ARG ENGINE_BUILD=rules@a4dbac566db96b00951930ad9da941e85c1b2429+bin:36c2f7f7da6998e5
 
 ARG BUILDER_IMAGE="docker.io/hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-debian-${DEBIAN_VERSION}"
 ARG RUNNER_IMAGE="docker.io/debian:${DEBIAN_VERSION}"
@@ -42,39 +47,42 @@ RUN mix local.hex --force \
 ENV MIX_ENV="prod"
 
 # install mix dependencies
-COPY mix.exs mix.lock ./
+COPY cloud/mix.exs cloud/mix.lock ./
 RUN mix deps.get --only $MIX_ENV
 RUN mkdir config
 
 # copy compile-time config files before we compile dependencies
 # to ensure any relevant config change will trigger the dependencies
 # to be re-compiled.
-COPY config/config.exs config/devices.exs config/${MIX_ENV}.exs config/
+COPY cloud/config/config.exs cloud/config/devices.exs cloud/config/${MIX_ENV}.exs config/
 RUN mix deps.compile
 
 RUN mix assets.setup
 
-COPY priv priv
+COPY cloud/priv priv
 
-COPY lib lib
+COPY cloud/lib lib
 
 # Compile the release
 RUN mix compile
 
-COPY assets assets
+COPY cloud/assets assets
 
 # compile assets
 RUN mix assets.deploy
 
 # Changes to config/runtime.exs don't require recompiling the code
-COPY config/runtime.exs config/
+COPY cloud/config/runtime.exs config/
 
-COPY rel rel
+COPY cloud/rel rel
 RUN mix release
 
 # start a new build stage so that the final image will only contain
 # the compiled release and other runtime necessities
 FROM ${RUNNER_IMAGE} AS final
+
+# re-declare so the build arg is visible in this stage
+ARG ENGINE_BUILD
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends libstdc++6 openssl libncurses6 locales ca-certificates \
@@ -96,6 +104,12 @@ ENV MIX_ENV="prod"
 
 # Only copy the final release from the build stage
 COPY --from=builder --chown=nobody:root /app/_build/${MIX_ENV}/rel/rescue_cloud ./
+
+# Frozen engine build for the replay verifier
+COPY --chown=nobody:root engine/dist/${ENGINE_BUILD}/ /app/engine/dist/${ENGINE_BUILD}/
+RUN test -x /app/engine/dist/${ENGINE_BUILD}/bin/mercury_engine \
+  && test -f /app/engine/dist/${ENGINE_BUILD}/manifest.json
+ENV ENGINE_DIST=/app/engine/dist
 
 USER nobody
 

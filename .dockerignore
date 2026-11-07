@@ -8,6 +8,10 @@ __pycache__
 .mypy_cache
 cloud/_build
 cloud/deps
+cloud/assets/node_modules
+cloud/priv/static/assets
+cloud/test
+cloud/cover
 node_modules
 *.db
 .env
