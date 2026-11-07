@@ -150,6 +150,21 @@ jobs:
       contents: read
     env:
       BRANCH: ${{ needs.pick.outputs.branch }}
+      # The CI environment (see ci.yml), so the agent can run its lane's tests before finishing.
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -161,6 +176,32 @@ jobs:
         with:
           name: task-${{ inputs.lane }}
           path: ${{ runner.temp }}/task
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            constraints.txt
+            */requirements.txt
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -c constraints.txt --group dev \
+            -r shared/requirements.txt -r field/requirements.txt \
+            -r engine/requirements.txt -r evals/requirements.txt
+
+      - uses: erlef/setup-beam@v1
+        with:
+          version-file: cloud/.tool-versions
+          version-type: strict
+
+      - name: Fetch and compile cloud dependencies
+        working-directory: cloud
+        env:
+          MIX_ENV: test
+        run: mix deps.get && mix deps.compile
 
       - name: Install Claude Code
         run: npm install -g "@anthropic-ai/claude-code@${{ vars.CLAUDE_CODE_VERSION || 'latest' }}"

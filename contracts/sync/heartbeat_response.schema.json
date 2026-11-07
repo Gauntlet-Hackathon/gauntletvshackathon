@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.rescue.invalid/sync/heartbeat_response.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "ok": {
+      "const": true
+    },
+    "server_time": {
+      "$ref": "../common.schema.json#/$defs/timestamp"
+    }
+  },
+  "required": [
+    "ok",
+    "server_time"
+  ],
+  "title": "POST /sync/heartbeat 200"
+}

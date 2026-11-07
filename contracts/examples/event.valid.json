@@ -1,0 +1,15 @@
+{
+  "event_id": "01JCB00000000000000000EV01",
+  "request_id": "01JCB00000000000000000RQ02",
+  "type": "received",
+  "device_id": "field-03",
+  "occurred_at": "2026-11-07T14:02:11Z",
+  "rules_version": "rules@a1b2c3d+bin:9f8e7d6c5b4a3f21",
+  "model_version": "hf:rescue-org/rescue-tagger@4d5e6f7a8b",
+  "payload": {
+    "channel": "sms",
+    "raw_text": "3 kids on the roof, water rising, behind the Kroger on Westheimer",
+    "lang_hint": "en",
+    "contact": "+17135550123"
+  }
+}

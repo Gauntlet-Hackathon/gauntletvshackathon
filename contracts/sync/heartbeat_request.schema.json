@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.rescue.invalid/sync/heartbeat_request.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "device_id": {
+      "$ref": "../common.schema.json#/$defs/device_id"
+    },
+    "sent_at": {
+      "$ref": "../common.schema.json#/$defs/timestamp"
+    },
+    "outbox_backlog": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "rules_version": {
+      "$ref": "../common.schema.json#/$defs/rules_version"
+    },
+    "model_version": {
+      "$ref": "../common.schema.json#/$defs/model_version"
+    }
+  },
+  "required": [
+    "device_id",
+    "sent_at",
+    "outbox_backlog",
+    "rules_version",
+    "model_version"
+  ],
+  "title": "POST /sync/heartbeat request"
+}

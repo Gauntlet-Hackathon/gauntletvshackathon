@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.rescue.invalid/payloads/closed_duplicate.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "duplicate_of": {
+      "$ref": "../common.schema.json#/$defs/ulid"
+    },
+    "note": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "duplicate_of",
+    "note"
+  ],
+  "title": "closed_duplicate payload"
+}

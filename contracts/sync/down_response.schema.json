@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.rescue.invalid/sync/down_response.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "next_since": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "../event.schema.json"
+      }
+    },
+    "approved": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rules_version": {
+          "anyOf": [
+            {
+              "$ref": "../common.schema.json#/$defs/rules_version"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "model_version": {
+          "anyOf": [
+            {
+              "$ref": "../common.schema.json#/$defs/model_version"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "rules_version",
+        "model_version"
+      ]
+    }
+  },
+  "required": [
+    "next_since",
+    "events",
+    "approved"
+  ],
+  "title": "GET /sync/down?since=N 200"
+}

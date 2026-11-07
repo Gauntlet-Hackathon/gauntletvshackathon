@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.rescue.invalid/sync/error_response.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "error": {
+      "type": "string",
+      "pattern": "^[a-z_]+$"
+    },
+    "detail": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "error"
+  ],
+  "title": "sync API error"
+}

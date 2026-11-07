@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.rescue.invalid/sync/events_response.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "acked": {
+      "type": "array",
+      "items": {
+        "$ref": "../common.schema.json#/$defs/ulid"
+      }
+    },
+    "rejected": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "error": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "event_id",
+          "error"
+        ]
+      }
+    }
+  },
+  "required": [
+    "acked",
+    "rejected"
+  ],
+  "title": "POST /sync/events 200",
+  "description": "acked includes events the cloud already had (idempotent). rejected events must not be retried unchanged."
+}
