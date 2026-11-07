@@ -36,6 +36,7 @@ services:
     environment:
       CLOUD_URL: http://cloud:4000
       DEVICE_ID: laptop-dev-01
+      DEMO_MODE: "1"
       DEVICE_TOKEN: dev-token-laptop-dev-01
       FIELD_DATA_DIR: /data
       PORT: "8000"
