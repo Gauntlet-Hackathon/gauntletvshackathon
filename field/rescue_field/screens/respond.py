@@ -5,8 +5,11 @@ remembers it in the browser). Their job is the open tier card (latest status `as
 escalated or rescued) whose latest `assigned` crew matches the boat, read from the same board
 snapshot as the queue (`board.build_board_from_events`, no ranking of its own).
 
-The OSM chips (Sent to you, On the way, There, Done) only pick the radio line to read out; they
-are not saved (responder-status events are deferred). The outcome buttons, shown after "There"
+The OSM chips (Sent to you, On the way, There, Done) pick the radio line to read out, and each
+tap appends one `responder_status` event through `POST /requests/{id}/responder-status`
+(`status.py`, #310; `respond.js` posts it, a repeat of the crew's latest step adds nothing). It
+never changes the request's status; Out now shows it. With no `step` in the URL the page opens
+on the crew's last saved step. The outcome buttons, shown after "There"
 or "Done", and "I can't take this one" post to the existing `POST /requests/{id}/status`, one
 event per tap; a refused move (409) shows the API's message. Radio lines use only extracted
 fields, the incident label and the volunteer name. No rule ID, version or confidence reaches
@@ -25,6 +28,7 @@ from rescue_field import words
 from rescue_field.board import build_board_from_events, templates
 from rescue_field.boats import list_boats
 from rescue_field.shell import shell_config, shell_context
+from rescue_field.status import latest_responder_status
 
 router = APIRouter()
 
@@ -36,6 +40,9 @@ STEPS = (
     ("done", "Done"),
 )
 OUTCOME_STEPS = ("onscene", "done")
+# chip key -> responder_status `status` (contracts/payloads/responder_status.schema.json)
+STEP_STATUS = {"assigned": "sent", "enroute": "on_the_way", "onscene": "there", "done": "done"}
+STATUS_STEP = {v: k for k, v in STEP_STATUS.items()}
 MAX_BOAT = 200
 
 
@@ -131,7 +138,12 @@ async def _snapshot(request: Request) -> tuple[list[dict[str, Any]], list[dict[s
 async def _job(request: Request, boat: str) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
     events, boats = await _snapshot(request)
     row = await run_in_threadpool(find_job, events, boat) if boat else None
-    return (job_card(row, shell_config()["volunteer_name"]) if row else None), boats
+    if row is None:
+        return None, boats
+    job = job_card(row, shell_config()["volunteer_name"])
+    saved = (await run_in_threadpool(latest_responder_status, events)).get(row["request_id"])
+    job["saved_step"] = STATUS_STEP.get(saved["status"]) if saved else None
+    return job, boats
 
 
 @router.get("/respond/job.json")
@@ -146,6 +158,8 @@ async def respond_page(request: Request, boat: str = "", step: str = "") -> HTML
     boat = _boat(boat)
     job, boats = await _job(request, boat)
     keys = [k for k, _ in STEPS]
+    if step not in keys:
+        step = (job or {}).get("saved_step") or ""
     ctx = await run_in_threadpool(shell_context, request)
     ctx |= {
         "mode": "respond",
@@ -153,6 +167,7 @@ async def respond_page(request: Request, boat: str = "", step: str = "") -> HTML
         "boats": boats,
         "job": job,
         "steps": STEPS,
+        "step_status": STEP_STATUS,
         "step": step if step in keys else None,
         "show_outcomes": step in OUTCOME_STEPS,
         "shelters": ctx["shelter_names"],

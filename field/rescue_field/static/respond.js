@@ -1,5 +1,7 @@
-// Respond mode (UI-5). Remembers the boat in this browser, copies the radio line, and posts each
-// outcome to POST /requests/{id}/status once (buttons are disabled while a post is in flight).
+// Respond mode (UI-5). Remembers the boat in this browser, copies the radio line, saves each OSM
+// chip tap as a responder_status event (POST /requests/{id}/responder-status, #310) before showing
+// its radio line, and posts each outcome to POST /requests/{id}/status once (buttons are disabled
+// while a post is in flight).
 (function () {
   "use strict";
   var KEY = "respond-boat";
@@ -76,6 +78,36 @@
           errorBox.textContent = "Could not save: " + e.message;
           errorBox.hidden = false;
           setBusy(false);
+        });
+    });
+  });
+
+  // OSM chips: save the step (a repeat of the latest step adds nothing on the server), then
+  // open the chip's page with the line to read. On an error, say so and stay.
+  var chipBusy = false;
+  Array.prototype.forEach.call(document.querySelectorAll("a.osm-chip"), function (chip) {
+    chip.addEventListener("click", function (ev) {
+      if (!cfg.request_id || !cfg.crew) return;
+      ev.preventDefault();
+      if (chipBusy) return;
+      chipBusy = true;
+      errorBox.hidden = true;
+      var body = new URLSearchParams();
+      body.set("crew", cfg.crew);
+      body.set("status", chip.dataset.status);
+      body.set("note", chip.dataset.note || "");
+      fetch("/requests/" + encodeURIComponent(cfg.request_id) + "/responder-status", { method: "POST", body: body })
+        .then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, j: j }; });
+        })
+        .then(function (res) {
+          if (!res.ok) throw new Error(res.j.detail || "Could not save.");
+          location.assign(chip.href);
+        })
+        .catch(function (e) {
+          errorBox.textContent = "Could not save: " + e.message;
+          errorBox.hidden = false;
+          chipBusy = false;
         });
     });
   });

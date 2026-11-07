@@ -1,8 +1,10 @@
-"""Down-sync (contracts/sync_api.md `GET /sync/down`): other sites' assigned / rescued.
+"""Down-sync (contracts/sync_api.md `GET /sync/down`): other sites' assigned / rescued, and
+their boats' `responder_status` (#310).
 
 `pull` asks the cloud for events after the stored cursor, keeps only valid `assigned` and
 `rescued` events from other devices that move a request strictly forward (the same
-forward-only order as `rescue_field.status`: none < assigned < escalated < rescued), and
+forward-only order as `rescue_field.status`: none < assigned < escalated < rescued) plus every
+valid `responder_status` event (not a status: Out now shows the latest per job), and
 stores them without outbox rows (they are not ours to send). In the same transaction it
 persists `next_since` and the approved rules/model versions: a newly approved version
 becomes `approved_*` (read at the next restart) and the one it replaces moves to
@@ -23,7 +25,7 @@ from rescue_field.store import EventStore
 from rescue_shared.contracts_io import validator_for
 
 CURSOR_KEY = "downsync_since"
-DOWN_TYPES = ("assigned", "rescued")
+DOWN_TYPES = ("assigned", "rescued", "responder_status")
 VERSION_KINDS = ("rules_version", "model_version")
 
 
@@ -60,10 +62,14 @@ def _usable(ev: Any, device_id: str | None) -> bool:
 
 def forward_only(store: EventStore, events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Events that move their request strictly forward, in order (repeats and backward
-    moves against local or earlier-in-batch status are dropped)."""
+    moves against local or earlier-in-batch status are dropped). Events that are not statuses
+    (`responder_status`) never move a request and are always kept."""
     status: dict[str, str | None] = {}
     keep = []
     for ev in events:
+        if ev["type"] not in RANK:
+            keep.append(ev)
+            continue
         rid = ev["request_id"]
         if rid not in status:
             status[rid] = current_status(store.request_events(rid))

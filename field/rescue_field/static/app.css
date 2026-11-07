@@ -76,6 +76,7 @@ img { max-width: 100%; }
 .queue-line { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; background: var(--white); border: 1px solid var(--line);
   border-radius: 12px; padding: .6rem .75rem; margin: .4rem 0; }
 .line-address { flex-basis: 100%; color: var(--muted); }
+.responder-status { flex-basis: 100%; font-weight: 600; }
 .set-aside summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
 #queue h1 { font-size: 1.4rem; margin: 1rem 0 .4rem; }
 #queue h2#check-first-heading { font-size: 1.1rem; }

@@ -8,7 +8,8 @@ ranking of its own. The technical board lives at `GET /board`.
   client-side cursor over this list and writes nothing.
 - **Waiting**: the other open tier rows, then Check first (the engine's abstains, question word
   for word, no Send button), then Set aside (not a request), collapsed.
-- **Out now**: rows with a crew assigned.
+- **Out now**: rows with a crew assigned, each with its boat's latest responder status ("On the
+  way · 4 min ago", #310), from this laptop or another one via down-sync.
 
 Duplicates never get their own card: they fold into their group's card as "+N other posts". An
 abstain a duplicate lifted onto a tier (review O-08) is shown on that tier card, with the
@@ -19,6 +20,7 @@ model version or confidence number reaches the HTML (`words.py` turns them into 
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Request
@@ -26,8 +28,9 @@ from fastapi.responses import HTMLResponse
 from starlette.concurrency import run_in_threadpool
 
 from rescue_field import words
-from rescue_field.board import load_board, templates
-from rescue_field.shell import shell_context
+from rescue_field.board import build_board_from_events, templates
+from rescue_field.shell import _ago, shell_context
+from rescue_field.status import RESPONDER_LABELS, latest_responder_status
 from rescue_field.words_es import spanish_line
 
 router = APIRouter()
@@ -86,9 +89,30 @@ def aside_card(rec: dict[str, Any]) -> dict[str, Any]:
     return card
 
 
-def build_queue(board: dict[str, Any]) -> dict[str, Any]:
+def responder_line(st: dict[str, Any] | None, now: datetime | None = None) -> dict[str, str] | None:
+    """{"crew": ..., "text": "On the way · 4 min ago"} for a `latest_responder_status` entry."""
+    if not st:
+        return None
+    parts = [RESPONDER_LABELS.get(st.get("status"), "")]
+    ago = _ago(st.get("occurred_at"), now)
+    if ago:
+        parts.append(ago)
+    return {"crew": st.get("crew") or "", "text": " · ".join(p for p in parts if p)}
+
+
+def out_card(row: dict[str, Any], responder: dict[str, Any] | None) -> dict[str, Any]:
+    card = tier_card(row)
+    card["responder"] = responder_line(responder)
+    return card
+
+
+def build_queue(
+    board: dict[str, Any], responders: dict[str, dict[str, Any]] | None = None
+) -> dict[str, Any]:
     """{"next": card|None, "queue": [cards], "waiting": [...], "check_first": [...],
-    "set_aside": [...], "out_now": [...]} from a `build_board` result."""
+    "set_aside": [...], "out_now": [...]} from a `build_board` result. `responders` is
+    `status.latest_responder_status` of the same snapshot (Out now's status line)."""
+    responders = responders or {}
     rows = [r for t in board["tiers"] for r in t["rows"]]
     escalated = [r for r in rows if r["status"] == "escalated"]
     fresh = [r for r in rows if r["status"] is None]
@@ -105,7 +129,9 @@ def build_queue(board: dict[str, Any]) -> dict[str, Any]:
         "waiting": queue[1:],
         "check_first": check_first,
         "set_aside": [aside_card(r) for r in board["not_requests"]],
-        "out_now": [tier_card(r) for r in rows if r["status"] == "assigned"],
+        "out_now": [
+            out_card(r, responders.get(r["request_id"])) for r in rows if r["status"] == "assigned"
+        ],
     }
 
 
@@ -115,8 +141,21 @@ def _has_recheck(request: Request) -> bool:
 
 @router.get("/", response_class=HTMLResponse)
 async def queue_page(request: Request) -> HTMLResponse:
-    board = await load_board(request)
-    ctx = await run_in_threadpool(build_queue, board)
+    store = request.app.state.store
+    if store is None:
+        raise RuntimeError("event store is not open (app lifespan not running)")
+    lock = request.app.state.intake_lock
+
+    def snapshot() -> list[dict[str, Any]]:
+        with lock:  # one SELECT; building and rendering happen outside the lock
+            return store.all_events()
+
+    events = await run_in_threadpool(snapshot)
+
+    def build() -> dict[str, Any]:
+        return build_queue(build_board_from_events(events), latest_responder_status(events))
+
+    ctx = await run_in_threadpool(build)
     ctx["recheck"] = _has_recheck(request)
     ctx["refresh_seconds"] = REFRESH_SECONDS
     ctx["couldnt"] = words.COULDNT_GET_THERE

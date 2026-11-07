@@ -41,10 +41,10 @@
 <section id="osm" aria-labelledby="osm-label">
 <h2 id="osm-label">Operational Status Messages (OSM)</h2>
 <p role="group" aria-labelledby="osm-label">
-{% for key, label in steps %}<a class="chip{% if step == key %} selected{% endif %}" aria-pressed="{{ 'true' if step == key else 'false' }}" href="/respond?boat={{ b }}&amp;step={{ key }}">{{ label }}</a>
+{% for key, label in steps %}<a class="chip osm-chip{% if step == key %} selected{% endif %}" aria-pressed="{{ 'true' if step == key else 'false' }}" data-status="{{ step_status[key] }}" data-note="{{ job.radio[key] }}" href="/respond?boat={{ b }}&amp;step={{ key }}">{{ label }}</a>
 {% endfor %}</p>
 {% if step %}
-<p class="muted">Tell dispatch (radio or text). Not saved here.</p>
+<p class="muted">{% if job.saved_step == step %}Saved here; it goes to dispatch with the next sync. {% endif %}Tell dispatch (radio or text).</p>
 <pre id="radio-line" class="draft">{{ job.radio[step] }}</pre>
 <button type="button" class="btn-small copy" data-copy="{{ job.radio[step] }}">Copy</button>
 {% endif %}
@@ -89,6 +89,6 @@
 </form>
 {% endif %}
 {% endif %}
-<script id="respond-config" type="application/json">{{ {"boat": boat}|tojson }}</script>
+<script id="respond-config" type="application/json">{{ {"boat": boat, "crew": job.crew if job else none, "request_id": job.request_id if job else none}|tojson }}</script>
 <script src="/static/respond.js" defer></script>
 {% endblock %}
