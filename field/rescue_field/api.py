@@ -45,8 +45,10 @@ MAX_TEXT_CHARS = 5000
 # (a single event over the cloud's 8 MB body limit, review O-01).
 MAX_CONTACT_CHARS = 200
 MAX_BULK_ROWS = 1000
-# Request body caps (review F-02): bulk uploads may carry MAX_BULK_ROWS rows, every other route
-# takes one small JSON object or form. Read at request time, so tests can lower them.
+# Request body caps (review F-02), answered with 413 before the body is parsed. Every route but
+# bulk takes one small JSON object or form: 64 KB. A bulk upload is capped at 8 MB as well as at
+# MAX_BULK_ROWS rows (1000 rows of 5000 ASCII characters is 5 MB); whichever limit is hit first
+# applies. Read at request time, so tests can lower them.
 MAX_BODY_BYTES = 64 * 1024
 MAX_BULK_BODY_BYTES = 8 * 1024 * 1024
 BULK_PATH = "/requests/bulk"

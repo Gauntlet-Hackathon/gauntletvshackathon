@@ -1,7 +1,8 @@
 # Source: fastresponderSLM src/rescue_tagger/durations.py @ c287541c25e08bd3c8173d74e106384c58e26f74
 # Local changes (keep when re-vendoring): _number returns None for a token it cannot read
-# ("1.2.3" raised ValueError and lost the request, review M-05); parse_hours clamps to MAX_HOURS
-# (a 400-digit number gave inf, which no JSON encoder sends, review O-06).
+# ("1.2.3" raised ValueError and lost the request, review M-05) and parse_hours then returns None
+# when no number it found is readable; parse_hours clamps to MAX_HOURS (a 400-digit number gave
+# inf, which no JSON encoder sends, review O-06). See docs/DECISIONS.md (model output format).
 """Deterministic parsing of NEED_DURATION spans into hours, and attaching them to a need kind.
 
 The model only finds the words ("for 30 hours", "desde ayer", "2 days"); turning them into a number
@@ -92,6 +93,8 @@ def parse_hours(span_text: str) -> float | None:
     found = [n * UNIT_HOURS[u] for n, u in numbers if n is not None]
     if found:
         return min(round(max(found), 2), MAX_HOURS)
+    if numbers:  # local change: "1.2.3 hours" is unreadable, not the lone unit "hours"
+        return None
     lone = LONE_UNIT.search(t)  # "all day", "toda la semana"
     return UNIT_HOURS[lone.group(1)] if lone else None
 

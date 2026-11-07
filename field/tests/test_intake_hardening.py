@@ -198,9 +198,14 @@ def test_parse_hours_huge_number_is_clamped_not_inf():
 
 
 @pytest.mark.parametrize("text", ["for 1.2.3 hours", "1,2,3 days", "no water since 12.30.45 hours"])
-def test_parse_hours_multi_separator_number_does_not_raise(text):
-    hours = parse_hours(text)
-    assert hours is None or 0 <= hours <= MAX_HOURS
+def test_parse_hours_unreadable_number_is_none(text):
+    # Neither a ValueError (M-05) nor the lone unit's 1 h / 24 h.
+    assert parse_hours(text) is None
+
+
+def test_parse_hours_keeps_a_readable_number_next_to_an_unreadable_one():
+    assert parse_hours("1.2.3 hours, maybe 2 days") == 48.0
+    assert parse_hours("for hours") == 1.0  # a lone unit without a number is unchanged
 
 
 def test_store_refuses_non_finite_numbers(store):
@@ -298,13 +303,16 @@ def ev(i, **extra):
 
 
 class Cloud:
-    """Acks every event; 413 for any body over `max_bytes`; `status` overrides every answer."""
+    """Acks every event; 413 for any body over `max_bytes` (or holding `too_large_id`);
+    `status` overrides every answer."""
 
-    def __init__(self, max_bytes=10_000_000, status=None):
+    def __init__(self, max_bytes=10_000_000, status=None, too_large_id=None):
         self.max_bytes = max_bytes
         self.status = status
+        self.too_large_id = too_large_id
         self.acked = []
         self.batches = []
+        self.posts = 0
 
     def __call__(self, request):
         if request.url.path == "/health":
@@ -313,26 +321,35 @@ class Cloud:
             return httpx.Response(200, json={"ok": True})
         if request.url.path == "/sync/down":
             return httpx.Response(200, json={"events": [], "next_since": 0})
+        self.posts += 1
         if self.status is not None:
             return httpx.Response(self.status, json={"error": "bad_request"})
-        if len(request.content) > self.max_bytes:
-            return httpx.Response(413, text="too large")
         ids = [e["event_id"] for e in json.loads(request.content)["events"]]
+        if len(request.content) > self.max_bytes or self.too_large_id in ids:
+            return httpx.Response(413, text="too large")
         self.batches.append(len(ids))
         self.acked += ids
         return httpx.Response(200, json={"acked": ids, "rejected": []})
 
 
-def worker(store, cloud):
+def worker(store, cloud, **kw):
     return sync.SyncWorker(
         store, "http://cloud", device_id="laptop-dev-01", token="tok",
         versions=lambda: ("rules@abc1234+bin:12345678", "stub:fixture-extractor"),
-        transport=httpx.MockTransport(cloud), rng=random.Random(1),
+        transport=httpx.MockTransport(cloud), rng=random.Random(1), **kw,
     )  # fmt: skip
 
 
-@pytest.mark.parametrize("poison", [{"raw_text": f"x{SURROGATE}"}, {"hours": float("inf")}])
-def test_unencodable_event_is_rejected_locally_and_the_rest_drain(poison):
+@pytest.mark.parametrize(
+    "poison, error",
+    [
+        ({"raw_text": f"x{SURROGATE}"}, "not sendable"),
+        ({"hours": float("inf")}, "not sendable"),
+        ({"contact": "555\x000100"}, "U+0000"),  # the cloud's jsonb refuses it (H-02)
+        ({"nested": [{"x\x00": 1}]}, "U+0000"),
+    ],
+)
+def test_unsendable_event_is_rejected_locally_and_the_rest_drain(poison, error):
     # Events stored before intake hardening (or by any other path) must not wedge sync (H-02,
     # O-06): httpx cannot encode them, so they are quarantined, never sent.
     store = EventStore(check_same_thread=False)
@@ -350,7 +367,8 @@ def test_unencodable_event_is_rejected_locally_and_the_rest_drain(poison):
     assert cloud.acked == ["e0000", "e0001", "e0003"]
     assert store.outbox_count() == 0
     [rej] = store.rejected()
-    assert rej["event_id"] == "e0002" and rej["error"].startswith("local: not sendable")
+    assert rej["event_id"] == "e0002" and error in rej["error"]
+    assert rej["error"].startswith("local: ")
 
 
 def test_413_bisects_and_rejects_only_the_oversized_event():
@@ -360,7 +378,7 @@ def test_413_bisects_and_rejects_only_the_oversized_event():
     store.append_events([ev(7, raw_text="9" * 5000)])
     store.append_events([ev(i) for i in range(8, 12)])
     cloud = Cloud(max_bytes=4000)
-    w = worker(store, cloud)
+    w = worker(store, cloud, oversize_bytes=4000)  # the real threshold is 1 MB
     w.run_cycle()
     assert w.online and w.last_error is None
     assert sorted(cloud.acked) == [f"e{i:04d}" for i in range(12) if i != 7]
@@ -387,3 +405,27 @@ def test_other_errors_still_back_off_and_reject_nothing(status):
     assert w.run_cycle() > 0
     assert not w.online and f"HTTP {status}" in w.last_error
     assert store.outbox_count() == 3 and store.rejected() == []
+
+
+def test_oversized_event_is_found_without_shrinking_the_rest():
+    # After a quarantine the batch size is back to 200: 1 oversized + 399 normal events drain
+    # in three POSTs (413, 200, 199), not one event at a time.
+    store = EventStore(check_same_thread=False)
+    store.append_events([ev(0, raw_text="9" * 5000)] + [ev(i) for i in range(1, 400)])
+    cloud = Cloud(too_large_id="e0000")
+    w = worker(store, cloud, oversize_bytes=4000)
+    w.run_cycle()
+    assert w.online and store.outbox_count() == 0
+    assert [r["event_id"] for r in store.rejected()] == ["e0000"]
+    assert cloud.posts == 3 and cloud.batches == [200, 199]
+
+
+def test_cloud_answering_413_to_everything_rejects_nothing():
+    # A proxy or captive portal that answers 413 to every POST must not empty the outbox: no
+    # normal-sized event is ever quarantined on 413.
+    store = EventStore(check_same_thread=False)
+    store.append_events([ev(i, raw_text="help") for i in range(500)])
+    w = worker(store, Cloud(status=413))
+    assert w.run_cycle() > 0
+    assert not w.online and "HTTP 413" in w.last_error
+    assert store.outbox_count() == 500 and store.rejected() == []
