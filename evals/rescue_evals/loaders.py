@@ -3,7 +3,10 @@
 Every row is validated; any problem raises ``EvalSetError`` naming file and line.
 Refused: set E (sealed holdout) unless ``open_sealed=True`` (logged), and any file
 containing a row with ``needs_review: true`` (drafts never count).
-Format: see evals/sets/README.md.
+Format: see evals/sets/README.md, plus two optional fields described in evals/README.md:
+``contact`` (the sender's phone or handle, as the field app receives it) and ``received_at``
+(arrival time, ``YYYY-MM-DDTHH:MM:SSZ``). The runner builds the duplicate context from them, in
+arrival order, exactly as the field pipeline does (review H-01).
 """
 
 from __future__ import annotations
@@ -13,6 +16,7 @@ import json
 import logging
 import sys
 from collections.abc import Sequence
+from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
@@ -59,9 +63,21 @@ class EvalCase(BaseModel):
     set: Literal["A", "B", "C", "D", "E"]
     split: Literal["train", "dev", "test"]
     needs_review: Literal[False] | None = None
+    # Optional (review H-01): what the field app receives next to the text. Duplicate detection
+    # matches on the same location plus the same contact or the same people count (>= 3), among
+    # earlier requests in arrival order. Without received_at the runner uses file order.
+    contact: str | None = None
+    received_at: str | None = None
 
 
 def _check_decision(case: EvalCase) -> None:
+    if case.received_at is not None:
+        try:
+            datetime.strptime(case.received_at, "%Y-%m-%dT%H:%M:%SZ")
+        except ValueError:
+            raise ValueError(
+                "received_at must be UTC, seconds precision: YYYY-MM-DDTHH:MM:SSZ"
+            ) from None
     d = case.gold_decision
     if d.outcome == "prioritized" and d.priority_tier is None:
         raise ValueError("prioritized needs priority_tier")

@@ -1,15 +1,19 @@
 """Pure-Python metrics for the evals table. Plain data in, numbers out; no I/O.
 
 Tiers are "P1"/"P2"/"P3"; a prediction that is not a tier (abstain, duplicate, not a request)
-is ``None``. Empty denominators return 0.0 so a table row never crashes.
+is ``None``. Empty denominators return 0.0 so a table row never crashes; the runner records
+each metric's denominator (``metric_n``) and leaves a metric out when it is 0 (review H-03).
 """
 
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections.abc import Iterable, Mapping, Sequence
 from itertools import combinations
-from typing import Any
+from typing import Any, Literal
+
+from rescue_shared.logic import TOKEN_MAP
 
 TIERS = ("P1", "P2", "P3")
 
@@ -25,11 +29,19 @@ def _f1(precision: float, recall: float) -> float:
 # --- P1 safety ---------------------------------------------------------------------------------
 
 
-def p1_misses_per_1000(true_tiers: Sequence[str | None], pred_tiers: Sequence[str | None]) -> float:
-    """True P1 requests the engine did not output as P1, per 1,000 requests scored."""
+def p1_misses_per_1000(
+    true_tiers: Sequence[str | None],
+    pred_tiers: Sequence[str | None],
+    per: Literal["urgent", "request"] = "urgent",
+) -> float:
+    """True P1 requests the engine did not output as P1, per 1,000 *urgent* (true P1) requests,
+    i.e. ``1000 * (1 - P1 recall)``: the plan's headline, "Urgent requests missed per 1,000 (P1
+    recall)" (docs/plan/05-evals.md, review O-03). ``per="request"`` divides by every request
+    scored instead (the pre-O-03 number, kept as a secondary row)."""
     _check_len(true_tiers, pred_tiers)
     misses = sum(1 for t, p in zip(true_tiers, pred_tiers, strict=True) if t == "P1" and p != "P1")
-    return 1000 * _ratio(misses, len(true_tiers))
+    den = sum(1 for t in true_tiers if t == "P1") if per == "urgent" else len(true_tiers)
+    return 1000 * _ratio(misses, den)
 
 
 def false_alarm_rate(true_tiers: Sequence[str | None], pred_tiers: Sequence[str | None]) -> float:
@@ -75,20 +87,37 @@ def top_k_accuracy(true_ranking: Sequence[str], pred_ranking: Sequence[str], k: 
 # --- field accuracy ----------------------------------------------------------------------------
 
 
-def _tokens(text: str | None) -> set[str]:
-    return set(re.findall(r"[a-z0-9]+", (text or "").lower()))
+_WORD_RE = re.compile(r"[^\W_]+")
+
+
+def location_tokens(text: str | None) -> list[str]:
+    """Location words, sorted, for any script (review L-01): NFKD, accents stripped, casefolded,
+    apostrophes dropped, split on anything that is not a letter or digit, and street/direction
+    abbreviations expanded with the product's own map (``rescue_shared.logic.TOKEN_MAP``, so
+    "Dr" and "Drive" are the same word). Arabic, Cyrillic or CJK text keeps its words; the old
+    ``[a-z0-9]+`` tokeniser threw them away, so any two such locations "matched".
+
+    Word order is ignored on purpose, as in the product's "same place" key
+    (``logic.normalize_location`` sorts its tokens): "Clinton Dr 8800" is the same address as
+    "8800 Clinton Dr". Repeated words count ("30 Rush Ave or 33 Rush Ave" is not "30 or 33 Rush
+    Ave")."""
+    folded = unicodedata.normalize("NFKD", text or "")
+    folded = "".join(c for c in folded if not unicodedata.combining(c)).casefold()
+    folded = folded.replace("'", "").replace("\u2019", "")
+    return sorted(TOKEN_MAP.get(w, w) for w in _WORD_RE.findall(folded))
 
 
 def location_exact(true: str | None, pred: str | None) -> bool:
-    """Same tokens ignoring case and punctuation; both empty counts as a match."""
-    return _tokens(true) == _tokens(pred)
+    """Same words (``location_tokens``: any order, ignoring case, accents and punctuation); both
+    empty counts as a match."""
+    return location_tokens(true) == location_tokens(pred)
 
 
 def location_partial(true: str | None, pred: str | None) -> bool:
-    """Exact, or one side's tokens are contained in the other's (non-empty)."""
-    t, p = _tokens(true), _tokens(pred)
-    if t == p:
+    """Exact, or one side's set of words is contained in the other's (both non-empty)."""
+    if location_exact(true, pred):
         return True
+    t, p = set(location_tokens(true)), set(location_tokens(pred))
     return bool(t and p) and (t <= p or p <= t)
 
 
@@ -104,8 +133,11 @@ def count_exact(pairs: Sequence[tuple[int | None, int | None]]) -> float:
     return _ratio(sum(1 for t, p in pairs if t == p), len(pairs))
 
 
-def set_f1(true_sets: Sequence[Iterable[str]], pred_sets: Sequence[Iterable[str]]) -> float:
-    """Micro-averaged F1 over per-request sets of labels (vulnerable kinds, hazard kinds)."""
+def set_f1_counts(
+    true_sets: Sequence[Iterable[str]], pred_sets: Sequence[Iterable[str]]
+) -> dict[str, int]:
+    """Micro-averaged ``tp``/``fp``/``fn`` over per-request label sets. Counts pool exactly across
+    sets (sum them, then ``f1_from_counts``); F1 values do not."""
     _check_len(true_sets, pred_sets)
     tp = fp = fn = 0
     for t, p in zip(true_sets, pred_sets, strict=True):
@@ -113,9 +145,24 @@ def set_f1(true_sets: Sequence[Iterable[str]], pred_sets: Sequence[Iterable[str]
         tp += len(ts & ps)
         fp += len(ps - ts)
         fn += len(ts - ps)
+    return {"tp": tp, "fp": fp, "fn": fn}
+
+
+def f1_from_counts(counts: Mapping[str, int]) -> float | None:
+    """F1 from ``tp``/``fp``/``fn``; None when all three are 0 (nothing to score: the runner then
+    leaves the metric out instead of writing a vacuous 1.0, review H-03)."""
+    tp, fp, fn = counts["tp"], counts["fp"], counts["fn"]
     if tp + fp + fn == 0:
-        return 1.0
+        return None
     return _f1(_ratio(tp, tp + fp), _ratio(tp, tp + fn))
+
+
+def set_f1(true_sets: Sequence[Iterable[str]], pred_sets: Sequence[Iterable[str]]) -> float:
+    """Micro-averaged F1 over per-request sets of labels (vulnerable kinds, hazard kinds).
+    Vacuously 1.0 when there are no labels on either side; the runner uses ``set_f1_counts`` and
+    leaves such a metric out instead."""
+    f1 = f1_from_counts(set_f1_counts(true_sets, pred_sets))
+    return 1.0 if f1 is None else f1
 
 
 # --- duplicates --------------------------------------------------------------------------------
@@ -131,10 +178,17 @@ def duplicate_pairwise_f1(
     """Precision/recall/F1 over unordered request pairs placed in the same group."""
     true_pairs, pred_pairs = _pairs(true_groups), _pairs(pred_groups)
     tp = len(true_pairs & pred_pairs)
-    if not true_pairs and not pred_pairs:
-        return {"precision": 1.0, "recall": 1.0, "f1": 1.0}
+    if not true_pairs and not pred_pairs:  # vacuous; the runner leaves the metric out
+        return {"precision": 1.0, "recall": 1.0, "f1": 1.0, "tp": 0, "fp": 0, "fn": 0}
     precision, recall = _ratio(tp, len(pred_pairs)), _ratio(tp, len(true_pairs))
-    return {"precision": precision, "recall": recall, "f1": _f1(precision, recall)}
+    return {
+        "precision": precision,
+        "recall": recall,
+        "f1": _f1(precision, recall),
+        "tp": tp,
+        "fp": len(pred_pairs) - tp,
+        "fn": len(true_pairs) - tp,
+    }
 
 
 # --- abstention --------------------------------------------------------------------------------
@@ -215,6 +269,3 @@ def consistency_pct(groups: Iterable[Sequence[Any]]) -> float:
 def _check_len(a: Sequence[Any], b: Sequence[Any]) -> None:
     if len(a) != len(b):
         raise ValueError(f"length mismatch: {len(a)} vs {len(b)}")
-
-
-

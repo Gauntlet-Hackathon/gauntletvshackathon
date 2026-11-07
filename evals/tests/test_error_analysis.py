@@ -18,10 +18,14 @@ EX = {
 
 
 def row(cid, text):
+    ex = json.loads(json.dumps(EX))
+    # one household per case: the runner now builds duplicate context, and identical location +
+    # count >= 3 would make every later case a duplicate of the first
+    ex["location"]["text"] = f"{len(cid) * 7 + sum(map(ord, cid))} Oak St"
     return {
         "id": cid,
         "raw_text": text,
-        "gold_extracted": EX,
+        "gold_extracted": ex,
         "gold_decision": {"outcome": "prioritized", "priority_tier": "P1"},
         "gold_duplicate_group": None,
         "set": "B",

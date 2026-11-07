@@ -16,6 +16,28 @@ Baselines are run ahead of time and stored here, never called live (docs/plan/05
 - Re-score the stored outputs without the network:
   `STORED_OUTPUTS=evals/results/opus/claude-opus-5-5.jsonl PYTHONPATH=shared:field:engine:evals python -m rescue_evals.runner --system stored --sets B,C,D --results-dir /tmp/x`
 
+### Re-scored with the PR-3 runner (2026-11-07)
+
+`opus__{B,C,D}.json` were re-scored from the stored JSONL with `--rescore` (no model calls) after
+the review PR-3 scoring fixes (definitions in `evals/README.md`). The tables below are from before
+it: their "P1 misses /1000" is per 1,000 requests of any kind, which is now
+`decision.p1_misses_per_1000_requests`; the headline key `decision.p1_misses_per_1000` is now per
+1,000 urgent (gold P1) requests. The v3 / laya-s13 columns need a re-run with the new runner.
+
+| metric (new runner) | keyword B / C / D | Opus + rubric B / C / D | gold extraction B / C / D |
+|---|---|---|---|
+| urgent missed per 1,000 urgent (headline) | 762 / 931 / n/a | 0 / 69 / n/a | 0 / 34 / n/a |
+| urgent missed per 1,000 requests | 327 / 443 / 0 | 0 / 33 / 0 | 0 / 16 / 0 |
+| same, not counting P1-flagged follow-ups | 714 / 828 / n/a | 0 / 0 / n/a | 0 / 34 / n/a |
+| Top-20 accuracy | 0.25 / 0.15 / 0.33 | 1.00 / 0.90 / 1.00 | 1.00 / 0.95 / 1.00 |
+| duplicate pairwise F1 | 0.00 / 0.00 / n/a | 0.67 / 0.67 / n/a | 0.67 / 0.67 / n/a |
+| outcome accuracy | 0.27 / 0.26 / 0.24 | 0.94 / 0.90 / 0.83 | 0.98 / 0.93 / 0.88 |
+
+n/a: the set has no gold P1 (D) or no duplicate pair on either side, so the metric is left out.
+Gold extraction stays below 1.0 on duplicates because two test-split groups need a `contact` the
+sets do not carry yet (b-dup-4: counts None vs 5; C-dup-2: one person) and three C groups have a
+member in another split.
+
 ### Set B (golden, n=49)
 
 | metric | keyword | Opus + rubric | gold extraction |

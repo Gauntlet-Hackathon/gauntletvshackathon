@@ -54,4 +54,18 @@ def test_holdout_guard():
 def test_result_records_versions_and_intervals():
     r = run_set(GoldExtractionSystem([]), [], "B", judge_id="j", judge_version="1")
     assert r["judge_id"] == "j" and r["judge_version"] == "1"
-    assert r["model_version"] and "decision.outcome_accuracy" in r["intervals"]
+    # an empty set has no denominators: no metric and no interval (review H-03)
+    assert r["model_version"] and r["metrics"] == {} and r["intervals"] == {}
+    case = EvalCase.model_validate(
+        {
+            "id": "b1",
+            "raw_text": "x",
+            "gold_extracted": None,
+            "gold_decision": {"outcome": "not_a_request"},
+            "gold_duplicate_group": None,
+            "set": "B",
+            "split": "test",
+        }
+    )
+    r = run_set(GoldExtractionSystem([case]), [case], "B")
+    assert r["intervals"]["decision.outcome_accuracy"]["n"] == 1
