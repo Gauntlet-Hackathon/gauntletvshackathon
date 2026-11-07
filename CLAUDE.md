@@ -32,3 +32,21 @@ Run your lane's command before opening a PR. All of them run from the repo root.
 See AGENT_RULES.md. Summary: work only on issues in your lane, one issue = one branch = one PR, never push to main,
 never edit .github/, .claude/, CLAUDE.md or AGENTS.md from an agent PR, append one line to progress/<lane>.md per change
 (one file per lane, so parallel PRs never conflict; never a shared progress.md).
+
+## Ticket path mapping (read before every ticket)
+The tickets were written before the packages were named. Wherever a ticket says the left side, use the right side:
+
+| Ticket says | Use |
+|---|---|
+| `field/field_app/<file>` (incl. `templates/`) | `field/rescue_field/<file>` |
+| `field_app.<module>` (imports, e.g. `field_app.slm_hf`) | `rescue_field.<module>` |
+| `engine/fallback/<file>` | `engine/rescue_engine/fallback/<file>` |
+| `engine/build.py`, `engine/replay_diff.py` | `engine/rescue_engine/build.py`, `engine/rescue_engine/replay_diff.py` |
+| `python -m engine.fallback` / `python -m engine.build` | `python -m rescue_engine.fallback` / `python -m rescue_engine.build` |
+| `evals/<file>.py`, `evals/baselines/…`, `evals/systems/…` | `evals/rescue_evals/<file>.py`, `evals/rescue_evals/baselines/…`, `evals/rescue_evals/systems/…` |
+| `python -m evals.runner` (and other `evals.*`) | `python -m rescue_evals.runner` |
+
+Unchanged: tests stay in `<lane>/tests/`; data stays at `engine/dist/`, `engine/mercury/`, `evals/sets/`, `evals/drafts/`, `evals/results/`; `cloud/` paths are as written.
+Running a module outside pytest needs the lane folders on the path: `PYTHONPATH=shared:field:engine:evals python -m rescue_engine.fallback`.
+The field engine client (F2) runs `ENGINE_CMD` (default `python -m rescue_engine.fallback`) with `PYTHONPATH` set to include `engine/` and `shared/`.
+The field FastAPI app is `app` in `field/rescue_field/api.py` (the Dockerfile runs `uvicorn rescue_field.api:app`).
