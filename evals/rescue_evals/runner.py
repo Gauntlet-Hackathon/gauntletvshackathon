@@ -53,6 +53,29 @@ def register_system(name: str, factory: SystemFactory) -> None:
     SYSTEMS[name] = factory
 
 
+# Modules that register a system when imported. The CLI imports them before looking up --system.
+SYSTEM_MODULES = (
+    "rescue_evals.systems.ours",
+    "rescue_evals.baselines.stored",
+    "rescue_evals.baselines.regex_baseline",
+)
+
+
+def available_systems() -> dict[str, SystemFactory]:
+    """Every registered system, after importing SYSTEM_MODULES.
+
+    Under `python -m rescue_evals.runner` this file runs as `__main__`, while the system modules
+    register into the importable `rescue_evals.runner`. So read that module's registry, not this
+    file's globals. Importing `ours` does not import torch (HFExtractor loads it lazily).
+    """
+    import importlib
+
+    for name in SYSTEM_MODULES:
+        importlib.import_module(name)
+    registry = importlib.import_module("rescue_evals.runner").SYSTEMS
+    return {**SYSTEMS, **registry}
+
+
 @dataclass
 class GoldExtractionSystem:
     """Reference system: returns the gold extraction, then the real fallback engine."""
@@ -410,8 +433,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--open-sealed", action="store_true")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO)
-    if args.system not in SYSTEMS:
-        print(f"error: unknown system {args.system!r}; known: {sorted(SYSTEMS)}", file=sys.stderr)
+    systems = available_systems()
+    if args.system not in systems:
+        print(f"error: unknown system {args.system!r}; known: {sorted(systems)}", file=sys.stderr)
         return 2
     try:
         for set_name in [s.strip().upper() for s in args.sets.split(",") if s.strip()]:
@@ -426,7 +450,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 if c.set == set_name
             ]
             result = run_set(
-                SYSTEMS[args.system](cases), cases, set_name, open_sealed=args.open_sealed
+                systems[args.system](cases), cases, set_name, open_sealed=args.open_sealed
             )
             print(f"wrote {write_result(result, args.results_dir)} (n={result['n']})")
     except EvalSetError as e:
