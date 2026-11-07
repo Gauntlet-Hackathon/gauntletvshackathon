@@ -22,7 +22,7 @@ Baselines are run ahead of time and stored here, never called live (docs/plan/05
 the review PR-3 scoring fixes (definitions in `evals/README.md`). The tables below are from before
 it: their "P1 misses /1000" is per 1,000 requests of any kind, which is now
 `decision.p1_misses_per_1000_requests`; the headline key `decision.p1_misses_per_1000` is now per
-1,000 urgent (gold P1) requests. The v3 / laya-s13 columns need a re-run with the new runner.
+1,000 urgent (gold P1) requests. The trained models (v3, laya-s13) are in "All columns on the current split" below.
 
 | metric (new runner) | keyword B / C / D | Opus + rubric B / C / D | gold extraction B / C / D |
 |---|---|---|---|
@@ -78,4 +78,36 @@ C-050, C-057 and C-060 moved from `test` to `dev` (`evals/sets/REVIEW.md`, "Spli
 re-scored from the stored JSONL with `--rescore` (no model calls); set C now has 58 test cases. Opus + rubric on C:
 outcome accuracy 0.90 -> 0.93, tier accuracy 0.86 -> 0.85, urgent missed per 1,000 urgent 69 -> 74 (2 of 27 instead of
 2 of 29), per 1,000 requests 33 -> 34, duplicate pairwise F1 0.67 (unchanged), Top-20 0.90 (unchanged). The C rows in
-the tables above are from before the change; keyword, gold extraction, v3 and laya-s13 need a re-run on the new split.
+the tables above are from before the change; every column is re-run on the new split in the next section.
+
+### All columns on the current split (2026-11-07, main at d6b1122)
+
+Test splits of B (49), C (58, after the split change) and D (41); same runner and frozen Mercury engine for every
+column. Keyword and gold extraction: `python -m rescue_evals.runner --system regex-baseline|gold-extraction --sets B,C,D`.
+v3 and laya-s13: `HF_REPO=paawandesai/rescue-tagger HF_REVISION=<sha> HF_MODEL_DIR=<snapshot> ENGINE_CMD=engine/dist/<build>/bin/mercury_engine
+python -m rescue_evals.runner --system ours --sets B,C,D` (needs an HF token to download the gated checkpoint; result
+files not committed, both checkpoints report as system `ours`). Opus is the stored `opus__*.json`. Pooled = the
+promotion-gate pooling (`rescue_evals.report.pool_metrics`) over B+C+D, n=148.
+
+| metric | keyword | v3 (pinned) | laya-s13 | Opus + rubric | gold extraction |
+|---|---|---|---|---|---|
+| **pooled outcome accuracy** | 0.26 | 0.53 | 0.66 | 0.91 | 0.95 |
+| pooled urgent missed per 1,000 urgent (headline) | 896 | 563 | 542 | 42 | 21 |
+| pooled same, not counting P1-flagged follow-ups | 813 | 354 | 438 | 0 | 21 |
+| pooled Top-20 accuracy | 0.21 | 0.53 | 0.70 | 0.95 | 0.98 |
+| pooled is_request accuracy | 0.42 | 0.70 | 0.80 | 0.96 | 1 |
+| pooled ECE | 0.26 | 0.19 | 0.14 | 0.12 | 0.23 |
+| B outcome accuracy | 0.27 | 0.71 (CI 0.58-0.82) | 0.84 (CI 0.71-0.91) | 0.94 | 0.98 |
+| B urgent missed per 1,000 urgent | 762 | 333 | 333 | 0 | 0 |
+| B Top-20 / duplicate F1 | 0.25 / 0.00 | 0.70 / 0.67 | 0.80 / 0.67 | 1.00 / 0.67 | 1.00 / 0.67 |
+| C outcome accuracy | 0.26 | 0.47 (CI 0.34-0.59) | 0.64 (CI 0.51-0.75) | 0.93 | 0.97 |
+| C urgent missed per 1,000 urgent | 1000 | 741 | 704 | 74 | 37 |
+| C same, not counting P1-flagged follow-ups | 889 | 444 | 556 | 0 | 37 |
+| C Top-20 accuracy | 0.15 | 0.40 | 0.65 | 0.90 | 0.95 |
+| C is_request accuracy | 0.43 | 0.76 | 0.86 | 0.98 | 1 |
+| D outcome accuracy | 0.24 | 0.41 (CI 0.28-0.57) | 0.49 (CI 0.34-0.64) | 0.83 | 0.88 |
+| D abstain recall | 0.24 | 0.42 | 0.50 | 0.82 | 0.87 |
+
+Reading: laya-s13 beats the pinned v3 on accuracy, ranking (Top-20) and calibration; v3 misses fewer hard P1s (urgent
+requests that do not even reach the follow-up queue as "P1?"). Both trained models are far above keyword and work
+offline; Opus is close to the gold ceiling but needs the network.
