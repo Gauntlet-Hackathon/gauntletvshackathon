@@ -1,0 +1,46 @@
+# Fly.io config for the cloud app (sync API + LiveView dashboard).
+# "rescue-cloud-demo" is a PLACEHOLDER app name: replace it (or let `fly launch --copy-config --no-deploy` rename it)
+# before deploying. Deploy steps: RUNBOOK.md, section "Deploy cloud to Fly".
+# Secrets (never in this file): DATABASE_URL (set by `fly postgres attach`), SECRET_KEY_BASE, DEVICE_TOKENS, PHX_HOST.
+
+app = "rescue-cloud-demo"
+primary_region = "iad"
+kill_signal = "SIGTERM"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[deploy]
+  # Runs once per deploy in a temporary machine before the new release starts.
+  release_command = "/app/bin/migrate"
+
+[env]
+  PORT = "8080"
+  # Fly Postgres (`fly postgres attach`) is reachable only over IPv6 on the private network.
+  ECTO_IPV6 = "true"
+  ERL_AFLAGS = "-proto_dist inet6_tcp"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Demo: keep the single machine running so the dashboard and sync API answer instantly.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 1000
+    soft_limit = 1000
+
+  [[http_service.checks]]
+    grace_period = "20s"
+    interval = "15s"
+    timeout = "5s"
+    method = "GET"
+    path = "/healthz"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
