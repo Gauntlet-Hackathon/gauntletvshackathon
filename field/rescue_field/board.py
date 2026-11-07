@@ -59,6 +59,7 @@ def _requests(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
             rec["channel"] = ev["payload"].get("channel")
             rec["lang_hint"] = ev["payload"].get("lang_hint")
             rec["contact"] = ev["payload"].get("contact")
+            rec["incident"] = ev["payload"].get("incident")
         elif kind == "extracted":
             rec["extracted"] = ev["payload"]
             rec["model_version"] = ev["model_version"]

@@ -90,6 +90,7 @@ def test_emits_three_events_with_ids_and_versions(store):
         "raw_text": CASES["C01"]["raw_text"],
         "lang_hint": None,
         "contact": CASES["C01"]["contact"],
+        "incident": "F07-0001",  # derived from device_id field-07
     }
     assert events[1]["payload"] == CASES["C01"]["extracted"]
 

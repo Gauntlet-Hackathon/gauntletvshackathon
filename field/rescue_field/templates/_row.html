@@ -1,6 +1,7 @@
 {% set s = r.tier_source %}
 <div class="row" data-request-id="{{ r.request_id }}" data-tier="{{ r.tier }}" data-status="{{ r.status or 'new' }}">
   <span class="tier-label tier-{{ r.tier }}">{{ r.tier }}</span>
+  <span class="incident">{{ r.incident or "#" ~ r.request_id[-4:] }}</span>
   <strong>{{ r.extracted.location.text }}</strong>
   <span class="status">[{{ r.status or "new" }}]</span>
   · {{ r.extracted.people_count.value if r.extracted.people_count.value is not none else "?" }} people
@@ -32,7 +33,7 @@
   {% if r.duplicates %}
   <details class="dups"><summary>{{ r.duplicates|length }} duplicate(s)</summary>
     {% for d in r.duplicates %}
-    <div>{{ d.request_id }} · {{ d.received_at }} · {{ d.decision.rule_id }}
+    <div>{% if d.incident %}<span class="incident">{{ d.incident }}</span> · {% endif %}{{ d.request_id }} · {{ d.received_at }} · {{ d.decision.rule_id }}
       · {{ d.decision.priority_tier or "-" }}</div>
     {% endfor %}
   </details>

@@ -113,7 +113,7 @@ def test_log_json_lists_requests_newest_first_with_result(client, db):
         and first["contact"] == "+17135550199"
         and first["lang_hint"] == "en"
     )
-    assert first["incident"] == ids[0][-4:]
+    assert [e["incident"] for e in log] == ["D01-0003", "D01-0002", "D01-0001"]
     assert first["received_at"].endswith("Z")
     assert set(first) == {
         "request_id",
