@@ -20,7 +20,8 @@ Review PR-3 (definitions in evals/README.md):
 * ``decision.p1_misses_per_1000`` is per 1,000 urgent (gold P1) requests, the plan's "P1 recall"
   headline (O-03); ``decision.p1_misses_per_1000_requests`` keeps the per-request rate.
 * ``decision.top20_accuracy``: the first 20 rows of the board (tier, then
-  ``logic.within_tier_sort_key``), predicted vs gold (H-04).
+  ``logic.within_tier_sort_key``), predicted vs gold (H-04); left out when a root that could be
+  in the gold top 20 has no gold extraction to sort by.
 * Systems get the case, not just its text, so identical texts are not conflated (F-04).
 """
 
@@ -341,10 +342,11 @@ def board_tier(outcome: str | None, tier: str | None) -> str | None:
     return tier if outcome in ("prioritized", "duplicate") and tier in TIERS else None
 
 
-def _gold_board(rows: list[dict[str, Any]]) -> list[tuple[str, str]]:
-    """(household, root case id) per gold tier row, in board order. A household is a gold
-    duplicate group (or a lone case); its row sits at the group's highest gold tier, headed by
-    its earliest member and sorted with that member's gold extraction, like the field board."""
+def _gold_board(rows: list[dict[str, Any]]) -> list[tuple[int, str, dict[str, Any]]]:
+    """(tier index, household, root row) per gold tier row, in board order. A household is a
+    gold duplicate group (or a lone case); its row sits at the group's highest gold tier, headed
+    by its earliest member and sorted with that member's gold extraction, like the field
+    board."""
     by_household: dict[str, list[dict[str, Any]]] = {}
     for r in rows:
         by_household.setdefault(r["household"], []).append(r)
@@ -357,8 +359,9 @@ def _gold_board(rows: list[dict[str, Any]]) -> list[tuple[str, str]]:
             continue
         root = min(members, key=lambda m: (m["received_at"], m["id"]))
         key = logic.within_tier_sort_key(root["gold_ex"] or {}, root["received_at"], root["id"])
-        entries.append((TIERS.index(min(tiers)), key, household, root["id"]))
-    return [(h, rid) for *_, h, rid in sorted(entries)]
+        entries.append((TIERS.index(min(tiers)), key, household, root))
+    entries.sort(key=lambda e: e[:3])
+    return [(tier, h, root) for tier, _, h, root in entries]
 
 
 def _pred_board(rows: list[dict[str, Any]]) -> list[tuple[str, str]]:
@@ -404,14 +407,22 @@ def _top_k(rows: list[dict[str, Any]], k: int = TOP_K) -> tuple[float | None, in
     share whose household is also among the first k rows of the predicted board. Rows are
     households, so a missed duplicate that takes two predicted slots counts once. n is the size
     of the gold top k (smaller than k on a small set). Failures: the gold top-k rows missing
-    from the predicted top k, by their earliest case id."""
-    gold = _gold_board(rows)[:k]
-    pred = _pred_board(rows)[:k]
+    from the predicted top k, by their earliest case id.
+
+    Left out (None) when the gold order is unknown: a root that could be in the gold top k (a row
+    of the top k, or any row on the tier of its last row) has no gold extraction to sort by
+    (set A style), so the gold top k itself would be a guess."""
+    board = _gold_board(rows)
+    gold = board[:k]
     if not gold:
         return None, 0, []
-    value = M.top_k_accuracy([h for h, _ in gold], [h for h, _ in pred], k)
+    cut = gold[-1][0]
+    if any(root["gold_ex"] is None for tier, _, root in board if tier <= cut):
+        return None, 0, []
+    pred = _pred_board(rows)[:k]
+    value = M.top_k_accuracy([h for _, h, _ in gold], [h for h, _ in pred], k)
     shown = {h for h, _ in pred}
-    return value, len(gold), [rid for h, rid in gold if h not in shown]
+    return value, len(gold), [root["id"] for _, h, root in gold if h not in shown]
 
 
 def _score_decision(rows: list[dict[str, Any]]) -> Scored:

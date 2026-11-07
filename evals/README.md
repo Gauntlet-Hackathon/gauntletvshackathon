@@ -25,7 +25,8 @@ Each result doc carries `metric_n` (every metric's denominator) and `metric_coun
 each F1). A metric whose denominator is 0 is left out of `metrics`, never written as 0.0 or 1.0: a
 set without gold extraction has no extraction rows, a set without gold abstains has no abstain
 recall, and so on. The report pools a rate as the sum of numerators over the sum of `metric_n` and
-an F1 from the summed counts. A failed extraction is a miss on every extraction row: its gold labels
+an F1 from the summed counts. A doc without `metric_n` (before PR-3) is weighted by its `n`, except
+that its `decision.p1_misses_per_1000` (then per request) is skipped with a warning. A failed extraction is a miss on every extraction row: its gold labels
 are false negatives in the F1 rows.
 
 | metric | denominator (`metric_n`) |
@@ -59,6 +60,8 @@ are false negatives in the F1 rows.
   `rescue_field.board`. The gold board uses gold tiers, gold duplicate groups and gold extractions; the
   predicted board uses the system's decisions and extractions. The score is the share of gold top-20
   households that are in the predicted top 20 (a missed merge that takes two slots counts once).
+  Left out when a root that could be in the gold top 20 (a top-20 row, or any row on the tier of the
+  20th) has no gold extraction to sort by (set A style): the gold order would be a guess.
 - **Location match** (L-01): words compared in any script (NFKD, accents stripped, casefolded, street
   abbreviations expanded with `logic.TOKEN_MAP`). Exact means the same words in any order, as the
   product's same-place key; partial means one side's words are contained in the other's.

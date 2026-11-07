@@ -191,6 +191,47 @@ defmodule RescueCloudWeb.EvalsLiveTest do
     assert has_element?(view, "#main-table-mystery\\.metric td[data-col=ours]", "n/a")
   end
 
+  test "per-request and hard-miss P1 rows and median latency are labelled", %{
+    conn: conn,
+    dir: dir
+  } do
+    write_custom(
+      dir,
+      [
+        r("decision.p1_misses_per_1000_requests", %{"ours" => 4.0}),
+        r("decision.p1_hard_misses_per_1000", %{"ours" => 1.0}),
+        r("running.median_ms_per_request", %{"ours" => 41.4})
+      ],
+      []
+    )
+
+    {:ok, view, _} = live(conn, ~p"/evals")
+
+    assert has_element?(
+             view,
+             "#main-table-decision\\.p1_misses_per_1000_requests",
+             "Urgent requests missed per 1,000 requests (any kind)"
+           )
+
+    assert has_element?(
+             view,
+             "#main-table-decision\\.p1_hard_misses_per_1000",
+             "not counting P1-flagged follow-ups"
+           )
+
+    assert has_element?(
+             view,
+             "#main-table-running\\.median_ms_per_request",
+             "Median time per request (ms)"
+           )
+
+    assert has_element?(
+             view,
+             "#main-table-running\\.median_ms_per_request td[data-col=ours]",
+             "41"
+           )
+  end
+
   test "notes: rubric always, HumAID only with set A", %{conn: conn, dir: dir} do
     write_custom(dir, [r("decision.ece", %{"ours" => 0.1})], [%{"system" => "ours", "set" => "b"}])
 

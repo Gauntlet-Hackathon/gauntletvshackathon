@@ -228,3 +228,42 @@ locations without a matching street to the follow-up queue (in line with "never 
 ## people_count maximum (H19 #270; Paawan, 2026-11-07)
 `people_count_value` has `maximum: 100000` in contracts/common.schema.json. The tagger's head emits 0-20 and the keyword
 extractor at most three digits; the cap keeps counts inside the cloud's int4 column and exact in Mercury's floats.
+
+## Three-model review fixes (2026-11-07)
+Decisions taken while fixing the three-model review (reviews 01-03; PRs #264, #278, #283, #286 and this one).
+- **O-03 headline:** `decision.p1_misses_per_1000` is urgent requests missed per 1,000 urgent (gold P1) requests, i.e.
+  `1000 * (1 - P1 recall)`, as plan 05 says ("P1 recall"). The per-request rate (`decision.p1_misses_per_1000_requests`)
+  and the hard-miss rate (`decision.p1_hard_misses_per_1000`, which does not count a miss the engine abstained on with
+  `provisional_tier` P1, since that one heads the follow-up queue) are reported beside it. A result document without `metric_n` predates this and
+  used the per-request meaning, so `report.pool_metrics` and the cloud gate skip its headline value (logged).
+- **Promotion gate pooling (PR-3b):** `RescueCloud.Models` pools sets A-D like `report.pool_metrics` (each metric by its
+  `metric_n`, F1s from summed `metric_counts`), takes abstain recall from set D only (plan 05), and fails a candidate
+  that lacks a gated metric the approved model has. P1 stays "<= current", so equal misses pass.
+- **Top-20:** `decision.top20_accuracy` is left out when a root that could be in the gold top 20 has no gold extraction
+  (set A style), because the gold order is then unknown.
+- **O-08:** an abstained root that a later prioritized duplicate lifts onto a tier keeps its follow-up question on the
+  tier row and keeps its follow-up queue entry, marked with the group's tier (`field/rescue_field/board.py`).
+- **Field `received_at`:** stamped after extraction, under the intake lock (`pipeline.process_batch`), so storage order
+  is arrival order and concurrent intakes see each other as duplicate candidates.
+- **U+0000:** the cloud rejects, per event (`invalid_payload`), a payload holding U+0000 in any string or key, since
+  PostgreSQL jsonb cannot store it; the rest of the batch is stored (#278).
+- **people_count:** payload validation rejects counts above 100000 (#284, #285). The projection's int4 guard from #278
+  (a count the column cannot hold is projected as unknown and kept in `extracted`) stays as defence in depth.
+- **Projection errors:** per-request isolation (#278) logs and skips a request whose own data fails (e.g. classes 22,
+  23); connection, transaction-state, deadlock, resource and operator errors (08, 25, 40, 53, 57) and system-level ones
+  (42, 55, 58, XX) abort the batch, so the device gets a 500 and retries instead of acking unprojected requests.
+- **Demo auth (F-07; Paawan, 2026-11-07 18:49Z):** the hosted demo's mutating routes (field intake, status changes,
+  `POST /sync/offline-toggle` with `DEMO_MODE=1`; cloud browser routes incl. `/corrections` and "Verify decisions")
+  stay unauthenticated. Accepted risk for the demo; no `DEMO_SECRET`.
+- **Down-sync scope (F-05/M-06):** the field stores other sites' `assigned`/`rescued` events
+  (`field/rescue_field/downsync.py`) but shows nothing for them: request ids are device-generated, so they never match
+  a local request, and the feed carries no cross-site duplicate link. Cross-site linking is out of scope for the
+  hackathon; down-sync is used for the approved rules/model versions.
+- **M-08 Opus baseline:** #279 added a stored Opus 5.5 baseline for Sets B-D whose prompt carries the full decision
+  rubric (`docs/plan/04-decision-rubric.md`) and the `extracted` schema; Opus only extracts and the same fallback engine
+  decides, so the column reads "Opus extraction + our engine", not Opus deciding directly
+  (`evals/rescue_evals/baselines/llm.py`, `evals/results/README.md`).
+- **L-02:** some draft duplicate groups have members in different splits; only `test` rows are scored, so those
+  groups give fewer pairs. Known label issue for the human set review, not fixed in code.
+- **O-05:** the tagger truncates input at 256 tokens (`tagger/model.py` `max_length`, `infer.py` `truncation=True`)
+  while intake accepts up to 5,000 characters (`MAX_TEXT_CHARS`); text past the limit is not read by the model.

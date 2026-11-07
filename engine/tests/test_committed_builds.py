@@ -7,8 +7,11 @@ and fails on a stale, corrupted or mis-stamped binary. Mercury builds are Linux 
 
 from __future__ import annotations
 
+import importlib.util
 import json
+import os
 import platform
+import random
 import shutil
 import subprocess
 from pathlib import Path
@@ -94,3 +97,68 @@ def test_check_build_rejects_corrupt_copy(tmp_path: Path, mode: str):
         (copy / "manifest.json").write_text(json.dumps(manifest))
     with pytest.raises((AssertionError, OSError)):
         check_build(copy)
+
+
+# --- review PR-9 (F-08, L-13): the shipped binary on the parity inputs -------------------------
+
+
+def _runnable(binary: Path) -> bool:
+    """False when this machine cannot execute the binary at all (wrong libc or loader)."""
+    try:
+        proc = subprocess.run(
+            [str(binary)], input="[]", capture_output=True, text=True, timeout=60, check=False
+        )
+    except OSError:
+        return False
+    return proc.returncode == 0 and proc.stdout.strip() == "[]"
+
+
+@pytest.fixture(scope="module")
+def shipped() -> Path:
+    if not SUPPORTED or not MANIFESTS:
+        pytest.skip("committed Mercury builds run on Linux x86_64 only")
+    dist_dir = MANIFESTS[-1].parent
+    binary = dist_dir / json.loads((dist_dir / "manifest.json").read_text())["entrypoint"]
+    if not _runnable(binary):
+        if os.environ.get("CI"):
+            pytest.fail(f"{binary} does not run on the CI runner")
+        pytest.skip(f"{binary} does not run on this machine")
+    return binary
+
+
+def _parity_module():
+    """test_parity.py's input generators (tests are not importable as modules)."""
+    spec = importlib.util.spec_from_file_location(
+        "parity_inputs", Path(__file__).with_name("test_parity.py")
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_shipped_binary_matches_fallback_beyond_the_fixtures(shipped: Path):
+    """The frozen binary (not a fresh compile) agrees with the Python fallback on the E4 grid,
+    3,000 random schema-valid inputs and the review-fix inputs, so a binary that is stale
+    against the rules fails here even where CI has no Mercury toolchain."""
+    m = _parity_module()
+    rng = random.Random(66)
+    for name, inputs in (
+        ("e4_grid", m.load_e4_grid()),
+        ("random", [m._random_input(rng) for _ in range(3000)]),
+        ("review_fixes", m.load_review_inputs()),
+    ):
+        outs = [_strip(o) for o in _run(shipped, inputs)]
+        expected = [_strip(o) for o in decide(inputs)]
+        assert len(outs) == len(inputs), name
+        bad = [i for i, (o, e) in enumerate(zip(outs, expected, strict=True)) if o != e]
+        assert not bad, f"{name}: {len(bad)} differ, first {inputs[bad[0]]}"
+
+
+@pytest.mark.parametrize("stdin", ["", "{", "[1, 2]", '{"extracted": {}}'])
+def test_shipped_binary_rejects_bad_input_with_one_stderr_line(shipped: Path, stdin: str):
+    proc = subprocess.run(
+        [str(shipped)], input=stdin, capture_output=True, text=True, timeout=60, check=False
+    )
+    assert proc.returncode == 1 and proc.stdout == ""
+    lines = proc.stderr.splitlines()
+    assert len(lines) == 1 and lines[0].startswith("rescue_engine.mercury: ")

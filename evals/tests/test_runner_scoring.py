@@ -221,6 +221,26 @@ def test_old_documents_without_metric_n_still_pool_by_n():
     assert pooled["decision.outcome_accuracy"] == 0.75 and ns["decision.outcome_accuracy"] == 40
 
 
+def test_old_documents_p1_headline_is_skipped_with_a_warning(caplog):
+    # before O-03 the key was per 1,000 requests; mixing it with per-urgent values is wrong
+    old = {"system": "ours", "set": "B", "n": 100, "metrics": {"decision.p1_misses_per_1000": 10.0}}
+    new = {
+        "system": "ours",
+        "set": "C",
+        "n": 50,
+        "metrics": {"decision.p1_misses_per_1000": 100.0, "decision.tier_accuracy": 0.5},
+        "metric_n": {"decision.p1_misses_per_1000": 20, "decision.tier_accuracy": 40},
+    }
+    with caplog.at_level("WARNING", logger="rescue_evals.report"):
+        pooled, ns = pool_metrics([old, new])
+    assert pooled["decision.p1_misses_per_1000"] == 100.0
+    assert ns["decision.p1_misses_per_1000"] == 20
+    assert "decision.p1_misses_per_1000" in caplog.text and "metric_n" in caplog.text
+    with caplog.at_level("WARNING", logger="rescue_evals.report"):
+        pooled, _ = pool_metrics([old])
+    assert "decision.p1_misses_per_1000" not in pooled
+
+
 # --- H-04: Top-20 from the board order ---------------------------------------------------------
 
 
@@ -260,6 +280,26 @@ def test_top20_counts_a_household_once(tmp_path):
     split["h2"] = Extracted.model_validate(ex("7 Bay Street East", 1, ["child", "elderly"]))
     res = run_set(Extractor(split), cases, "B")
     assert res["metrics"]["decision.top20_accuracy"] == pytest.approx(19 / 20)
+
+
+def test_top20_left_out_when_a_top_root_has_no_gold_extraction(tmp_path):
+    # set A style: one P1 root in the gold top 20 has no gold extraction, so the gold order (and
+    # with it the gold top 20) is unknown
+    rows = [case(f"r{i:02d}", ex(f"{i} Main St")) for i in range(22)]
+    rows[5]["gold_extracted"] = None
+    cases = load(tmp_path, rows)
+    sys = Extractor({c.id: ex(f"{c.id} Main St") for c in cases})
+    res = run_set(sys, cases, "B")
+    for part in ("metrics", "metric_n", "failures"):
+        assert "decision.top20_accuracy" not in res[part]
+    assert "decision.tier_accuracy" in res["metrics"]
+    # a root on a tier below the top 20's last tier does not decide membership: still scored
+    rows = [case(f"r{i:02d}", ex(f"{i} Main St")) for i in range(21)]
+    rows.append(case("low", None, tier="P3"))
+    cases = load(tmp_path, rows, "b2.jsonl")
+    sys = Extractor({c.id: ex(f"{c.id} Main St") for c in cases})
+    res = run_set(sys, cases, "B")
+    assert res["metric_n"]["decision.top20_accuracy"] == 20
 
 
 # --- F-04: identical texts are separate cases --------------------------------------------------

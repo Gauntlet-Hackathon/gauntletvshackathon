@@ -19,7 +19,11 @@ defmodule RescueCloudWeb.EvalsLive do
   @humaid "Set A: HumAID (Alam, Qazi, Imran, Ofli, ICWSM 2021, doi:10.1609/icwsm.v15i1.18116); tweet IDs and aggregate scores only."
 
   @labels %{
-    "decision.p1_misses_per_1000" => "Urgent requests missed per 1,000",
+    "decision.p1_misses_per_1000" => "Urgent requests missed per 1,000 urgent requests",
+    "decision.p1_misses_per_1000_requests" =>
+      "Urgent requests missed per 1,000 requests (any kind)",
+    "decision.p1_hard_misses_per_1000" =>
+      "Urgent requests missed per 1,000 urgent, not counting P1-flagged follow-ups",
     "decision.false_alarm_rate" => "False alarm rate",
     "decision.tier_accuracy" => "Priority tier accuracy",
     "decision.outcome_accuracy" => "Outcome accuracy (request / abstain / duplicate)",
@@ -39,6 +43,7 @@ defmodule RescueCloudWeb.EvalsLive do
     "extraction.vulnerable_f1" => "Vulnerable people F1",
     "extraction.hazard_f1" => "Hazards F1",
     "consistency.pct_cases_changed" => "Cases that changed across repeated runs (%)",
+    "running.median_ms_per_request" => "Median time per request (ms)",
     "running.mean_ms_per_request" => "Mean time per request (ms)",
     "running.seconds_per_1000_requests" => "Seconds per 1,000 requests",
     "running.cost_per_1000_usd" => "Cost per 1,000 requests (USD)",
@@ -97,7 +102,11 @@ defmodule RescueCloudWeb.EvalsLive do
   defp fmt("running.cost_per_1000_usd", v) when is_number(v),
     do: "$" <> :erlang.float_to_binary(v / 1, decimals: 2)
 
-  defp fmt("running.mean_ms_per_request", v) when is_number(v), do: Integer.to_string(round(v))
+  defp fmt(ms, v)
+       when ms in ["running.mean_ms_per_request", "running.median_ms_per_request"] and
+              is_number(v),
+       do: Integer.to_string(round(v))
+
   defp fmt(_metric, v), do: fmt(v)
 
   defp label(key), do: Map.get(@labels, key, key)

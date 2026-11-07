@@ -68,10 +68,57 @@ defmodule RescueCloud.ModelsTest do
             "set" => set,
             "n" => 10,
             "model_version" => version,
-            "metrics" => m
+            "metrics" => m,
+            "metric_n" => Map.new(m, fn {k, _} -> {k, 10} end)
           }
 
     File.write!(path, Jason.encode!(%{"results" => results}))
+  end
+
+  # One result doc (review PR-3 shape): `metrics` name => {value, metric_n}.
+  defp doc(version, set, n, metrics, counts \\ %{}) do
+    %{
+      "system" => "ours",
+      "set" => set,
+      "n" => n,
+      "model_version" => version,
+      "metrics" => Map.new(metrics, fn {k, {v, _}} -> {k, v} end),
+      "metric_n" => Map.new(metrics, fn {k, {_, mn}} -> {k, mn} end),
+      "metric_counts" => counts
+    }
+  end
+
+  # P1 misses on set B (49 requests, 21 urgent) and set C (61 requests, 29 urgent), plus a set D
+  # doc so the abstain check has data.
+  defp p1_docs(version, {miss_b, urgent_b, n_b}, {miss_c, urgent_c, n_c}) do
+    p1 = fn miss, urgent -> {1000 * miss / urgent, urgent} end
+
+    [
+      doc(version, "B", n_b, %{
+        "decision.p1_misses_per_1000" => p1.(miss_b, urgent_b),
+        "calibration.ece" => {0.05, n_b}
+      }),
+      doc(version, "C", n_c, %{
+        "decision.p1_misses_per_1000" => p1.(miss_c, urgent_c),
+        "calibration.ece" => {0.05, n_c}
+      }),
+      doc(version, "D", 60, %{"decision.abstain_recall" => {0.8, 20}})
+    ]
+  end
+
+  defp write_docs(path, docs), do: File.write!(path, Jason.encode!(%{"results" => docs}))
+
+  defp approved_and_candidate! do
+    cur = register!(@sha)
+    stub_files_for(@sha2)
+    {:ok, cand} = Models.pull(@repo, @sha2, %{"model.bin" => sha256("weights")})
+    {cur, cand}
+  end
+
+  defp approve!(%{model_version: v} = m, path, docs) do
+    write_docs(path, docs)
+    assert {:ok, %{status: "approved"}} = Models.promote(v)
+    m
   end
 
   defp register!(sha) do
@@ -225,6 +272,119 @@ defmodule RescueCloud.ModelsTest do
       write_summary(s, [{"hf:other/x@#{@sha}", metrics(1.0, 1.0, 0.0)}])
       assert {:ok, %{status: "rejected"}} = Models.promote(m.model_version)
       assert {:error, :not_found} = Models.promote("hf:nope/none@#{@sha}")
+    end
+  end
+
+  describe "gate pooling (review H-03, PR-3b)" do
+    test "P1 misses pool by urgent requests: 0+3 vs 2+1 misses is a tie, not a win", %{
+      summary: s
+    } do
+      {cur, cand} = approved_and_candidate!()
+      cur_docs = p1_docs(cur.model_version, {2, 21, 49}, {1, 29, 61})
+      approve!(cur, s, cur_docs)
+      docs = cur_docs ++ p1_docs(cand.model_version, {0, 21, 49}, {3, 29, 61})
+      write_docs(s, docs)
+      summary = %{"results" => docs}
+
+      # 3 misses of 50 urgent requests each (weighting by the docs' n gave the candidate 57.4
+      # against 61.5 for the approved model: a win that is not there)
+      p1 = "decision.p1_misses_per_1000"
+      assert_in_delta Models.pooled_metrics(summary, cand.model_version)[p1], 60.0, 1.0e-9
+      assert_in_delta Models.pooled_metrics(summary, cur.model_version)[p1], 60.0, 1.0e-9
+      assert {:pass, _} = Models.evaluate(cand.model_version)
+    end
+
+    test "a candidate worse per urgent request fails even when n-weighting made it look better",
+         %{summary: s} do
+      {cur, cand} = approved_and_candidate!()
+      # B: 100 requests, 10 urgent; C: 100 requests, 40 urgent.
+      cur_docs = p1_docs(cur.model_version, {1, 10, 100}, {0, 40, 100})
+      approve!(cur, s, cur_docs)
+      write_docs(s, cur_docs ++ p1_docs(cand.model_version, {0, 10, 100}, {3, 40, 100}))
+
+      # n-weighted: candidate 37.5 <= approved 50 (passed); per urgent: 60 > 20
+      assert {:fail, rep} = Models.evaluate(cand.model_version)
+      assert [reason] = rep["reasons"]
+      assert reason =~ "p1_misses_per_1000: candidate 60.0 must be <= current 20.0"
+    end
+
+    test "abstain recall is taken from set D only", %{summary: s} do
+      {cur, cand} = approved_and_candidate!()
+      cur_docs = p1_docs(cur.model_version, {0, 10, 50}, {0, 10, 50})
+      approve!(cur, s, cur_docs)
+
+      # 1.0 on B's 30 gold abstains would lift a pooled A-D recall to 0.88; on D it is 0.7
+      cand_docs =
+        [
+          doc(cand.model_version, "B", 50, %{
+            "decision.p1_misses_per_1000" => {0.0, 10},
+            "decision.abstain_recall" => {1.0, 30},
+            "calibration.ece" => {0.05, 50}
+          }),
+          doc(cand.model_version, "D", 60, %{"decision.abstain_recall" => {0.7, 20}})
+        ]
+
+      write_docs(s, cur_docs ++ cand_docs)
+      pooled = Models.pooled_metrics(%{"results" => cand_docs}, cand.model_version)
+      assert_in_delta pooled["decision.abstain_recall"], 0.7, 1.0e-9
+      assert {:fail, rep} = Models.evaluate(cand.model_version)
+      assert [reason] = rep["reasons"]
+      assert reason =~ "abstain_recall: candidate 0.7 must be >= current 0.8"
+
+      # no set D result at all: the candidate has no abstain recall and fails
+      write_docs(s, cur_docs ++ Enum.take(cand_docs, 1))
+      assert {:fail, rep} = Models.evaluate(cand.model_version)
+      assert "decision.abstain_recall missing for candidate" in rep["reasons"]
+    end
+
+    test "a gated metric the approved model has and the candidate lacks fails", %{summary: s} do
+      {cur, cand} = approved_and_candidate!()
+      hazard = doc(cur.model_version, "C", 50, %{"extraction.hazard_f1" => {0.8, 40}})
+      cur_docs = [hazard | p1_docs(cur.model_version, {0, 10, 50}, {0, 10, 50})]
+      approve!(cur, s, cur_docs)
+      write_docs(s, cur_docs ++ p1_docs(cand.model_version, {0, 10, 50}, {0, 10, 50}))
+
+      assert {:fail, rep} = Models.evaluate(cand.model_version)
+      assert [reason] = rep["reasons"]
+      assert reason =~ "extraction.hazard_f1 missing for candidate"
+    end
+
+    test "F1s are recomputed from summed metric_counts; old docs pool by n without the P1 row" do
+      v = "hf:org/slm@#{@sha}"
+
+      docs = [
+        doc(v, "B", 50, %{"extraction.hazard_f1" => {0.947, 10}}, %{
+          "extraction.hazard_f1" => %{"tp" => 9, "fp" => 1, "fn" => 0}
+        }),
+        doc(v, "C", 5, %{"extraction.hazard_f1" => {0.0, 10}}, %{
+          "extraction.hazard_f1" => %{"tp" => 0, "fp" => 0, "fn" => 10}
+        })
+      ]
+
+      # tp=9 fp=1 fn=10 -> 18/29 (an n-weighted mean of the two F1s says 0.86)
+      pooled = Models.pooled_metrics(%{"results" => docs}, v)
+      assert_in_delta pooled["extraction.hazard_f1"], 18 / 29, 1.0e-9
+
+      old = fn set, n, value ->
+        %{
+          "system" => "ours",
+          "set" => set,
+          "n" => n,
+          "model_version" => v,
+          "metrics" => %{
+            "decision.outcome_accuracy" => value,
+            "decision.p1_misses_per_1000" => 5.0
+          }
+        }
+      end
+
+      {pooled, log} =
+        ExUnit.CaptureLog.with_log(fn ->
+          Models.pooled_metrics(%{"results" => [old.("B", 30, 1.0), old.("C", 10, 0.0)]}, v)
+        end)
+
+      assert pooled == %{"decision.outcome_accuracy" => 0.75}
+      assert log =~ "skipping decision.p1_misses_per_1000"
     end
   end
 

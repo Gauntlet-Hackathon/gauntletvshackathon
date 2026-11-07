@@ -64,8 +64,10 @@ defmodule RescueCloud.Projection do
   column cannot hold, a bug in a fold rule) is logged with its id and left as it was, and every
   other request is still projected; a failing regroup is logged, and the next sync or
   `rebuild/0` recomputes the groups.
-  Connection loss, deadlocks and other transient database errors still raise, which rolls the
-  whole projection back; the caller answers 500 and the device's retry projects again.
+  Connection loss, deadlocks, other transient database errors and system-level ones (a missing
+  table or column, a lock or object in the wrong state, a system or internal error) still raise,
+  which rolls the whole projection back; the caller answers 500 and the device's retry projects
+  again, instead of acking events whose requests were never projected.
   Returns `{:ok, projected_request_ids}` (without the ones that failed).
   `rebuild/0` repairs everything once the cause of a logged failure is fixed.
   """
@@ -125,7 +127,7 @@ defmodule RescueCloud.Projection do
     true
   rescue
     e ->
-      if transient?(e), do: reraise(e, __STACKTRACE__)
+      if abort_batch?(e), do: reraise(e, __STACKTRACE__)
 
       Logger.error(
         "projection: #{what} failed, left unchanged (fix the cause, then run " <>
@@ -135,16 +137,23 @@ defmodule RescueCloud.Projection do
       false
   end
 
-  # Connection exceptions, deadlocks/serialisation failures (40), insufficient resources (53),
-  # operator intervention (57) and an already-aborted transaction (25P02) are not about one
-  # request: they abort the whole transaction and must reach the caller.
-  defp transient?(%DBConnection.ConnectionError{}), do: true
+  # Errors that are not about one request's data abort the whole transaction and must reach
+  # the caller: connection exceptions (08), an already-aborted transaction (25),
+  # deadlocks/serialisation failures (40), insufficient resources (53), operator intervention
+  # (57), and the system-level classes: syntax error or access rule violation (42, e.g. a
+  # missing column after a bad deploy), object not in prerequisite state (55, e.g. lock not
+  # available), system error (58) and internal error (XX). Data exceptions (22) and integrity
+  # violations (23) stay isolated to the request.
+  @abort_classes ["08", "25", "40", "42", "53", "55", "57", "58", "XX"]
 
-  defp transient?(%Postgrex.Error{postgres: %{pg_code: code}}) when is_binary(code),
-    do: String.starts_with?(code, ["08", "25", "40", "53", "57"])
+  @doc false
+  def abort_batch?(%DBConnection.ConnectionError{}), do: true
 
-  defp transient?(%Postgrex.Error{}), do: true
-  defp transient?(_), do: false
+  def abort_batch?(%Postgrex.Error{postgres: %{pg_code: code}}) when is_binary(code),
+    do: String.starts_with?(code, @abort_classes)
+
+  def abort_batch?(%Postgrex.Error{}), do: true
+  def abort_batch?(_), do: false
 
   @doc "All requests, ordered by request_id."
   def list_requests, do: Repo.all(from r in Request, order_by: r.request_id)
@@ -300,8 +309,9 @@ defmodule RescueCloud.Projection do
     })
   end
 
-  # The schema puts no maximum on people_count (only >= 0), the column is int4. A count it
-  # cannot hold is no real count: keep it in `extracted`, treat it as unknown here (review F-01).
+  # The column is int4. Payload validation caps people_count at 100000 (#284, #285); this guard
+  # stays as defence in depth for events stored before that cap: a count the column cannot hold
+  # is no real count, so keep it in `extracted` and treat it as unknown here (review F-01).
   defp int4(n) when is_integer(n) and n in -2_147_483_648..2_147_483_647, do: n
   defp int4(_), do: nil
 
