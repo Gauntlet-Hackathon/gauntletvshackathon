@@ -6,6 +6,13 @@ and very long messages, emoji). Requests go through `process_batch`, the same co
 intake API uses, so outbox rows are created exactly as in real use. No network, no model
 calls; all text is generated from the templates below (nothing is taken from eval sets).
 Output is deterministic for a given seed.
+
+The no-model extractor (KeywordExtractor) marks every request it recognises as
+`request_kind: rescue`, which the engine ranks at least P2 (R-P2-04). A decided P3 can only come
+from a dry evacuation report, so the `dry` style uses the two contract fixture texts for one
+(cases C08 and C24, in `contracts/fixtures/cases.jsonl`); the default FixtureExtractor knows
+their extraction. Repeat reports of an incident reuse the first report's phone when it had one,
+so they match as duplicates (`contracts/logic.md`).
 """
 
 from __future__ import annotations
@@ -69,10 +76,17 @@ LONG_FILLER = (
     "please send someone as soon as you can",
     "I am writing this from my phone on the second floor",
 )
+# Contract fixtures C08 and C24: a dry evacuation request and its repeat (R-P3-01).
+DRY_REPORTS = (
+    "We are dry and safe but the creek is high, we would like to evacuate. "
+    "311 Washington Ave, 4 people",
+    "We'd like to evacuate, 311 Washington Avenue, 4 people, dry for now",
+)
 STYLES = (
     "plain", "caps", "sms", "typo", "spanish", "mixed", "no_location", "short", "long", "emoji",
 )  # fmt: skip
 DUPLICATE_RATE = 0.12
+DRY_RATE = 0.03  # share of new incidents that are a dry evacuation report
 
 
 def _typo(rng: random.Random, text: str) -> str:
@@ -101,6 +115,8 @@ def _compose(rng: random.Random, style: str, address: str) -> str:
     es = rng.choice(SITUATIONS_ES)
     extra_en = rng.choice(EXTRAS_EN).format(n=n)
     extra_es = rng.choice(EXTRAS_ES).format(n=n)
+    if style == "dry":
+        return rng.choice(DRY_REPORTS)
     if style == "spanish":
         return f"Ayuda por favor, {es}. Estamos en {address}. {extra_es}."
     if style == "mixed":
@@ -130,16 +146,23 @@ def generate(count: int, seed: int) -> list[IntakeItem]:
     rng = random.Random(seed)
     items: list[IntakeItem] = []
     incidents: list[str] = []
+    first_contact: dict[str, str | None] = {}
     while len(items) < count:
-        if incidents and rng.random() < DUPLICATE_RATE:
+        repeat = bool(incidents) and rng.random() < DUPLICATE_RATE
+        if repeat:
             address = rng.choice(incidents)
             style = rng.choice(("plain", "sms", "caps", "typo", "spanish"))
+        elif rng.random() < DRY_RATE:
+            address, style = "", "dry"  # fixture text carries its own address
         else:
             address = _address(rng)
             incidents.append(address)
             style = rng.choice(STYLES)
         raw = _compose(rng, style, address)
         contact = f"+1555{rng.randrange(1000000, 9999999)}" if rng.random() < 0.6 else None
+        if repeat and first_contact[address]:
+            contact = first_contact[address]  # the same phone reporting again
+        first_contact.setdefault(address, contact)
         lang = "es" if style == "spanish" else None
         items.append(IntakeItem(raw, rng.choice(CHANNELS), contact, lang))
     return items
