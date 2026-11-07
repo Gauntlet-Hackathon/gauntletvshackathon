@@ -56,6 +56,17 @@ defmodule RescueCloud.ReleaseTest do
     assert [1, 1, 1, 1, 1] = counts()
   end
 
+  test "rebuild_projection/0 rebuilds the requests read model from the events" do
+    seed!()
+    Repo.delete_all(Request)
+
+    output = ExUnit.CaptureIO.capture_io(fn -> assert :ok = Release.rebuild_projection() end)
+
+    assert output =~ "1 requests"
+    assert [%{request_id: request_id}] = Repo.all(Request)
+    assert request_id == rid("A1")
+  end
+
   test "the Fly release_command is still migrate only" do
     assert File.read!(@fly_toml) =~ ~s(release_command = "/app/bin/migrate")
   end

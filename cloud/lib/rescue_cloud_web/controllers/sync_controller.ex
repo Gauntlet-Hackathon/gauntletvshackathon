@@ -35,10 +35,12 @@ defmodule RescueCloudWeb.SyncController do
         if mismatch?(params, events, device_id) do
           conn |> put_status(403) |> json(%{error: "device_mismatch"})
         else
-          {:ok, %{acked: acked, rejected: rejected, inserted: inserted}} =
+          {:ok, %{acked: acked, rejected: rejected, inserted: inserted, request_ids: ids}} =
             Events.append_batch(events)
 
-          {:ok, _ids} = Projection.apply_events(inserted)
+          # Every request of the batch, not only the newly inserted events: when a previous
+          # attempt stored the events and then failed (500), this retry projects them (M-01).
+          {:ok, _projected} = Projection.project_requests(ids)
 
           Enum.each(
             inserted,

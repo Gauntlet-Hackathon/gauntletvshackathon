@@ -4,6 +4,10 @@ defmodule RescueCloud.Events.Event do
   `synced_at` is the server time of the sync that first delivered the event (set by
   `RescueCloud.Events.append_batch/2`, not part of the wire envelope).
   Validation mirrors `contracts/event.schema.json` plus the payload schema for the event type.
+  One addition: a payload holding U+0000 in any string or key is invalid, because PostgreSQL
+  cannot store it in jsonb (`22P05`); without this check one such event made the whole batch's
+  insert fail (500). It is rejected on its own as `invalid_payload` (`contracts/sync_api.md`:
+  rejected events must not be retried unchanged).
   """
   use Ecto.Schema
   import Ecto.Changeset
@@ -65,13 +69,27 @@ defmodule RescueCloud.Events.Event do
     type = get_field(changeset, :type)
     payload = get_field(changeset, :payload)
 
-    if changeset.errors[:type] || changeset.errors[:payload] || is_nil(payload) do
-      changeset
-    else
-      case Payload.validate(type, payload) do
-        :ok -> changeset
-        {:error, errors} -> add_error(changeset, :payload, "is invalid", details: errors)
-      end
+    cond do
+      changeset.errors[:type] || changeset.errors[:payload] || is_nil(payload) ->
+        changeset
+
+      nul?(payload) ->
+        add_error(changeset, :payload, "contains U+0000, which the database cannot store")
+
+      true ->
+        validate_payload(changeset, type, payload)
     end
   end
+
+  defp validate_payload(changeset, type, payload) do
+    case Payload.validate(type, payload) do
+      :ok -> changeset
+      {:error, errors} -> add_error(changeset, :payload, "is invalid", details: errors)
+    end
+  end
+
+  defp nul?(value) when is_binary(value), do: :binary.match(value, <<0>>) != :nomatch
+  defp nul?(value) when is_list(value), do: Enum.any?(value, &nul?/1)
+  defp nul?(value) when is_map(value), do: Enum.any?(value, fn {k, v} -> nul?(k) or nul?(v) end)
+  defp nul?(_value), do: false
 end

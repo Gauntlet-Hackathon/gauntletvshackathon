@@ -113,6 +113,7 @@ fly logs --app <app>                   # if the release_command or the check fai
 Prod loads none of the committed dev tokens (`config/devices.exs`), so `DEVICE_TOKENS` must list every device that syncs and must include `demo-field-01:<token>` for the demo (the prod cloud accepts only `DEVICE_TOKENS`); a device left out gets 401.
 Then point each field laptop at it: `CLOUD_URL=https://<app>.fly.dev`, `DEVICE_ID`/`DEVICE_TOKEN` matching a `DEVICE_TOKENS` pair.
 If the deploy fails at `release_command` with a connection error, check `fly secrets list --app <app>` shows `DATABASE_URL` (re-run `fly postgres attach`) and that `ECTO_IPV6` is still in `[env]`.
+If the dashboard misses requests that devices synced (their outbox is empty), or `fly logs` shows `projection: project <request_id> failed`, fix the cause and rebuild the read model from the stored events (safe while devices sync; it never deletes events): `fly ssh console --app <app> -C "/app/bin/rescue_cloud eval 'RescueCloud.Release.rebuild_projection()'"`. See `cloud/README.md`, "Rebuild the dashboard".
 
 ## Deploy hosted field demo to Fly
 Config: `field/fly.toml`. Its app name `rescue-field-demo` is a **placeholder** (`<app>` below). Nothing here has been deployed and no credentials are in the repo. Run every command from the **repo root** (the image builds from the root), logged in with `fly auth login`. Deploy the cloud first: you need its URL.

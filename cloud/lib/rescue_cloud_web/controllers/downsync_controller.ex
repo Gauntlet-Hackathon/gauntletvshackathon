@@ -30,11 +30,14 @@ defmodule RescueCloudWeb.DownsyncController do
     end
   end
 
+  # Sequence numbers are bigint; a larger `since` would fail in the query (500) instead of 400.
+  @max_since 9_223_372_036_854_775_807
+
   defp parse_since(nil), do: {:ok, 0}
 
   defp parse_since(v) when is_binary(v) do
     case Integer.parse(v) do
-      {n, ""} when n >= 0 -> {:ok, n}
+      {n, ""} when n in 0..@max_since -> {:ok, n}
       _ -> :error
     end
   end
