@@ -31,6 +31,7 @@ defmodule RescueCloudWeb.Router do
 
     post "/heartbeat", SyncController, :heartbeat
     post "/events", SyncController, :events
+    get "/down", DownsyncController, :show
   end
 
   scope "/", RescueCloudWeb do

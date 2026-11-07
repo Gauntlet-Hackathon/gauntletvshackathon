@@ -68,6 +68,27 @@ defmodule RescueCloud.Events do
     Repo.all(query)
   end
 
+  @doc """
+  Down-sync feed: `assigned`/`rescued` events from devices other than `device_id` with
+  sequence number greater than `since`, oldest first. Returns `{events, next_since}`;
+  `next_since` is the last returned sequence number, or `since` when nothing is new.
+  """
+  @spec read_down(String.t(), non_neg_integer(), keyword()) :: {[struct()], non_neg_integer()}
+  def read_down(device_id, since, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 500)
+
+    events =
+      Repo.all(
+        from e in Event,
+          where:
+            e.id > ^since and e.type in ["assigned", "rescued"] and e.device_id != ^device_id,
+          order_by: [asc: e.id],
+          limit: ^limit
+      )
+
+    {events, events |> List.last() |> then(&if(&1, do: &1.id, else: since))}
+  end
+
   defp validate(attrs) when is_map(attrs) do
     changeset = Event.changeset(attrs)
 
