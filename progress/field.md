@@ -47,3 +47,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 field #232 F25b: lifespan picks HFExtractor when HF_REPO+HF_REVISION set (fallback to FixtureExtractor with one log line), model_version in board header/heartbeat; test_extractor_select.py
 2026-11-07 field #233 F32: Dockerfile bakes pinned model (CPU torch, build-secret HF_TOKEN) only when HF_REPO+HF_REVISION build args are set; fly.toml/RUNBOOK docs; 4 static tests
 2026-11-07 field #243 F36: fly.toml 2gb/2cpu VM + 60s grace, compose passes HF_REPO/HF_REVISION build args, RUNBOOK note, tests
+2026-11-07 field #243 follow-up: field/fly.toml VM memory 2gb -> 4gb (measured ~630 MB with CPU torch and a tiny checkpoint before mmBERT-base's ~1.3 GB weights); test and RUNBOOK updated
