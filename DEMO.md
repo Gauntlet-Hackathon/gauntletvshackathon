@@ -22,8 +22,9 @@ Always reset the field app and the cloud **together**: the field app's down-sync
 
 - Hosted field app: `fly ssh console --app <field-app>`, then `rm -f /data/field.db*` (the SQLite file under
   `FIELD_DATA_DIR`), exit, and restart the machine (`fly machine restart --app <field-app>`).
-- Cloud: use the cloud demo-reset command once it exists (draft C25). Until then, reset the cloud database (see
-  [cloud/README.md](cloud/README.md)).
+- Cloud: run the C25 demo-reset release command (see [cloud/README.md](cloud/README.md#reset-a-demo-stack)):
+  `fly ssh console --app <cloud-app> -C "/app/bin/rescue_cloud eval 'RescueCloud.Release.reset_demo(\"yes-delete-all-demo-data\")'"`
+  (from a shell in the release: `bin/rescue_cloud eval 'RescueCloud.Release.reset_demo("yes-delete-all-demo-data")'`).
 - Locally: `docker compose down -v`.
 
 ## 3. Script notes
@@ -36,7 +37,8 @@ Always reset the field app and the cloud **together**: the field app's down-sync
 
 ## 4. The unseen-challenge inputs
 
-Run with the no-model build (keyword extractor, fallback engine). Each text is checked by
+Run with the no-model build (keyword extractor; the Docker image runs the frozen Mercury engine build, local
+`pytest` runs the Python fallback engine). Each text is checked by
 [field/tests/test_demo_challenges.py](field/tests/test_demo_challenges.py); none is marked `xfail`.
 
 | Challenge | Type this | The board shows |

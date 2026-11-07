@@ -13,7 +13,18 @@
     },
     "bin_hash": {
       "type": "string",
-      "pattern": "^[0-9a-f]{8,64}$"
+      "pattern": "^[0-9a-f]{8,64}$",
+      "description": "Hash of the engine artifact AND the frozen config: rescue_shared.frozen_config.combined_bin_hash(artifact_hash, config_hash). Builds made before the config freeze carry only the artifact hash here."
+    },
+    "artifact_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8,64}$",
+      "description": "sha256 (first 16 hex) of the engine artifact as compiled, before the version stamp."
+    },
+    "config_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8,64}$",
+      "description": "rescue_shared.frozen_config.config_hash of the frozen thresholds, hoax markers and street list (copied to config/ next to this manifest). The field app refuses to start when its own config hashes differently."
     },
     "engine_kind": {
       "enum": [
@@ -39,5 +50,13 @@
     "built_at"
   ],
   "title": "engine manifest",
-  "description": "engine/dist/<rules_version>/manifest.json. rules_version must equal rules@<rules_sha>+bin:<bin_hash>."
+  "description": "engine/dist/<rules_version>/manifest.json. rules_version must equal rules@<rules_sha>+bin:<bin_hash>.",
+  "dependentRequired": {
+    "artifact_hash": [
+      "config_hash"
+    ],
+    "config_hash": [
+      "artifact_hash"
+    ]
+  }
 }

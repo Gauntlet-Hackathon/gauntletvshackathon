@@ -26,6 +26,8 @@ from rescue_field.store import EventStore
 from rescue_shared import logic
 
 TIERS = ("P1", "P2", "P3")
+# The `possible_hoax` follow-up text (contracts/engine_rules.md, "Follow-up questions").
+Q_HOAX = "Can you confirm this request is real and tell us exactly what help you need?"
 templates = Jinja2Templates(directory=str(Path(__file__).with_name("templates")))
 router = APIRouter()
 
@@ -88,6 +90,19 @@ def _follow_up_key(r: dict[str, Any]) -> tuple[int, tuple[int, int, str, str]]:
     return rank, logic.within_tier_sort_key(r["extracted"], r["received_at"], r["request_id"])
 
 
+def _question(members: list[dict[str, Any]]) -> dict[str, str] | None:
+    """The follow-up question to show on a tier row: the first member (the one that set the
+    tier first) whose `prioritized` or `duplicate` decision carries one (DECISIONS R9: a
+    duplicate whose own signal set the group tier keeps its question)."""
+    for m in members:
+        d = m["decision"]
+        if d["outcome"] in ("prioritized", "duplicate") and d.get("follow_up_question"):
+            q = d["follow_up_question"]
+            label = "Possible hoax" if q == Q_HOAX else "Needs confirmation"
+            return {"text": q, "label": label}
+    return None
+
+
 def allowed_statuses(current: str | None) -> list[str]:
     """Statuses the order accepts next: strictly above `current` (any when it is None)."""
     floor = RANK.get(current, 0) if current else 0
@@ -128,6 +143,7 @@ def build_board(store: EventStore) -> dict[str, Any]:
                 **rec,
                 "tier": tier,
                 "tier_source": shown,
+                "question": _question([shown, rec, *dups]),
                 "duplicates": dups,
                 "allowed": allowed_statuses(rec["status"]),
             }
@@ -162,5 +178,8 @@ async def board(request: Request) -> HTMLResponse:
     ctx = await run_in_threadpool(read)
     ctx["model_version"] = getattr(request.app.state.extractor, "model_version", None) or "unknown"
     ctx["demo_mode"] = os.environ.get("DEMO_MODE") == "1"
+    # The state /sync/offline-toggle flips, so the button label survives a reload.
+    worker = getattr(request.app.state, "sync_worker", None)
+    ctx["sync_paused"] = bool(getattr(worker, "paused", False))
     name = "_board.html" if request.headers.get("HX-Request") else "board.html"
     return templates.TemplateResponse(request, name, ctx)

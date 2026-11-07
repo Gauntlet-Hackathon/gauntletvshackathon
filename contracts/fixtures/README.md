@@ -36,6 +36,10 @@ The conflicting-counts pairs (C18/C06 and C03/C19) are also duplicate relations 
 ## Other files
 - `streets.txt`: 50 Houston streets and landmarks for location matching (`rescue_shared.logic.street_list_hits`).
 - `hoax_markers.txt`: the default hoax marker list (`rescue_shared.logic.hoax_marker_hits`). Real deployments make it configurable.
+- `thresholds.json`: the default `context.thresholds` (the values in `contracts/engine_rules.md`); the field app sends exactly these.
+
+`thresholds.json`, `hoax_markers.txt` and `streets.txt` are frozen with the demo engine build (DECISIONS H12, R15): their parsed content is hashed into the build's
+`manifest.json` (`config_hash`) and into its `rules_version`, and the field app refuses to start when its copies differ. Editing any of them means a new build.
 
 `shared/tests/test_fixtures.py` checks that every case validates against the schemas and that the case data is internally consistent (spans, street hits, hoax marker counts and
 duplicate candidates match the shared logic). It does not check `expected`; only an engine can, and the engine lane's tests do.

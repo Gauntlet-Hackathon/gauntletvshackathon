@@ -1,4 +1,5 @@
 import json
+import shutil
 
 import pytest
 
@@ -165,3 +166,31 @@ def test_provisional_tier_change_reported(tmp_path):
     md = rd.to_markdown(report)
     assert ULID.format(1) in md and ULID.format(2) not in md
     assert f"{row['before']['provisional_tier']} → {row['after']['provisional_tier']}" in md
+
+
+def test_config_drift_is_reported(tmp_path):
+    """DECISIONS H12 / R15: a request decided with thresholds other than the build's frozen ones
+    is listed under config_drift even when its outcome does not change."""
+    v = _version(tmp_path, "a")
+    frozen = rd.frozen_thresholds(v)
+    ok = _input()
+    ok["context"] = {"thresholds": dict(frozen)}
+    drifted = _input()
+    drifted["context"] = {"thresholds": {**frozen, "need_hours_over": 48}}
+    path = tmp_path / "events.jsonl"
+    evs = [_event(1, 1, ok), _event(2, 2, drifted), _event(3, 3, _input())]
+    path.write_text("\n".join(json.dumps(e) for e in evs) + "\n")
+    report = rd.diff(path, v, v)
+    assert report["config_drift"] == {"old": [ULID.format(2)], "new": [ULID.format(2)]}
+    assert report["changed"] == 0
+    assert "config drift vs after build: 1 request" in rd.to_markdown(report)
+
+
+def test_build_before_config_freeze_reports_no_drift(tmp_path):
+    v = _version(tmp_path, "a")
+    shutil.rmtree(v / "config")
+    inp = _input()
+    inp["context"] = {"thresholds": {"need_hours_over": 48}}
+    path = tmp_path / "events.jsonl"
+    path.write_text(json.dumps(_event(1, 1, inp)) + "\n")
+    assert rd.diff(path, v, v)["config_drift"] == {"old": [], "new": []}

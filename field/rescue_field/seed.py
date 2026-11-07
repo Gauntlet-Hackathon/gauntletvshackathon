@@ -24,6 +24,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+from rescue_field import freeze
 from rescue_field.pipeline import BatchDecider, IntakeItem, PipelineConfig, process_batch
 from rescue_field.slm import Extractor
 from rescue_field.store import EventStore
@@ -228,6 +229,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             export_csv(items, args.export_csv)
         return 0
     env = {"FIELD_DATA_DIR": args.data_dir} if args.data_dir else None
+    config = PipelineConfig.from_env()
+    freeze.check(config.thresholds, config.hoax_markers, config.streets)  # R15
     store = api.open_store(env)
     try:
         n = seed_store(
@@ -235,7 +238,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.count,
             args.seed,
             decide_batch=api.default_decide_batch(),
-            config=PipelineConfig.from_env(),
+            config=config,
         )
     finally:
         store.close()
