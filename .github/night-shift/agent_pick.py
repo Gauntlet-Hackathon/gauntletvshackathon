@@ -11,7 +11,7 @@ Order of checks:
                      and it works on fixing main (at most MAX_ATTEMPTS times per failing
                      commit, counted by markers on the night-log issue). If CI status
                      cannot be read, every lane waits (fail closed).
-  4. Next issue      Oldest unassigned open issue in this lane with READY_LABEL,
+  4. Next issue      Oldest unassigned open issue in this lane with READY_LABEL and none of SKIP_LABELS,
                      lowest wave first (wave:3 or wave:W03), whose "Blocked by #N" issues are all closed and that
                      has fewer than MAX_ATTEMPTS failed attempts and fewer than
                      2*MAX_ATTEMPTS runs that never started. Only markers posted by
@@ -32,7 +32,8 @@ ATTEMPT_MARKER = "<!-- agent-attempt -->"
 INFRA_MARKER = "<!-- agent-infra -->"   # a run that never really started; capped separately
 BLOCK_MARKER = "<!-- agent-blocked -->"  # attempts before the latest block notice don't count
 LEGACY_BLOCK_TEXT = "marking blocked for a human"
-SKIP_LABELS = {"blocked", "needs-human"}
+# human/integrator: person-owned work (docs/NIGHT_SHIFT_ISSUES.md). Skipped even if night-safe is added by mistake.
+SKIP_LABELS = {"blocked", "needs-human", "human", "integrator"}
 FAILED_CONCLUSIONS = {"FAILURE", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED", "STARTUP_FAILURE", "ERROR"}
 PENDING_STATES = {"QUEUED", "IN_PROGRESS", "PENDING", "WAITING", "REQUESTED", "EXPECTED"}
 DEP_RE = re.compile(r"(?:blocked\s+by|depends\s+on)\s*:?\s*((?:#\d+(?:\s*,\s*|\s+and\s+|\s+)?)+)", re.I)
