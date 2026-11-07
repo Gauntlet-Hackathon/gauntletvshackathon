@@ -22,3 +22,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 field #173 F18: board intake panel (_intake.html: single, paste, CSV forms; fetch script with Processing/Added/alert states, board fragment refresh); tests/test_board_intake.py
 2026-11-07 field #174 F27: rescue_field/loadtest.py surge load test (real engine, optional sync drain, JSON timings); tests/test_loadtest.py
 2026-11-07 field #154 F16: root docker-compose.yml (db+cloud+field), .env.example, RUNBOOK 'Run locally'; verified POST /requests syncs to the cloud db; cloud prod.exs force_ssl now excludes host 'cloud'
+2026-11-07 field #155 F17: scripts/smoke.sh (health, 3 synced, cloud stop, 5 queued in outbox, restart, 5 arrive <=90s no dupes; --no-docker); verified PASS on every step against the compose stack
