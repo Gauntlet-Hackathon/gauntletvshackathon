@@ -11,3 +11,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 cloud #55 C7: /records subscribes to PubSub "events" and reloads list + open detail (activity already did); LiveViewTest posting to /sync/events updates open /records, detail and /activity
 - C8 #50: GET /sync/down (other devices' assigned/rescued events since cursor, approved versions from config, next_since), DownsyncController, Events.read_down, tests
 - C12 #52: Corrections context (create via Events.append_batch, review queue approve/reject in correction_reviews, export approved to exports/corrections-<date>.jsonl, refuses evals paths), /corrections LiveView, tests
+- C9 #53: Replay verifier (RescueCloud.Replay: per-rules_version Port run of manifest entrypoint, match/mismatch/missing_version in verifications table, shown on record detail and dashboard mismatch count), fake engine script + tests

@@ -6,7 +6,7 @@ defmodule RescueCloudWeb.RecordsLive do
   """
   use RescueCloudWeb, :live_view
 
-  alias RescueCloud.Records
+  alias RescueCloud.{Records, Replay}
 
   @impl true
   def mount(_params, _session, socket) do
@@ -38,6 +38,7 @@ defmodule RescueCloudWeb.RecordsLive do
     socket
     |> assign(:requests, Records.search_requests(filters))
     |> assign(:record, id && Records.get_record(id))
+    |> assign(:verifications, if(id, do: Replay.for_request(id), else: %{}))
   end
 
   @impl true
@@ -144,6 +145,7 @@ defmodule RescueCloudWeb.RecordsLive do
               <th>Rules</th>
               <th>Model</th>
               <th>Synced (cloud)</th>
+              <th>Replay</th>
             </tr>
           </thead>
           <tbody>
@@ -154,12 +156,22 @@ defmodule RescueCloudWeb.RecordsLive do
               <td data-role="rules-version">{e.rules_version}</td>
               <td data-role="model-version">{e.model_version}</td>
               <td data-role="synced-at">{fmt(e.synced_at)}</td>
+              <td data-role="verification">
+                {e.type == "decided" && verification_status(@verifications, e)}
+              </td>
             </tr>
           </tbody>
         </table>
       </section>
     </Layouts.app>
     """
+  end
+
+  defp verification_status(verifications, event) do
+    case verifications[event.event_id] do
+      nil -> "unverified"
+      v -> v.status
+    end
   end
 
   defp fmt(nil), do: ""

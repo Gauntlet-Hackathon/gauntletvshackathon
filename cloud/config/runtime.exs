@@ -40,6 +40,10 @@ if config_env() == :dev do
     ]
 end
 
+if engine_dist = System.get_env("ENGINE_DIST") do
+  config :rescue_cloud, :engine_dist, engine_dist
+end
+
 if config_env() == :prod do
   case System.get_env("DEVICE_TOKENS") do
     nil ->
