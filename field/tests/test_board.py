@@ -202,3 +202,78 @@ def test_follow_up_group_takes_highest_provisional_tier(store):
         ("OTHER", "P2"),
     ]
     assert [d["request_id"] for d in follow[0]["duplicates"]] == ["DUP"]
+
+
+# --- F20: status buttons -------------------------------------------------------------------
+import re  # noqa: E402
+
+from rescue_field import status as status_mod  # noqa: E402
+
+
+def post_status(store, rid, body):
+    with TestClient(create_app(store=store)) as client:
+        r = client.post(f"/requests/{rid}/status", json=body)
+        page = client.get("/")
+    assert page.status_code == 200
+    return r, page.text
+
+
+def row_html(page, rid):
+    m = re.search(rf'<div class="row" data-request-id="{rid}".*?</form>', page, re.S)
+    assert m, page
+    return m.group(0)
+
+
+def disabled_statuses(html):
+    out = set()
+    for m in re.finditer(r"<button[^>]*>", html):
+        tag = m.group(0)
+        val = re.search(r'value="(\w+)"', tag).group(1)
+        if " disabled" in tag:
+            out.add(val)
+    return out
+
+
+def test_new_row_has_three_labelled_actions(store):
+    add(store, "R1", output("P1"), extracted(location="Elm St"))
+    html = row_html(get(store).text, "R1")
+    assert 'data-status="new"' in html
+    for st in status_mod.ORDER:
+        assert f'value="{st}"' in html
+    assert 'aria-label="Crew for Elm St"' in html
+    assert 'aria-label="Escalation reason for Elm St"' in html
+    assert "Number rescued (optional) for Elm St" in html
+    assert 'min="0"' in html
+    assert 'aria-label="Mark assigned: Elm St"' in html
+    assert disabled_statuses(html) == set()
+
+
+RID = new_ulid()
+
+
+def test_after_assigned_refused_actions_are_disabled(store):
+    add(store, RID, output("P1"))
+    r, page = post_status(store, RID, {"status": "assigned", "crew": "Crew A"})
+    assert r.status_code == 200, r.text
+    html = row_html(page, RID)
+    assert 'data-status="assigned"' in html
+    expected = {s for s in status_mod.ORDER if status_mod.RANK[s] <= status_mod.RANK["assigned"]}
+    assert expected and disabled_statuses(html) == expected
+
+
+def test_blank_crew_and_reason_get_422_with_detail(store):
+    add(store, RID, output("P1"))
+    r, page = post_status(store, RID, {"status": "assigned", "crew": "  "})
+    assert r.status_code == 422 and "crew" in r.json()["detail"]
+    assert RID in page
+    r, page = post_status(store, RID, {"status": "escalated", "reason": ""})
+    assert r.status_code == 422 and "reason" in r.json()["detail"]
+    assert 'data-status="new"' in row_html(page, RID)
+
+
+def test_refused_move_is_409(store):
+    add(store, RID, output("P1"))
+    with TestClient(create_app(store=store)) as client:
+        assert client.post(f"/requests/{RID}/status", json={"status": "rescued"}).status_code == 200
+        r = client.post(f"/requests/{RID}/status", json={"status": "assigned", "crew": "A"})
+    assert r.status_code == 409 and r.json()["detail"]

@@ -8,6 +8,15 @@
     rules <span class="rules-version">{{ s.rules_version }}</span> ·
     model <span class="model-version">{{ s.model_version }}</span> · {{ r.received_at }}
   </div>
+  {% set loc = r.extracted.location.text %}
+  <form class="status-form" data-request-id="{{ r.request_id }}">
+    <label>Crew <input type="text" name="crew" aria-label="Crew for {{ loc }}" aria-required="true"{% if 'assigned' not in r.allowed %} disabled{% endif %}></label>
+    <button type="submit" name="status" value="assigned" aria-label="Mark assigned: {{ loc }}"{% if 'assigned' not in r.allowed %} disabled{% endif %}>Assigned</button>
+    <label>Reason <input type="text" name="reason" aria-label="Escalation reason for {{ loc }}" aria-required="true"{% if 'escalated' not in r.allowed %} disabled{% endif %}></label>
+    <button type="submit" name="status" value="escalated" aria-label="Mark escalated: {{ loc }}"{% if 'escalated' not in r.allowed %} disabled{% endif %}>Escalated</button>
+    <label>Rescued <input type="number" name="rescued_count" min="0" step="1" aria-label="Number rescued (optional) for {{ loc }}"{% if 'rescued' not in r.allowed %} disabled{% endif %}></label>
+    <button type="submit" name="status" value="rescued" aria-label="Mark rescued: {{ loc }}"{% if 'rescued' not in r.allowed %} disabled{% endif %}>Rescued</button>
+  </form>
   <details><summary>Extracted fields</summary>
     <p>{{ r.raw_text }}</p>
     {% set e = r.extracted %}{% include "_fields.html" %}
