@@ -212,3 +212,19 @@ The plan (02 "Model registry", 06 hours 12-15) has laptops pull approved models 
 - The cloud keeps the registry and the gate (`RescueCloud.Models.pull/3`, `evaluate/2`, `promote/2`; cloud/README.md). The order for #104 is: run the evals on the candidate, `promote` it on the cloud, and pin only an `approved` revision in the field image build. That last step is a manual rule: nothing checks that the image's `HF_REVISION` matches the cloud's approved version.
 - Without both build args no model is baked in, and the app starts on the keyword fallback (its model_version `stub:keyword-extractor` shows on `/sync/status` and the board; F37's banner, #244, appears only when the build args are set and the model then fails to load).
 - Not built: `GET /models/{version}` and fetching a model bundle. Down-sync already carries the approved `model_version` string, and the laptop stores it with the previous one for rollback (`field/rescue_field/downsync.py`), but nothing downloads or loads that version. A model change ships as a new field image. That is fine for one hosted demo device and is the next step for a real fleet.
+
+## Rules that may drop a message without a human (H20 #271; Paawan, 2026-11-07)
+Kept as written in contracts/engine_rules.md for the demo; the rules freeze (H12) stays in place.
+- **Stale posts:** a post judged stale is `not_a_request` (`R-NAR-02`) unless its cautious tier is P1 (R5). A stale P2 is
+  not shown to a human.
+- **Confident "not a request":** `is_request=false` at high confidence is `not_a_request` (`R-NAR-01`) even when P1
+  hazards are extracted, so news reports and thank-you posts that mention injuries do not reach the board.
+- **Landmarks:** any `street_list_hits` > 0 makes a landmark location usable, even if the hit is unrelated to the
+  landmark text.
+Why: each change needs the freeze lifted, both engines changed, a new `engine/dist/` build and Sets B-D re-checked,
+hours before the demo. After the hackathon, the recommended change is to send stale P2 posts and landmark-only
+locations without a matching street to the follow-up queue (in line with "never lower priority because of uncertainty").
+
+## people_count maximum (H19 #270; Paawan, 2026-11-07)
+`people_count_value` has `maximum: 100000` in contracts/common.schema.json. The tagger's head emits 0-20 and the keyword
+extractor at most three digits; the cap keeps counts inside the cloud's int4 column and exact in Mercury's floats.

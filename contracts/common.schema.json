@@ -51,7 +51,8 @@
     },
     "people_count_value": {
       "type": "integer",
-      "minimum": 0
+      "minimum": 0,
+      "maximum": 100000
     }
   }
 }
