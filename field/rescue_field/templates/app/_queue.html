@@ -1,0 +1,19 @@
+<section id="next" class="next" aria-label="Next">
+  <h2>Next</h2>
+  {% for c in next %}{% set hidden = not loop.first %}{% include "app/_card.html" %}
+  {% else %}<p class="muted">Nothing waiting. Nice work.</p>{% endfor %}
+  {% if next|length > 1 %}<button type="button" class="btn" id="skip">Skip for now</button>{% endif %}
+</section>
+<section id="waiting" aria-label="Waiting">
+  <h2>Waiting <small>({{ waiting|length + check_first|length }})</small></h2>
+  {% for c in waiting %}<p class="mini" data-request-id="{{ c.request_id }}"><span class="pill pill-{{ c.tier }}">{{ c.pill }}</span> {{ c.headline }} · {{ c.address }}</p>{% endfor %}
+  {% for c in check_first %}{% include "app/_card.html" %}{% endfor %}
+  <details class="set-aside"><summary>Set aside ({{ set_aside|length }})</summary>
+    {% for r in set_aside %}<p class="mini" data-request-id="{{ r.request_id }}"><span class="pill pill-aside">Set aside</span> {{ r.text }}</p>{% else %}<p class="muted">None.</p>{% endfor %}
+  </details>
+</section>
+<section id="out-now" aria-label="Out now">
+  <h2>Out now <small>({{ out_now|length }})</small></h2>
+  {% for c in out_now %}<p class="mini" data-request-id="{{ c.request_id }}"><span class="pill pill-{{ c.tier }}">{{ c.pill }}</span> {{ c.headline }} · {{ c.address }}</p>
+  {% else %}<p class="muted">Nobody is out right now.</p>{% endfor %}
+</section>

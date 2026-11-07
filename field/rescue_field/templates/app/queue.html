@@ -1,0 +1,38 @@
+{% extends "app/_shell.html" %}
+{% block title %}Queue · CommunityRescue{% endblock %}
+{% block content %}
+<div id="queue">{% include "app/_queue.html" %}</div>
+<script>
+(function () {
+  const skipped = new Set();          // the cursor lives here only: skipping writes nothing
+  const root = document.getElementById("queue");
+  function show() {
+    const cards = Array.from(root.querySelectorAll("#next .req"));
+    let pick = cards.find(c => !skipped.has(c.dataset.requestId));
+    if (!pick && cards.length) { skipped.clear(); pick = cards[0]; }
+    cards.forEach(c => { c.hidden = c !== pick; });
+  }
+  root.addEventListener("click", async (ev) => {
+    const t = ev.target;
+    if (t.id === "skip") {
+      const cur = root.querySelector("#next .req:not([hidden])");
+      if (cur) skipped.add(cur.dataset.requestId);
+      show();
+    } else if (t.dataset && t.dataset.copy) {
+      try { await navigator.clipboard.writeText(t.dataset.copy); t.textContent = "Copied"; } catch (e) { t.textContent = "Press and hold to copy"; }
+    } else if (t.dataset && t.dataset.recheck) {
+      ev.preventDefault();
+      await fetch("/requests/" + encodeURIComponent(t.dataset.recheck) + "/recheck", {method: "POST"});
+      refresh();
+    }
+  });
+  async function refresh() {
+    try {
+      const r = await fetch("/", {headers: {"HX-Request": "true"}});
+      if (r.ok) { root.innerHTML = await r.text(); show(); }
+    } catch (e) { /* offline: keep what is on screen */ }
+  }
+  setInterval(refresh, 5000);
+})();
+</script>
+{% endblock %}

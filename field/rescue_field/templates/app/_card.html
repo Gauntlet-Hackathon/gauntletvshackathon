@@ -1,0 +1,22 @@
+{# One request card. Expects `c`; `recheck` and `hidden` optional. No rule ids, versions or confidences. #}
+<article class="card req" data-request-id="{{ c.request_id }}"{% if hidden %} hidden{% endif %}>
+  <p class="card-top">
+    <span class="pill pill-{{ c.tier or 'check' }}">{{ c.pill }}</span>
+    {% if c.escalated %}<span class="pill pill-flag">Couldn't get there</span>{% endif %}
+    <span class="badge">#{{ c.badge }}</span>
+  </p>
+  <h3 class="headline">{{ c.headline }}</h3>
+  <p class="address">{{ c.address }}</p>
+  <ul class="details">{% for d in c.details %}<li>{{ d }}</li>{% endfor %}{% if c.more %}<li class="more">{{ c.more }}</li>{% endif %}</ul>
+  <p class="contact">{{ c.contact }}{% if c.channel %} · via {{ c.channel }}{% endif %}{% if c.age %} · {{ c.age }}{% endif %}</p>
+  {% if c.question %}
+  <div class="check-first">
+    {% if c.maybe %}<p><span class="pill pill-maybe pill-{{ c.maybe_tier }}">{{ c.maybe }}</span></p>{% endif %}
+    <p class="question">{{ c.question }}</p>
+    {% if c.question_es %}<p class="question-es" lang="es">{{ c.question_es }}</p>{% endif %}
+    <button type="button" class="chip copy" data-copy="{{ c.question }}">Copy question</button>
+  </div>
+  {% endif %}
+  <details class="why"><summary>Why is this one first?</summary><p>{{ c.why }}</p></details>
+  {% if recheck %}<a class="recheck" href="#" data-recheck="{{ c.request_id }}">Check again</a>{% endif %}
+</article>

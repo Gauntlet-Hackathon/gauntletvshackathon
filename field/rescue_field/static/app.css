@@ -48,3 +48,20 @@ a { color: var(--blue); }
 a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
   outline: 3px solid var(--blue); outline-offset: 2px; }
 img { max-width: 100%; }
+/* Queue (UI-2). Pill pairs: #FFFFFF on red #B00020 7.3:1 (P1); #5C3300 on #FFF4E5 10.0:1 (P2, Check first);
+   ink on #FFFFFF 18.5:1 (P3, Set aside). Dashed border marks a provisional tier. */
+.pill { display: inline-block; padding: .1rem .7rem; border-radius: 1rem; font-weight: 700; border: 2px solid var(--ink);
+  background: var(--white); color: var(--ink); }
+.pill-P1 { background: var(--red); color: var(--white); border-color: var(--red); }
+.pill-P2, .pill-check { background: var(--amber-bg); color: var(--amber-ink); border-color: var(--amber-ink); }
+.pill-maybe { border-style: dashed; }
+.pill-flag { background: var(--white); color: var(--red); border-color: var(--red); }
+.card-top { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; margin: 0 0 .4rem; }
+.badge { margin-left: auto; color: var(--muted); font-weight: 700; }
+.headline { margin: .2rem 0 .5rem; font-size: 1.15rem; }
+.details { margin: .5rem 0; padding-left: 1.2rem; }
+.contact { margin: .4rem 0; color: var(--muted); }
+.check-first { background: var(--amber-bg); color: var(--amber-ink); border-radius: 8px; padding: .5rem .75rem; margin: .5rem 0; }
+.mini { margin: .4rem 0; padding: .5rem .75rem; background: var(--white); border: 1px solid var(--line); border-radius: 8px; }
+.recheck { display: inline-block; min-height: 44px; line-height: 44px; }
+.next h2, #waiting h2, #out-now h2 { font-size: 1.1rem; margin: 1rem 0 .3rem; }

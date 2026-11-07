@@ -102,6 +102,10 @@ def shell_context(request: Request) -> dict[str, Any]:
 
 @router.get("/app", response_class=HTMLResponse)
 async def app_home(request: Request, mode: str = "queue") -> HTMLResponse:
+    if mode != "respond":
+        from rescue_field import volunteer  # late: volunteer builds on this module
+
+        return await volunteer.queue_page(request)
     ctx = await run_in_threadpool(shell_context, request)
     ctx["mode"] = "respond" if mode == "respond" else "queue"
     return templates.TemplateResponse(request, "app/home.html", ctx)
