@@ -36,4 +36,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 engine runner CLI: `python -m rescue_evals.runner --system ours|stored|regex-baseline` now finds those systems (they registered into a second copy of the runner module); test in evals/tests/test_runner_cli.py
 2026-11-07 engine DECISIONS: record model delivery (baked into field image from an approved, pinned revision; laptop pull from the cloud registry not built) against plan 02/06
 2026-11-07 engine evals runner/consistency: engine context now gets street_list_hits + hoax_marker_hits from contracts/fixtures like the field pipeline (was always empty/0); DEMO.md notes how the challenge rows look with the trained model
-2026-11-07 engine evals: sets C (101) and D (68) from Paawan's review of the drafts -> evals/sets/c_hard.jsonl, d_abstain.jsonl; reasons for the 32 changes + 2 kept-with-note in evals/sets/REVIEW.md
+2026-11-07 engine evals: sets C (101) and D (68) from Paawan's review of the drafts, calls aligned with the frozen engine -> evals/sets/c_hard.jsonl, d_abstain.jsonl; 8 changes from the drafts with reasons in evals/sets/REVIEW.md
