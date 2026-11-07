@@ -15,6 +15,36 @@ defmodule RescueCloudWeb.EvalsLive do
     {"ours", "Ours"}
   ]
 
+  @headline "decision.p1_misses_per_1000"
+  @humaid "Set A: HumAID (Alam, Qazi, Imran, Ofli, ICWSM 2021, doi:10.1609/icwsm.v15i1.18116); tweet IDs and aggregate scores only."
+
+  @labels %{
+    "decision.p1_misses_per_1000" => "Urgent requests missed per 1,000",
+    "decision.false_alarm_rate" => "False alarm rate",
+    "decision.tier_accuracy" => "Priority tier accuracy",
+    "decision.outcome_accuracy" => "Outcome accuracy (request / abstain / duplicate)",
+    "decision.top20_accuracy" => "Top-20 ranking accuracy",
+    "decision.top_20_accuracy" => "Top-20 ranking accuracy",
+    "ranking.top20_accuracy" => "Top-20 ranking accuracy",
+    "decision.abstain_precision" => "Abstain precision",
+    "decision.abstain_recall" => "Abstain recall",
+    "decision.follow_up_field_rate" => "Follow-up question picks the right field",
+    "decision.duplicate_pairwise_f1" => "Duplicate detection F1",
+    "decision.ece" => "Calibration error (ECE)",
+    "calibration.ece" => "Calibration error (ECE)",
+    "extraction.location_exact" => "Location exact match",
+    "extraction.location_partial" => "Location partial match",
+    "extraction.people_count_exact" => "People count exact match",
+    "extraction.is_request_accuracy" => "Is-a-request accuracy",
+    "extraction.vulnerable_f1" => "Vulnerable people F1",
+    "extraction.hazard_f1" => "Hazards F1",
+    "consistency.pct_cases_changed" => "Cases that changed across repeated runs (%)",
+    "running.mean_ms_per_request" => "Mean time per request (ms)",
+    "running.seconds_per_1000_requests" => "Seconds per 1,000 requests",
+    "running.cost_per_1000_usd" => "Cost per 1,000 requests (USD)",
+    "running.works_offline" => "Works offline"
+  }
+
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket), do: Phoenix.PubSub.subscribe(RescueCloud.PubSub, Fleet.topic())
@@ -60,6 +90,33 @@ defmodule RescueCloudWeb.EvalsLive do
   defp fmt(nil), do: "n/a"
   defp fmt(v) when is_number(v), do: :erlang.float_to_binary(v / 1, decimals: 3)
 
+  defp fmt(_metric, nil), do: "n/a"
+  defp fmt("running.works_offline", v) when is_number(v), do: if(v >= 0.5, do: "yes", else: "no")
+  defp fmt("running.works_offline", v) when is_boolean(v), do: if(v, do: "yes", else: "no")
+
+  defp fmt("running.cost_per_1000_usd", v) when is_number(v),
+    do: "$" <> :erlang.float_to_binary(v / 1, decimals: 2)
+
+  defp fmt("running.mean_ms_per_request", v) when is_number(v), do: Integer.to_string(round(v))
+  defp fmt(_metric, v), do: fmt(v)
+
+  defp label(key), do: Map.get(@labels, key, key)
+
+  # Headline metric first; the rest keep their order.
+  defp headline_first(rows) do
+    {head, rest} = Enum.split_with(rows, &(&1["metric"] == @headline))
+    head ++ rest
+  end
+
+  defp set_a?(%{"results" => results}) when is_list(results),
+    do:
+      Enum.any?(
+        results,
+        &(is_map(&1) and is_binary(&1["set"]) and String.upcase(&1["set"]) == "A")
+      )
+
+  defp set_a?(_), do: false
+
   defp reasons(%{gate_report: %{"reasons" => [_ | _] = r}}), do: r
   defp reasons(_), do: []
 
@@ -88,25 +145,29 @@ defmodule RescueCloudWeb.EvalsLive do
         </tr>
       </thead>
       <tbody>
-        <tr :for={row <- @block["rows"]} id={"#{@id}-#{row["metric"]}"}>
+        <tr :for={row <- headline_first(@block["rows"])} id={"#{@id}-#{row["metric"]}"}>
           <td>
             <.link
               patch={~p"/evals?#{%{metric: row["metric"]}}"}
               id={"#{@id}-link-#{row["metric"]}"}
               class="link"
             >
-              {row["metric"]}
+              {label(row["metric"])}
             </.link>
+            <.status_badge :if={row["metric"] == "decision.p1_misses_per_1000"} kind={:neutral}>
+              Headline
+            </.status_badge>
             <.status_badge :if={row["ours_loses"]} kind={:alarm} data-role="loses">
               ours loses
             </.status_badge>
+            <span class="block text-sm opacity-70" data-role="raw-key">{row["metric"]}</span>
           </td>
           <td
             :for={{key, _} <- @columns}
             data-col={key}
             class={key in (row["best"] || []) && "font-bold"}
           >
-            {fmt(row["values"][key])}
+            {fmt(row["metric"], row["values"][key])}
           </td>
         </tr>
       </tbody>
@@ -133,6 +194,7 @@ defmodule RescueCloudWeb.EvalsLive do
 
       <section :if={@summary} id="evals-sealed">
         <h2 class="text-2xl font-semibold">Sealed holdout (set E)</h2>
+        <p id="sealed-note" class="text-sm">Scored once, never seen while building.</p>
         <.metrics_table block={@summary["sealed"] || %{}} id="sealed-table" columns={@columns} />
       </section>
 
@@ -145,6 +207,12 @@ defmodule RescueCloudWeb.EvalsLive do
             <li :for={id <- f.ids} data-role="case-id">{id}</li>
           </ul>
         </div>
+      </section>
+
+      <section id="evals-notes" class="text-sm">
+        <h2 class="text-xl font-semibold">Notes</h2>
+        <p data-role="rubric-note">Rubric: draft, to be validated with emergency managers.</p>
+        <p :if={set_a?(@summary)} data-role="data-sources">Data sources: {humaid()}</p>
       </section>
 
       <section id="evals-approved">
@@ -222,6 +290,8 @@ defmodule RescueCloudWeb.EvalsLive do
     </Layouts.app>
     """
   end
+
+  defp humaid, do: @humaid
 
   defp verdict_kind("fail"), do: :alarm
   defp verdict_kind("pending"), do: :neutral

@@ -31,3 +31,4 @@ One line per merged change: date, lane, issue, what changed.
 - 2026-11-07 cloud #169 C20a: skip link + main#main, focus-visible CSS, aria-live on replay/fleet/activity, sr-only captions + scope=col on all tables, tests
 - cloud #170 C20b: phx-disable-with on verify/correction/search buttons, Loading… until LiveView connects (phx-loading CSS), EvalResults.summary_status/0, evals page distinguishes missing vs unreadable summary, tests
 - cloud #204 C23: dashboard home re-ages fleet summary on FleetLive.tick_ms timer using FleetLive.now clock (both made public), test in dashboard_fleet_tick_test
+- cloud #205 C24: evals panel readable metric labels, headline row, yes/no and $ formats, rubric/HumAID/sealed notes, tests in evals_live_test

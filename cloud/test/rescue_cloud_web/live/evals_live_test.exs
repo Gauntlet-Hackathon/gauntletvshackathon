@@ -118,6 +118,105 @@ defmodule RescueCloudWeb.EvalsLiveTest do
     refute has_element?(view, "#main-table td", "0.770")
   end
 
+  defp write_custom(dir, main_rows, results) do
+    File.write!(
+      Path.join(dir, "summary.json"),
+      Jason.encode!(%{
+        "main" => %{"rows" => main_rows},
+        "sealed" => %{"rows" => []},
+        "results" => results
+      })
+    )
+  end
+
+  defp r(m, vals), do: %{"metric" => m, "values" => vals, "best" => [], "ours_loses" => false}
+
+  test "headline row first and labelled; raw key kept", %{conn: conn, dir: dir} do
+    write_custom(
+      dir,
+      [
+        r("extraction.people_count_exact", %{"ours" => 0.9}),
+        r("decision.p1_misses_per_1000", %{"ours" => 2.0})
+      ],
+      []
+    )
+
+    {:ok, view, _} = live(conn, ~p"/evals")
+    assert has_element?(view, "#main-table tbody tr:first-child", "Headline")
+
+    assert has_element?(
+             view,
+             "#main-table tbody tr:first-child",
+             "Urgent requests missed per 1,000"
+           )
+
+    assert has_element?(
+             view,
+             "#main-table tbody tr:first-child [data-role=raw-key]",
+             "decision.p1_misses_per_1000"
+           )
+  end
+
+  test "running formats and unknown metric fallback", %{conn: conn, dir: dir} do
+    write_custom(
+      dir,
+      [
+        r("running.works_offline", %{"regex" => 1, "opus" => 0, "ours" => 1}),
+        r("running.cost_per_1000_usd", %{"opus" => 1.5, "ours" => 0}),
+        r("running.mean_ms_per_request", %{"ours" => 12.6}),
+        r("mystery.metric", %{"ours" => nil})
+      ],
+      []
+    )
+
+    {:ok, view, _} = live(conn, ~p"/evals")
+    sel = "#main-table-running\\.works_offline td[data-col="
+    assert has_element?(view, sel <> "regex]", "yes")
+    assert has_element?(view, sel <> "opus]", "no")
+
+    assert has_element?(
+             view,
+             "#main-table-running\\.cost_per_1000_usd td[data-col=opus]",
+             "$1.50"
+           )
+
+    assert has_element?(
+             view,
+             "#main-table-running\\.cost_per_1000_usd td[data-col=ours]",
+             "$0.00"
+           )
+
+    assert has_element?(view, "#main-table-running\\.mean_ms_per_request td[data-col=ours]", "13")
+    assert has_element?(view, "#main-table-mystery\\.metric", "mystery.metric")
+    assert has_element?(view, "#main-table-mystery\\.metric td[data-col=ours]", "n/a")
+  end
+
+  test "notes: rubric always, HumAID only with set A", %{conn: conn, dir: dir} do
+    write_custom(dir, [r("decision.ece", %{"ours" => 0.1})], [%{"system" => "ours", "set" => "b"}])
+
+    {:ok, view, _} = live(conn, ~p"/evals")
+
+    assert has_element?(
+             view,
+             "#evals-notes",
+             "Rubric: draft, to be validated with emergency managers."
+           )
+
+    refute has_element?(view, "#evals-notes", "HumAID")
+
+    write_custom(dir, [r("decision.ece", %{"ours" => 0.1})], [%{"system" => "ours", "set" => "a"}])
+
+    {:ok, view, _} = live(conn, ~p"/evals")
+    assert has_element?(view, "#evals-notes", "HumAID")
+    assert has_element?(view, "#evals-notes", "doi:10.1609/icwsm.v15i1.18116")
+  end
+
+  test "sealed table is labelled", %{conn: conn, dir: dir} do
+    write_summary(dir)
+    {:ok, view, _} = live(conn, ~p"/evals")
+    assert has_element?(view, "#evals-sealed", "never seen while building")
+  end
+
   test "history shows pass/fail with reasons", %{conn: conn} do
     model!(@v1, "approved", %{"reasons" => []})
     model!(@v2, "rejected", %{"reasons" => ["ece 0.3 must be <= ceiling 0.1"]})
