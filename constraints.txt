@@ -35,3 +35,10 @@ starlette==1.10.0
 typing-inspection==0.4.5
 typing_extensions==4.16.0
 uvicorn==0.54.0
+# Model runtime (H11, #177): installed only by field/requirements-model.txt in the field image, never by CI.
+# Same versions the trainer uses (fastresponderSLM modal_jobs/train.py). torch comes from the CPU wheel index.
+torch==2.15.0
+transformers==5.22.2
+safetensors==0.8.0
+huggingface_hub==2.4.0
+tokenizers==0.23.3

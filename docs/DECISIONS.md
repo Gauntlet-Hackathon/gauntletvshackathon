@@ -60,11 +60,39 @@ Made by the integrator while turning the plan into contracts. Reverse any of the
 - H1 (HF repo and output format) before F11 gets `night-safe`.
 
 ## Model output format (H1a)
-- Model type: <encoder tagger + heads | generative constrained JSON>
-- Span tags: <e.g. LOCATION, COUNT, CONTACT, TIME>
-- Heads and labels: <is_request; request_kind: rescue/evacuation/welfare_check/supply/other; vulnerable: ...; hazards: ...; needs: ...>
-- Sample raw output for "trapped on roof, 3 kids, water rising, near the Shell on 5th": <paste>
-- Repo and revision come from env HF_REPO / HF_REVISION (pinned commit SHA, never main); filled in by H1b. Until then tests mock the model.
+Decided 2026-11-07 (H11, #177) from the SLM trainer's answer, relayed by Paawan.
+- **Model type:** an encoder tagger plus heads, not a generative model. The whole model is fine-tuned; no LoRA or PEFT.
+  - Primary: `convaiinnovations/laya-multilingual` @ `1720e3e`, an mmBERT-base (ModernBERT) encoder.
+  - Challenger: `jhu-clsp/mmBERT-small` @ `abc3262`.
+- **Library:** PyTorch with Hugging Face `transformers` (`AutoModel` for the encoder) and the trainer's own heads. The inference code is `src/rescue_tagger/{model,infer,labels,durations}.py` in the public repo [fastresponderSLM](https://github.com/Gauntlet-Hackathon/fastresponderSLM) @ `c287541`. The field app vendors these files (F25a, #188).
+- **Versions:** torch 2.15.0, transformers 5.22.2, safetensors 0.8.0, huggingface_hub 2.4.0 and tokenizers 0.23.3, pinned in `constraints.txt`. They are installed only through `field/requirements-model.txt` in the field image (F32, #233), with torch taken from the CPU wheel index. CI never installs them, so its tests mock the model.
+- **Checkpoint layout:** `encoder/` (save_pretrained), `tokenizer/`, `heads.safetensors`, `tagger_config.json`, and `calibration.json` (per-head temperatures). It loads with `infer.Extractor.load(folder)`.
+- **Runtime:** CPU, 4 threads, deterministic, about 45-50 ms per message.
+- **Span tags (BIO):** LOCATION, COUNT, TIME, NEED_DURATION, CONTACT. CONTACT is never put into the payload. `hours_without` is parsed from the NEED_DURATION span by code, not by the model.
+- **Heads and labels:**
+  - yes/no: `is_request`, `is_stale_post`
+  - multi-label: `vulnerable`, `hazards`, `needs`
+  - single-label: `request_kind`, `location_type`
+  - `people_count`: 21 classes, where 0 means not stated and 1-20 are counts
+  - Confidences are calibrated (temperature scaling) and truncated, not rounded.
+- **Sample raw output** from the Laya checkpoint `train_laya-20261107-043427`. The input is a message the trainer wrote, not one from any eval set: "Please help, water is up to the roof at 4512 Bellfort Ave. My grandmother is 82 and on oxygen, 3 of us stuck in the attic since last night, no food or water for 2 days". The output passes `rescue_field.slm.validate_extracted`:
+  ```json
+  {"location": {"text": "4512 Bellfort Ave", "type": "address", "confidence": 1.0},
+   "people_count": {"value": 3, "confidence": 0.971},
+   "vulnerable": [{"kind": "elderly", "confidence": 0.997}],
+   "hazards": [{"kind": "rising_water", "confidence": 0.66}, {"kind": "on_roof", "confidence": 0.961}],
+   "time_ref": {"text": "since last night", "is_stale_post": false, "confidence": 0.999},
+   "is_request": {"value": true, "confidence": 0.998},
+   "spans": [{"start": 40, "end": 57, "label": "LOCATION"}, {"start": 95, "end": 102, "label": "COUNT"},
+             {"start": 122, "end": 138, "label": "TIME"}, {"start": 157, "end": 167, "label": "NEED_DURATION"}],
+   "needs": [{"kind": "food", "hours_without": null}, {"kind": "water", "hours_without": 48.0}],
+   "request_kind": "supply"}
+  ```
+  Known weak spots in this sample: "on oxygen" did not set `medical`, and "2 days" went to water only. The trainer is adding both as eval edge cases.
+- **Repo and revision:** read from env `HF_REPO` / `HF_REVISION`. The revision must be a pinned 40-character commit SHA, never `main`, and is filled in by H1b (#104). Until then, tests mock the model.
+- **Training data and publishing (Paawan, 2026-11-07; overrides H2's "do not train on HumAID"):**
+  - The trainer's data includes HumAID (source share 0.2-0.25), Munro (CC BY 4.0) and OpenAI-generated synthetic data.
+  - The model is published only under H2's conditions: CC BY-NC-SA 4.0, a card marked non-commercial and research-only, gated access on Hugging Face, HumAID cited (see Required citations), and no training data shipped. Details are in H16 (#213).
 
 ## W0-5: Mercury toolchain spike (#24)
 **GO**, decided by the team on the result of PR #73. Cut line 5 does not apply, so E7 stays in.
@@ -155,5 +183,8 @@ Findings R1–R13 (engine rules) and A1–A12 (agent assumptions) are in the ste
 ## Rules freeze for the demo (H12, #178)
 - **Engine kind:** the Mercury build (Paawan, 2026-11-07), because the pitch is "a Mercury rules engine decides". The Python fallback stays in the repo as the backup and for parity tests.
 - **Frozen version:** `rules@a4dbac566db96b00951930ad9da941e85c1b2429+bin:36c2f7f7da6998e5`, built with `python -m rescue_engine.build --kind mercury` from the commit that last changed `engine/mercury/` (`a4dbac5`).
-- **How it ships (option a):** the build is committed at `engine/dist/rules@a4dbac566db96b00951930ad9da941e85c1b2429+bin:36c2f7f7da6998e5/` (`.gitignore` re-includes `engine/dist/`). The field image (F23, #180) and the cloud image (C26a, #207) copy that folder; the binary is linked statically against the Mercury runtime (`--mercury-linkage static`), so the images need no Mercury toolchain and no Python to run it. It needs glibc 2.38 or newer (both images are Debian trixie).
+- **How it ships (option a):** the build is committed at `engine/dist/rules@a4dbac566db96b00951930ad9da941e85c1b2429+bin:36c2f7f7da6998e5/` (`.gitignore` re-includes `engine/dist/`). The field image (F23, #180) and the cloud image (C26a, #207) will copy that folder; the binary is linked statically against the Mercury runtime (`--mercury-linkage static`), so the images need no Mercury toolchain and no Python to run it. It needs glibc 2.38 or newer (both images are Debian trixie).
 - **Freeze:** no rule changes in `engine/mercury/`, `engine/rescue_engine/fallback/` or `contracts/engine_rules.md` after this, unless Paawan lifts the freeze. A change means a new build, a new folder and a new entry here. Tag: `rules-freeze-a4dbac5`.
+
+## Code license (H15 #212; Paawan, 2026-11-07)
+- **Code:** MIT (`LICENSE`). It covers the code in this repo only. Data sets keep their own licenses (see "Dataset licenses (H2)"), and the trained model is published separately under CC BY-NC-SA 4.0 (see H1a above and #213).
