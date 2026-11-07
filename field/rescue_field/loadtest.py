@@ -51,7 +51,8 @@ def run(
             for events in process_batch(
                 items[i : i + batch], store=store, decide_batch=decide, config=config
             ):
-                tiers[events[-1]["payload"]["engine_output"]["priority_tier"]] += 1
+                out = events[-1]["payload"]["engine_output"]
+                tiers[out["priority_tier"] or out["outcome"]] += 1
         intake_s = time.perf_counter() - start
 
         sync_s = None
