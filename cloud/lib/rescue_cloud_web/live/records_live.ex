@@ -95,7 +95,16 @@ defmodule RescueCloudWeb.RecordsLive do
     ])
   end
 
+  defp event_details(%{type: "responder_status", payload: p}),
+    do: join([p["crew"] <> ": " <> responder_label(p["status"]), p["note"]])
+
   defp event_details(_event), do: nil
+
+  defp responder_label("sent"), do: "sent"
+  defp responder_label("on_the_way"), do: "on the way"
+  defp responder_label("there"), do: "there"
+  defp responder_label("done"), do: "done"
+  defp responder_label(other), do: to_string(other)
 
   defp join(parts), do: parts |> Enum.reject(&(&1 in [nil, ""])) |> Enum.join(" · ")
 

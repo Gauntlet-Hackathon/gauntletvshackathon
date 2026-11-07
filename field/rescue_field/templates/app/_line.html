@@ -1,0 +1,9 @@
+{# A compact Waiting / Out now line for card `c`. #}
+<li class="queue-line" data-request-id="{{ c.request_id }}">
+{% if c.escalated %}<span class="pill pill-blocked">{{ couldnt }}</span>{% endif %}
+<span class="pill {{ c.pill.cls }}">{{ c.pill.text }}</span>
+<span class="incident">{{ c.incident }}</span>
+<strong>{{ c.headline }}</strong>
+{% if c.address %}<span class="line-address">{{ c.address }}</span>{% endif %}
+{% if c.other_posts %}<span class="other-posts">{{ c.other_posts }}</span>{% endif %}
+</li>

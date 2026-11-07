@@ -23,6 +23,7 @@ CONTRACT_MAP = {
     "payload-corrected": ("payloads/corrected.schema.json", m.Corrected),
     "payload-escalated": ("payloads/escalated.schema.json", m.Escalated),
     "payload-closed_duplicate": ("payloads/closed_duplicate.schema.json", m.ClosedDuplicate),
+    "payload-responder_status": ("payloads/responder_status.schema.json", m.ResponderStatus),
     "engine_input": ("engine_input.schema.json", m.EngineInput),
     "engine_output": ("engine_output.schema.json", m.EngineOutput),
     "engine_manifest": ("engine_manifest.schema.json", m.EngineManifest),
@@ -107,7 +108,7 @@ def test_invalid_example_fails_model(key):
 
 PAYLOAD_TYPES = [
     "received", "extracted", "decided", "assigned", "rescued", "corrected", "escalated",
-    "closed_duplicate",
+    "closed_duplicate", "responder_status",
 ]  # fmt: skip
 
 

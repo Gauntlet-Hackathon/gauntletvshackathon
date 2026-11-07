@@ -284,6 +284,26 @@ defmodule RescueCloudWeb.RecordsLiveTest do
              )
     end
 
+    test "boat status events show on the timeline without changing status (#307)", %{conn: conn} do
+      sync!(
+        [
+          event("E5", 7, "responder_status", "2026-11-07T14:35:00Z",
+            payload: %{"crew" => "Boat 7", "status" => "on_the_way", "note" => "10 min out"}
+          )
+        ],
+        @t
+      )
+
+      {:ok, view, _} = live(conn, ~p"/records/#{rid("E5")}")
+      assert has_element?(view, "#record-detail [data-role=status]", "rescued")
+
+      assert has_element?(
+               view,
+               "#event-#{eid("E5", 7)} [data-role=details]",
+               "Boat 7: on the way · 10 min out"
+             )
+    end
+
     test "an old rescued event without the fields shows neither", %{conn: conn} do
       sync!([event("F6", 1, "rescued", "2026-11-07T15:00:00Z")], @t)
       {:ok, view, _} = live(conn, ~p"/records/#{rid("F6")}")

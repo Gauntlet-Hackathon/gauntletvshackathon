@@ -4,7 +4,7 @@ The interfaces every lane builds against. Owned by the integrator; change them o
 
 | Path | What |
 |---|---|
-| `event.schema.json`, `payloads/*.schema.json` | Event envelope and the eight payloads (received, extracted, decided, assigned, rescued, corrected, escalated, closed_duplicate) |
+| `event.schema.json`, `payloads/*.schema.json` | Event envelope and the nine payloads (received, extracted, decided, assigned, rescued, corrected, escalated, closed_duplicate, responder_status) |
 | `engine_input.schema.json`, `engine_output.schema.json` | Decision-engine stdin/stdout JSON |
 | `engine_manifest.schema.json` | `engine/dist/<rules_version with ':' as '-'>/manifest.json` |
 | `sync/*.schema.json`, `sync_api.md` | Field ↔ cloud sync API |

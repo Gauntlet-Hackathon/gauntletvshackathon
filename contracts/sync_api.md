@@ -30,7 +30,7 @@ Response `200` (`sync/events_response`): `{"acked": [event_id, …], "rejected":
 ## `GET /sync/down?since=<n>`
 Down-sync for the device (cut line 2). `since` is the cloud sequence number last seen (integer, default `0`). Response `200` (`sync/down_response`):
 `{"next_since": int, "events": [<event envelope>, …], "approved": {"rules_version": string|null, "model_version": string|null}}`.
-- `events`: `assigned` and `rescued` events from **other** devices with a cloud sequence number greater than `since`, oldest first (so two crews don't go to the same roof). The device's own events are not echoed.
+- `events`: `assigned`, `rescued` and `responder_status` (#307) events from **other** devices with a cloud sequence number greater than `since`, oldest first (so two crews don't go to the same roof, and Out now can show each boat's latest status). The device's own events are not echoed. A device that does not know a type skips it.
 - `approved`: the newest rules and model versions that passed the promotion gate (null if none yet). The device pulls a bundle only when its version differs.
 - Persist `next_since` and send it on the next call.
 

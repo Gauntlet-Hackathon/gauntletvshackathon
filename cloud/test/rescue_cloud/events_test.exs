@@ -65,6 +65,20 @@ defmodule RescueCloud.EventsTest do
       assert valid?.(nil)
     end
 
+    test "responder_status.crew: 1 to 200 characters (#307)" do
+      ok = example("payload-responder_status.valid")
+      base = event(%{"type" => "responder_status"})
+
+      valid? = fn crew ->
+        Event.changeset(%{base | "payload" => %{ok | "crew" => crew}}).valid?
+      end
+
+      assert valid?.(String.duplicate("é", 200))
+      refute valid?.(String.duplicate("a", 201))
+      refute valid?.("")
+      refute valid?.(nil)
+    end
+
     test "envelope violations" do
       for {k, v} <- [
             {"event_id", "nope"},

@@ -110,6 +110,15 @@ defmodule RescueCloud.Events.Payload do
   defp spec("closed_duplicate"),
     do: obj(%{"duplicate_of" => {:pattern, @ulid}, "note" => nullable(str())})
 
+  # A dispatched boat's latest status (#307); never changes the request's status rank.
+  defp spec("responder_status") do
+    obj(%{
+      "crew" => {:all, [text(), {:max_string, 200}]},
+      "status" => enum(~w(sent on_the_way there done)),
+      "note" => nullable(str())
+    })
+  end
+
   defp spec(_), do: {:enum, []}
 
   defp engine_input do
@@ -232,6 +241,10 @@ defmodule RescueCloud.Events.Payload do
 
   defp check(:any, _value, _path), do: []
   defp check({:optional, s}, v, path), do: check(s, v, path)
+
+  defp check({:all, specs}, v, path),
+    do: Enum.find_value(specs, [], &nonempty(check(&1, v, path)))
+
   defp check(:boolean, v, _path) when is_boolean(v), do: []
   defp check({:nullable, _}, nil, _path), do: []
   defp check({:nullable, s}, v, path), do: check(s, v, path)
@@ -297,4 +310,7 @@ defmodule RescueCloud.Events.Payload do
   end
 
   defp check(_spec, _v, path), do: ["#{path} has the wrong type"]
+
+  defp nonempty([]), do: nil
+  defp nonempty(errors), do: errors
 end

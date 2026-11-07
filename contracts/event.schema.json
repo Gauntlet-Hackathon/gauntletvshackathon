@@ -19,7 +19,8 @@
         "rescued",
         "corrected",
         "escalated",
-        "closed_duplicate"
+        "closed_duplicate",
+        "responder_status"
       ]
     },
     "device_id": {
@@ -213,6 +214,25 @@
         "properties": {
           "payload": {
             "$ref": "payloads/closed_duplicate.schema.json"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "responder_status"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "payloads/responder_status.schema.json"
           }
         }
       }

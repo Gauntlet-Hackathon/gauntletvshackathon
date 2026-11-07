@@ -54,6 +54,7 @@ EventType = Literal[
     "corrected",
     "escalated",
     "closed_duplicate",
+    "responder_status",
 ]
 
 
@@ -267,6 +268,14 @@ class ClosedDuplicate(Contract):
     note: str | None
 
 
+class ResponderStatus(Contract):
+    """A dispatched boat's latest status (#307). Never changes the request's status rank."""
+
+    crew: Annotated[str, StringConstraints(min_length=1, max_length=200)]
+    status: Literal["sent", "on_the_way", "there", "done"]
+    note: str | None
+
+
 PAYLOAD_MODELS: dict[str, type[Contract]] = {
     "received": Received,
     "extracted": Extracted,
@@ -276,6 +285,7 @@ PAYLOAD_MODELS: dict[str, type[Contract]] = {
     "corrected": Corrected,
     "escalated": Escalated,
     "closed_duplicate": ClosedDuplicate,
+    "responder_status": ResponderStatus,
 }
 
 
