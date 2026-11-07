@@ -6,4 +6,6 @@
 <strong>{{ c.headline }}</strong>
 {% if c.address %}<span class="line-address">{{ c.address }}</span>{% endif %}
 {% if c.other_posts %}<span class="other-posts">{{ c.other_posts }}</span>{% endif %}
+{% if c.status == "assigned" %}{% if c.crew %}<span class="line-crew">{{ c.crew }} went</span>{% endif %}
+<a class="btn-small update" href="/requests/{{ c.request_id | urlencode }}/update">Update: how did it go?</a>{% endif %}
 </li>

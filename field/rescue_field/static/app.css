@@ -79,3 +79,13 @@ img { max-width: 100%; }
 .set-aside summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
 #queue h1 { font-size: 1.4rem; margin: 1rem 0 .4rem; }
 #queue h2#check-first-heading { font-size: 1.1rem; }
+/* Send someone and Update (UI-3). Seat warning #8A2B00 on #FFFFFF 8.0:1, ok #1B5E20 on #FFFFFF 7.9:1. */
+.crew-picker, .outcomes, .outcome-fields { border: 1px solid var(--line); border-radius: 12px; margin: .6rem 0; padding: .5rem .75rem; }
+.crew-option, .outcome { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; min-height: 56px; }
+.outcome-fields label, .crew-picker > label { display: flex; flex-direction: column; gap: .3rem; margin: .4rem 0; }
+.outcome-fields input, .outcome-fields select, .crew-picker input[type=text] { min-height: 44px; font: inherit; }
+.seat-warning { font-weight: 700; color: #8A2B00; }
+.seat-ok { font-weight: 700; color: #1B5E20; }
+.draft { background: var(--ink); color: var(--white); border-radius: 12px; padding: .75rem; font-size: 1.1rem; line-height: 1.45; }
+#send-form .btn, .queue-card .send { margin: .5rem 0; text-decoration: none; }
+.line-crew { color: var(--ink); }

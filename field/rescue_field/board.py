@@ -64,7 +64,9 @@ def _requests(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
         elif kind == "decided":
             rec["decision"] = ev["payload"]["engine_output"]
             rec["rules_version"] = ev["rules_version"]
-        elif kind in RANK and (rec["status"] is None or RANK[kind] > RANK[rec["status"]]):
+        elif kind == "assigned":
+            rec["crew"] = ev["payload"].get("crew")  # the latest crew sent (UI-3, Out now)
+        if kind in RANK and (rec["status"] is None or RANK[kind] > RANK[rec["status"]]):
             rec["status"] = kind
     return {
         rid: r for rid, r in recs.items() if {"received_at", "extracted", "decision"} <= r.keys()

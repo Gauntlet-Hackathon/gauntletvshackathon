@@ -1,0 +1,11 @@
+{% extends "app/_shell.html" %}
+{% block title %}Saved · CommunityRescue{% endblock %}
+{% block content %}
+<section id="done" role="status">
+<h1>{{ title }}</h1>
+<p class="card-top"><span class="incident">{{ c.incident }}</span></p>
+{% for line in lines %}<p class="done-line">{{ line }}</p>{% endfor %}
+<p><a class="btn btn-primary" href="/">Next person</a></p>
+<p><a href="/#out-now">Out now</a></p>
+</section>
+{% endblock %}
