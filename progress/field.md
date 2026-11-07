@@ -51,3 +51,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 field #243 follow-up: field/fly.toml VM memory 2gb -> 4gb (measured ~630 MB with CPU torch and a tiny checkpoint before mmBERT-base's ~1.3 GB weights); test and RUNBOOK updated
 2026-11-07 field #245 F38: HFExtractor builds model_version with rescue_shared.versions.model_version before resolving the checkpoint, so HF_REPO without an org fails in __init__ and select_extractor falls back; tests (incl. real-env select_extractor_with_info check)
 2026-11-07 field #246 F39: location.confidence = min(type head, span confidence) via torch-free tagger/assemble.py (used by infer.py); DECISIONS.md bullet; tests
+2026-11-07 field #254 F40: header lists local edits in vendored tagger/infer.py; torch-free AST guard test (test_tagger_vendored.py)
