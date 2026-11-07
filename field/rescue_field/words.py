@@ -9,6 +9,7 @@ sentence fails the tests.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 
@@ -94,9 +95,15 @@ def other_posts(n: int) -> str | None:
     return f"+{n} other post" if n == 1 else f"+{n} other posts"
 
 
-def incident(request_id: str) -> str:
-    """Badge text until incident numbers land: the last 4 characters of the request ID."""
-    return "#" + request_id[-4:]
+def incident_number(rec: Mapping[str, Any]) -> str:
+    """The request's incident number (`D01-0147`, from its `received` event, #308), or the last 4
+    characters of the request ID for requests stored before incident numbers existed."""
+    return rec.get("incident") or rec["request_id"][-4:]
+
+
+def incident(rec: Mapping[str, Any]) -> str:
+    """Badge text: the incident number, or `#` and the request-ID suffix for older requests."""
+    return rec.get("incident") or "#" + rec["request_id"][-4:]
 
 
 def _people(e: dict[str, Any]) -> str:

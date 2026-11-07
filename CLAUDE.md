@@ -57,6 +57,8 @@ Field app (read from environment, with these defaults for tests):
 - `FIELD_DATA_DIR` (directory for the SQLite file; default `./data` locally, `/data` in Docker)
 - `ECC_NAME` (default `ECC 1`), `VOLUNTEER_NAME` (default generated from `DEVICE_ID`, e.g. `Jordan K.`), `VOLUNTEER_ROLE` (default `Volunteer`),
   `SHELTER_NAMES` (comma-separated; default generated, e.g. `Shelter 1 (Lincoln High)`): demo values for the volunteer app shell
+- `INCIDENT_PREFIX` (1-4 of A-Z0-9; incident numbers are `PREFIX-0001`, ... from a per-laptop counter; default derived from `DEVICE_ID`:
+  last part all digits -> first letter of the part before it + last 3 digits, e.g. `laptop-dev-01` -> `D01`, else the last part's first 4 characters)
 - `DEMO_MODE` (`1` enables POST /sync/offline-toggle), `ENGINE_CMD` (default `python -m rescue_engine.fallback`)
 - `GRADER_MODE` (`1` shows the grader badge, ? hints and samples on every volunteer screen; default off, or per browser via `?grader=1`)
 - The FastAPI app is `app` in `field/rescue_field/api.py`; it serves on `$PORT` (default 8000).

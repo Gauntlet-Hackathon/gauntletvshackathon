@@ -52,6 +52,10 @@ CREATE TABLE IF NOT EXISTS boats (
     status TEXT NOT NULL CHECK (status IN ('ready', 'out', 'returning')),
     last_check_in TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS counters (
+    name TEXT PRIMARY KEY,
+    value INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -208,6 +212,27 @@ class EventStore:
             args = (device_id,)
         row = self._conn.execute(sql + " ORDER BY seq DESC LIMIT 1", args).fetchone()
         return json.loads(row[0]).get("rules_version") if row else None
+
+    @_locked
+    def reserve(self, name: str, n: int = 1) -> int:
+        """Reserve `n` consecutive numbers from the persistent counter `name` (first is 1).
+        Returns the first reserved number. Numbers are never handed out twice, even across
+        restarts; a reservation whose events are never stored leaves a gap."""
+        if n < 1:
+            raise ValueError("n must be at least 1")
+        self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            value = self._conn.execute(
+                "INSERT INTO counters(name, value) VALUES (?, ?)"
+                " ON CONFLICT(name) DO UPDATE SET value = value + excluded.value"
+                " RETURNING value",
+                (name, n),
+            ).fetchone()[0]
+            self._conn.execute("COMMIT")
+        except BaseException:
+            self._conn.execute("ROLLBACK")
+            raise
+        return value - n + 1
 
     @_locked
     def get_meta(self, key: str) -> str | None:

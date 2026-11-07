@@ -19,6 +19,7 @@ import sys
 import threading
 from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from functools import partial
 from pathlib import Path
 from typing import Any, Protocol
@@ -243,7 +244,16 @@ def _item(fields: Mapping[str, Any], default_channel: str, row: int | None = Non
         lang_hint = lang_hint.lower()
         if not _LANG_RE.fullmatch(lang_hint):
             raise InputError("lang_hint must be a two-letter language code", row)
-    return IntakeItem(raw=raw, channel=channel, contact=contact, lang_hint=lang_hint)
+    sample = _sample(fields, row)
+    return IntakeItem(raw=raw, channel=channel, contact=contact, lang_hint=lang_hint, sample=sample)
+
+
+def _sample(fields: Mapping[str, Any], row: int | None = None) -> bool | None:
+    """The grader-sample flag from a JSON body: true, false or absent/null (#308)."""
+    value = fields.get("sample")
+    if value is not None and not isinstance(value, bool):
+        raise InputError("sample must be true, false or null", row)
+    return value
 
 
 def _content_type(request: Request) -> str:
@@ -297,7 +307,7 @@ def _csv_items(text: str, channel: str) -> list[IntakeItem]:
         for n, values in enumerate(reader, start=1):
             if not any(v.strip() for v in values):
                 continue
-            fields = {k: v for k, v in zip(names, values, strict=False) if k}
+            fields = {k: v for k, v in zip(names, values, strict=False) if k and k != "sample"}
             items.append(_item(fields, channel, row=n))
     except csv.Error as exc:
         raise InputError(f"CSV is malformed: {exc}") from exc
@@ -310,7 +320,8 @@ async def _single_input(request: Request) -> IntakeItem:
         return _item(await _json_object(request), SINGLE_DEFAULT_CHANNEL)
     if _is_form(ctype):
         form = await request.form()
-        fields = {k: v for k, v in form.items() if isinstance(v, str)}
+        # "sample" is a JSON-only flag; a form field of that name is ignored.
+        fields = {k: v for k, v in form.items() if isinstance(v, str) and k != "sample"}
         return _item(fields, SINGLE_DEFAULT_CHANNEL)
     raise InputError("send JSON or a form (application/json, x-www-form-urlencoded, multipart)")
 
@@ -338,7 +349,8 @@ async def _bulk_input(request: Request) -> list[IntakeItem]:
         if not isinstance(text, str):
             raise InputError("JSON body needs 'text' with one request per line")
         channel = _optional(body, "channel", None) or BULK_DEFAULT_CHANNEL
-        items = _paste_items(text, channel)
+        sample = _sample(body)
+        items = [replace(i, sample=sample) for i in _paste_items(text, channel)]
     else:
         raise InputError("send multipart (file or text), text/csv, text/plain or JSON")
     if not items:
@@ -394,6 +406,7 @@ async def _intake(request: Request, items: list[IntakeItem]) -> list[dict[str, A
     return [
         {
             "request_id": events[0]["request_id"],
+            "incident": events[0]["payload"]["incident"],
             "received_at": events[0]["occurred_at"],
             "decision": events[2]["payload"]["engine_output"],
         }

@@ -78,7 +78,9 @@ def test_single_json_returns_decision(store):
         "raw_text": C01,
         "lang_hint": "en",
         "contact": "+17135550101",
+        "incident": "D01-0001",
     }
+    assert body["incident"] == "D01-0001"
     assert events[2]["payload"]["engine_output"] == body["decision"]
 
 

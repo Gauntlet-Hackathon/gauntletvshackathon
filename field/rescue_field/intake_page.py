@@ -54,7 +54,7 @@ def intake_log(events: Iterable[Mapping[str, Any]], limit: int = LOG_LIMIT) -> l
         out.append(
             {
                 "request_id": rid,
-                "incident": rid[-4:],
+                "incident": payload.get("incident") or rid[-4:],
                 "received_at": ev.get("occurred_at"),
                 "raw_text": payload.get("raw_text"),
                 "channel": payload.get("channel"),

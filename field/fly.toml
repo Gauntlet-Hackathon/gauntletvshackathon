@@ -26,6 +26,7 @@ kill_signal = "SIGTERM"
   ECC_NAME = "ECC 1"
   VOLUNTEER_ROLE = "Volunteer"
   DEVICE_ID = "demo-field-01"
+  INCIDENT_PREFIX = "A"
   FIELD_DATA_DIR = "/data"
 
 # Measured 2026-11-07: the image with CPU torch and a tiny checkpoint in the trainer layout uses ~630 MB;
