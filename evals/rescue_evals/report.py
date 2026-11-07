@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import sys
 from collections.abc import Sequence
 from datetime import UTC, datetime
@@ -65,6 +66,10 @@ LOWER_IS_BETTER = {
     ROW_CONSISTENCY,
 }
 EPS = 1e-9
+# Before PR-3 (no ``metric_n``) this key was per 1,000 requests of any kind; now it is per 1,000
+# urgent requests (O-03). An old document's value means something else, so it is not pooled.
+P1_HEADLINE = "decision.p1_misses_per_1000"
+log = logging.getLogger("rescue_evals.report")
 # Plain-language names for TABLE.md (the key stays in the row; the cloud panel has its own).
 LABELS = {
     "decision.p1_misses_per_1000": "Urgent requests missed per 1,000 urgent requests (headline)",
@@ -100,7 +105,9 @@ def pool_metrics(docs: list[dict[str, Any]]) -> tuple[dict[str, float], dict[str
 
     A metric with ``metric_counts`` (tp/fp/fn) is an F1 recomputed from the summed counts;
     any other metric is weighted by its ``metric_n`` (the document's ``n`` for an old document
-    without ``metric_n``). A document that left a metric out contributes nothing to it."""
+    without ``metric_n``). A document that left a metric out contributes nothing to it. An old
+    document's ``decision.p1_misses_per_1000`` (per request, before O-03) is skipped with a
+    warning."""
     num: dict[str, float] = {}
     den: dict[str, int] = {}
     counts: dict[str, dict[str, int]] = {}
@@ -110,6 +117,14 @@ def pool_metrics(docs: list[dict[str, Any]]) -> tuple[dict[str, float], dict[str
         metric_counts = d.get("metric_counts") or {}
         for k, v in d["metrics"].items():
             if not _number(v):
+                continue
+            if k == P1_HEADLINE and not isinstance(metric_n, dict):
+                log.warning(
+                    "skipping %s from %s/%s: a result without metric_n is per request (pre-O-03)",
+                    k,
+                    d.get("system"),
+                    d.get("set"),
+                )
                 continue
             c = metric_counts.get(k)
             if isinstance(c, dict) and all(_number(c.get(x)) for x in ("tp", "fp", "fn")):

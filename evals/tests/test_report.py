@@ -6,6 +6,7 @@ from rescue_evals.report import build_summary, load_results, main, publish, rend
 def _w(d, system, set_, metrics, n=10):
     run_at = "2026-01-01T00:00:00Z"
     doc = {"system": system, "set": set_, "run_at": run_at, "n": n, "metrics": metrics}
+    doc["metric_n"] = {k: n for k in metrics}  # a post-PR-3 document
     (d / f"{system}__{set_}.json").write_text(json.dumps(doc))
 
 
