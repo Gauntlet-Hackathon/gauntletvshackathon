@@ -23,7 +23,8 @@
 <input id="single-contact" type="text" name="contact" maxlength="{{ limits.max_contact }}">
 <label for="single-channel">Came in by</label>
 <select id="single-channel" name="channel">
-{% for ch in limits.channels %}<option value="{{ ch }}"{% if ch == limits.single_channel %} selected{% endif %}>{{ ch }}</option>
+{% set channel_words = {"sms": "Text message", "social": "Social post", "form": "Web form", "call_note": "Call note", "csv": "CSV"} %}
+{% for ch in limits.channels %}<option value="{{ ch }}"{% if ch == limits.single_channel %} selected{% endif %}>{{ channel_words.get(ch, ch) }}</option>
 {% endfor %}
 </select>
 <button class="btn btn-primary" type="submit">Sort this message</button>

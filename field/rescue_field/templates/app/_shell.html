@@ -20,7 +20,7 @@
 <a class="brand" href="/"><img src="/static/icons/communityrescue-icon-64.png" width="40" height="40" alt=""><span>CommunityRescue</span></a>
 {% if grader_mode %}<span id="grader-badge" class="grader-badge">Grader mode</span>
 <button id="grader-help" class="grader-help" type="button" aria-haspopup="dialog" aria-controls="grader-panel" aria-label="Grader hints">?</button>
-{% endif %}<p class="who"><strong>{{ volunteer_name }}</strong> · {{ volunteer_role }}<br><span class="muted">{{ ecc_name }}</span></p>
+{% endif %}<p class="who"><span class="avatar" aria-hidden="true">{{ initials }}</span><span class="who-text"><strong>{{ volunteer_name }}</strong><span class="who-sub">{{ volunteer_role }}</span><span class="who-sub">{{ ecc_name }}</span></span></p>
 </div>
 <nav class="mode-toggle" aria-label="Mode">
 <a href="/"{% if mode == "queue" %} class="selected" aria-current="page"{% endif %}>Queue</a>

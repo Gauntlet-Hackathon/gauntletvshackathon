@@ -33,6 +33,13 @@ def _pick(device_id: str, salt: str, n: int) -> int:
     return hashlib.sha256(f"{salt}:{device_id}".encode()).digest()[0] % n
 
 
+def initials(name: str) -> str:
+    """Up to two capital letters for the avatar: "Sam K." -> "SK", "Riley" -> "R"."""
+    letters = [w[0] for w in name.replace(".", " ").split() if w[0].isalnum()]
+    picked = letters[:1] + letters[-1:] if len(letters) > 1 else letters
+    return "".join(picked).upper() or "?"
+
+
 def shell_config(env: Mapping[str, str] | None = None) -> dict[str, Any]:
     """ECC, volunteer and shelter names for the header. Blank values fall back to the defaults."""
     env = os.environ if env is None else env
@@ -50,6 +57,7 @@ def shell_config(env: Mapping[str, str] | None = None) -> dict[str, Any]:
     return {
         "ecc_name": get("ECC_NAME") or "ECC 1",
         "volunteer_name": name,
+        "initials": initials(name),
         "volunteer_role": get("VOLUNTEER_ROLE") or "Volunteer",
         "shelter_names": shelters,
     }
@@ -78,11 +86,19 @@ def connection_line(badge: Mapping[str, Any], now: datetime | None = None) -> di
     state = badge.get("state")
     if state == "online":
         ago = _ago(badge.get("last_sync_at"), now)
-        return {"state": "online", "text": f"Online · last sync {ago}" if ago else "Online"}
+        text = f"Online · last sync {ago}" if ago else "Online"
+        if waiting > 0:
+            text += f" · {waiting} {_updates(waiting)} to send"
+        return {"state": "online", "text": text}
     if state == "offline":
-        text = f"No Internet: Local Store, Sync when online · {waiting} waiting"
+        text = f"No Internet: Local Store, Sync when online · {waiting} {_updates(waiting)} waiting"
         return {"state": "offline", "text": text}
-    return {"state": "no-sync", "text": f"Not connected to the ECC · {waiting} waiting"}
+    text = f"Not connected to the ECC · {waiting} {_updates(waiting)} saved on this laptop"
+    return {"state": "no-sync", "text": text}
+
+
+def _updates(n: int) -> str:
+    return "update" if n == 1 else "updates"
 
 
 def model_banner(request: Request) -> str | None:
