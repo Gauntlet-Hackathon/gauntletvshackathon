@@ -23,3 +23,5 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 field step3-A4: store persists rejected events (outbox rejected_at/reject_error, added to existing SQLite files on open), pending_outbox and backlog skip them, sync worker marks them and never resends, /sync/status shows "rejected"; tests in test_store.py, test_sync.py
 2026-11-07 field step3-A5: one DEFAULT_DEVICE_ID = "laptop-dev-01" in pipeline.py, used by PipelineConfig and sync.worker_from_env; test in test_sync.py
 2026-11-07 field step3-R1/A2: fake engine and test fixtures emit provisional_tier; heartbeat rules_version comes from the newest local decided event (EventStore.latest_rules_version), falling back to RULES_VERSION then the placeholder; tests in test_sync.py
+2026-11-07 field #173 F18: board intake panel (_intake.html: single, paste, CSV forms; fetch script with Processing/Added/alert states, board fragment refresh); tests/test_board_intake.py
+2026-11-07 field #174 F27: rescue_field/loadtest.py surge load test (real engine, optional sync drain, JSON timings); tests/test_loadtest.py

@@ -84,3 +84,54 @@ def test_parse_output_rejects_bad():
         parse_output("no json here")
     with pytest.raises(ValueError):
         parse_output('{"location": 1}')
+
+
+def _rows_of(path):
+    return [json.loads(line) for line in path.read_text().splitlines()]
+
+
+def test_mock_rows_have_usage_and_latency_and_result_has_latency_block(tmp_path):
+    assert _run(tmp_path, "--mock") == 0
+    rows = _rows_of(tmp_path / "res" / "opus" / "mock-opus.jsonl")
+    assert all(r["input_tokens"] == 120 and r["output_tokens"] == 80 for r in rows)
+    assert all(isinstance(r["latency_ms"], float) and r["latency_ms"] >= 0 for r in rows)
+    result = json.loads((tmp_path / "res" / "opus__B.json").read_text())
+    assert set(result["baseline_latency"]) == {"total_ms_per_request", "seconds_per_1000_requests"}
+    assert "running" not in result  # no prices set -> no cost, never hard-coded
+
+
+def test_cost_only_with_prices_and_not_in_metrics(tmp_path):
+    env = {"OPUS_USD_PER_MTOK_IN": "10", "OPUS_USD_PER_MTOK_OUT": "50"}
+    assert _run(tmp_path, "--mock", env=env) == 0
+    result = json.loads((tmp_path / "res" / "opus__B.json").read_text())
+    # (120*10 + 80*50)/1e6 USD per call * 1000
+    assert abs(result["running"]["cost_per_1000_usd"] - 5.2) < 1e-6
+    assert not any("cost" in k for k in result["metrics"])
+    assert _run(tmp_path, "--mock", system="slm", env=env) == 0  # slm needs SLM_ prices
+    assert "running" not in json.loads((tmp_path / "res" / "slm__B.json").read_text())
+
+
+def test_usage_parsed_for_both_api_shapes():
+    from rescue_evals.baselines.llm import _usage
+
+    assert _usage(
+        {"usage": {"input_tokens": 5, "output_tokens": 7}}, "input_tokens", "output_tokens"
+    ) == (5, 7)
+    assert _usage(
+        {"usage": {"prompt_tokens": 3, "completion_tokens": 4}},
+        "prompt_tokens",
+        "completion_tokens",
+    ) == (3, 4)
+    assert _usage({}, "input_tokens", "output_tokens") == (None, None)
+
+
+def test_run_baseline_records_none_usage_and_latency(tmp_path):
+    from rescue_evals.baselines.llm import run_baseline
+    from rescue_evals.loaders import load_cases
+
+    cases = load_cases(_sets(tmp_path, n=2) / "b.jsonl", split="dev")
+    out = tmp_path / "o.jsonl"
+    run_baseline("opus", cases, lambda t: "no json", "m", out)
+    rows = _rows_of(out)
+    assert all(r["input_tokens"] is None and r["output_tokens"] is None for r in rows)
+    assert all(r["latency_ms"] >= 0 for r in rows)

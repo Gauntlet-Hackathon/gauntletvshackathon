@@ -55,3 +55,94 @@ def test_publish_writes_files(tmp_path):
 def test_empty_dir(tmp_path):
     publish(tmp_path)
     assert "_No results yet._" in (tmp_path / "TABLE.md").read_text()
+
+
+def _rows(s):
+    return {r["metric"]: r for r in s["main"]["rows"]}
+
+
+def _lat(ms):
+    return {"total_ms_per_request": ms, "seconds_per_1000_requests": ms}
+
+
+def _wl(d, system, set_, metrics, latency, n=10):
+    doc = {"system": system, "set": set_, "n": n, "metrics": metrics, "latency": latency}
+    (d / f"{system}__{set_}.json").write_text(json.dumps(doc))
+
+
+def _conditions(d):
+    m = {"decision.tier_accuracy": 0.5}
+    _wl(d, "opus", "A", m, _lat(1.0))
+    _wl(d, "slm", "A", m, _lat(2.0))
+    _wl(d, "regex-baseline", "A", m, _lat(3.0))
+    _wl(d, "ours", "A", m, _lat(10.0), n=10)
+    _wl(d, "ours", "B", m, _lat(40.0), n=30)
+    (d / "consistency__ours.json").write_text(json.dumps({"pct_cases_changed": 0.0}))
+    (d / "consistency__regex-baseline.json").write_text(json.dumps({"pct_cases_changed": 0}))
+
+
+def test_aliases_fill_columns_and_running_rows(tmp_path):
+    _conditions(tmp_path)
+    s = build_summary(load_results(tmp_path), tmp_path)
+    rows = _rows(s)
+    assert rows["decision.tier_accuracy"]["values"]["opus"] == 0.5
+    assert rows["decision.tier_accuracy"]["values"]["generic_slm"] == 0.5
+    ms = rows["running.mean_ms_per_request"]
+    assert ms["lower_is_better"] and ms["best"] == ["regex"]
+    assert abs(ms["values"]["ours"] - 32.5) < 1e-9
+    assert ms["values"]["opus"] is None and ms["values"]["generic_slm"] is None
+    assert rows["running.seconds_per_1000_requests"]["values"]["opus"] is None
+    assert rows["running.seconds_per_1000_requests"]["lower_is_better"]
+    c = rows["consistency.pct_cases_changed"]
+    assert c["lower_is_better"] and c["values"]["opus"] is None and c["values"]["ours"] == 0.0
+
+
+def test_offline_row_numbers_and_yes_no(tmp_path):
+    _conditions(tmp_path)
+    s = build_summary(load_results(tmp_path), tmp_path)
+    off = _rows(s)["running.works_offline"]
+    assert off["values"] == {"regex": 1, "opus": 0, "generic_slm": 1, "ours": 1}
+    assert off["best"] == []
+    table = render_table(s)
+    line = next(ln for ln in table.splitlines() if "running.works_offline" in ln)
+    assert "| yes | no | yes | yes |" in line and "**" not in line
+
+
+def test_summary_values_numeric_and_metrics_unchanged(tmp_path):
+    _conditions(tmp_path)
+    s = build_summary(load_results(tmp_path), tmp_path)
+    for r in s["main"]["rows"]:
+        for v in r["values"].values():
+            assert v is None or (isinstance(v, (int, float)) and not isinstance(v, bool))
+    for res in s["results"]:
+        assert set(res["metrics"]) == {"decision.tier_accuracy"}
+
+
+def test_missing_consistency_file_is_null(tmp_path):
+    _wl(tmp_path, "ours", "A", {"decision.tier_accuracy": 0.5}, _lat(5.0))
+    s = build_summary(load_results(tmp_path), tmp_path)
+    assert _rows(s)["consistency.pct_cases_changed"]["values"]["ours"] is None
+
+
+def test_cost_row_and_rendering(tmp_path):
+    _conditions(tmp_path)
+    doc = json.loads((tmp_path / "opus__A.json").read_text())
+    doc["running"] = {"cost_per_1000_usd": 12.5}
+    (tmp_path / "opus__A.json").write_text(json.dumps(doc))
+    s = build_summary(load_results(tmp_path), tmp_path)
+    cost = _rows(s)["running.cost_per_1000_usd"]
+    assert cost["lower_is_better"]
+    assert cost["values"] == {"regex": 0.0, "opus": 12.5, "generic_slm": None, "ours": 0.0}
+    line = next(ln for ln in render_table(s).splitlines() if "running.cost_per_1000_usd" in ln)
+    assert "$0 (local)" in line and "$12.50" in line and "n/a" in line
+
+
+def test_baseline_latency_fills_api_columns_else_null(tmp_path):
+    _conditions(tmp_path)
+    doc = json.loads((tmp_path / "opus__A.json").read_text())
+    doc["baseline_latency"] = {"total_ms_per_request": 900.0, "seconds_per_1000_requests": 900.0}
+    (tmp_path / "opus__A.json").write_text(json.dumps(doc))
+    rows = _rows(build_summary(load_results(tmp_path), tmp_path))
+    assert rows["running.mean_ms_per_request"]["values"]["opus"] == 900.0
+    assert rows["running.mean_ms_per_request"]["values"]["generic_slm"] is None
+    assert rows["running.seconds_per_1000_requests"]["values"]["opus"] == 900.0

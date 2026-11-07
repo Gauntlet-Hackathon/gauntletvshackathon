@@ -73,7 +73,7 @@ defmodule RescueCloudWeb.RecordsLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash}>
+    <Layouts.app flash={@flash} current="/records">
       <h1 id="records-title" class="text-2xl font-semibold">Records</h1>
 
       <.form

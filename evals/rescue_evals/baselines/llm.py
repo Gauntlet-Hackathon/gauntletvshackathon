@@ -6,7 +6,8 @@ Env: opus uses ANTHROPIC_API_KEY (+ OPUS_MODEL_ID, default claude-opus-5-5, + AN
 slm uses SLM_ENDPOINT (OpenAI-compatible chat completions URL), SLM_MODEL_ID, optional SLM_API_KEY.
 Every output is validated against the ``extracted`` contract. Rows go to
 ``<results-dir>/<system>/<model-id>.jsonl`` (id, set, split, model_id, model_version, timestamp,
-raw_output, extracted, valid, error) and the file is then scored with the stored-baseline harness
+raw_output, extracted, valid, error, input_tokens, output_tokens, latency_ms)
+and the file is then scored with the stored-baseline harness
 and the standard runner report (``<results-dir>/<system>__<set>.json``).
 Set E is refused (EV10 guard).
 ``--mock`` never touches the network; CI uses only ``--mock``.
@@ -20,6 +21,7 @@ import logging
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Sequence
@@ -91,6 +93,22 @@ def _post(url: str, headers: dict[str, str], body: dict[str, Any]) -> dict[str, 
 Generate = Callable[[str], str]
 
 
+def _usage(out: dict[str, Any], key_in: str, key_out: str) -> tuple[int | None, int | None]:
+    """(input_tokens, output_tokens) from an API reply's ``usage``; None when absent."""
+    u = out.get("usage")
+    if not isinstance(u, dict):
+        return None, None
+
+    def num(k: str) -> int | None:
+        v = u.get(k)
+        return v if isinstance(v, int) and not isinstance(v, bool) else None
+
+    return num(key_in), num(key_out)
+
+
+MOCK_USAGE = (120, 80)  # fixed small token counts for the mock client
+
+
 def opus_client(env: dict[str, str]) -> tuple[str, Generate]:
     key = env.get("ANTHROPIC_API_KEY")
     if not key:
@@ -111,6 +129,7 @@ def opus_client(env: dict[str, str]) -> tuple[str, Generate]:
                 "messages": [{"role": "user", "content": text}],
             },
         )
+        generate.last_usage = _usage(out, "input_tokens", "output_tokens")  # type: ignore[attr-defined]
         return "".join(b.get("text", "") for b in out.get("content", []))
 
     return model, generate
@@ -139,6 +158,7 @@ def slm_client(env: dict[str, str]) -> tuple[str, Generate]:
                 ],
             },
         )
+        generate.last_usage = _usage(out, "prompt_tokens", "completion_tokens")  # type: ignore[attr-defined]
         return out["choices"][0]["message"]["content"]
 
     return model, generate
@@ -153,11 +173,13 @@ def mock_client(system: str, cases: Sequence[EvalCase]) -> tuple[str, Generate]:
         i = order.get(text, 0)
         ex = gold.get(text)
         if i % 7 == 6 or ex is None:
+            generate.last_usage = MOCK_USAGE  # type: ignore[attr-defined]
             return "sorry, I cannot help with that"
         data = ex.model_dump(mode="json")
         if i % 4 == 3:
             data["people_count"]["value"] = "three"  # wrong type
             data.pop("request_kind", None)
+        generate.last_usage = MOCK_USAGE  # type: ignore[attr-defined]
         return "```json\n" + json.dumps(data) + "\n```"
 
     return f"mock-{system}", generate
@@ -183,6 +205,8 @@ def run_baseline(
     with out_path.open("w", encoding="utf-8") as fh:
         for c in cases:
             raw, extracted, error = None, None, None
+            generate.last_usage = (None, None)  # type: ignore[attr-defined]
+            t0 = time.perf_counter()
             try:
                 raw = generate(c.raw_text)
                 extracted = parse_output(raw).model_dump(mode="json")
@@ -190,6 +214,8 @@ def run_baseline(
                 error = f"invalid output: {str(e).splitlines()[0]}"
             except RuntimeError as e:  # transport failure: also counted, run continues
                 error = str(e)
+            latency_ms = round((time.perf_counter() - t0) * 1000, 3)
+            tok_in, tok_out = getattr(generate, "last_usage", (None, None))
             ok, bad = (ok + 1, bad) if error is None else (ok, bad + 1)
             row = {
                 "id": c.id,
@@ -203,9 +229,49 @@ def run_baseline(
                 "extracted": extracted,
                 "valid": error is None,
                 "error": error,
+                "input_tokens": tok_in,
+                "output_tokens": tok_out,
+                "latency_ms": latency_ms,
             }
             fh.write(json.dumps(row) + "\n")
     return ok, bad
+
+
+def _price(env: dict[str, str], name: str) -> float | None:
+    try:
+        return float(env[name])
+    except (KeyError, ValueError):
+        return None
+
+
+def _read_rows(path: Path, ids: set[str]) -> list[dict[str, Any]]:
+    rows = [json.loads(ln) for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    return [r for r in rows if r.get("id") in ids]
+
+
+def baseline_latency(rows: Sequence[dict[str, Any]]) -> dict[str, float] | None:
+    """Real model wall-clock per request, from the stored rows' ``latency_ms``."""
+    ms = [r["latency_ms"] for r in rows if isinstance(r.get("latency_ms"), (int, float))]
+    if not ms:
+        return None
+    mean = sum(ms) / len(ms)
+    return {"total_ms_per_request": mean, "seconds_per_1000_requests": mean}  # ms*1000/1000 = s
+
+
+def cost_per_1000_usd(
+    rows: Sequence[dict[str, Any]], price_in: float | None, price_out: float | None
+) -> float | None:
+    """USD per 1,000 requests from token usage; None unless both prices and usage exist."""
+    if price_in is None or price_out is None:
+        return None
+    used = [r for r in rows if r.get("input_tokens") is not None]
+    if not used:
+        return None
+    total = sum(
+        (r["input_tokens"] * price_in + (r.get("output_tokens") or 0) * price_out) / 1e6
+        for r in used
+    )
+    return total / len(used) * 1000
 
 
 def main(argv: Sequence[str] | None = None, env: dict[str, str] | None = None) -> int:
@@ -251,6 +317,15 @@ def main(argv: Sequence[str] | None = None, env: dict[str, str] | None = None) -
                 continue
             result = run_stored_set(subset, name, out_path, name=args.system)
             result["model_version"] = model_id
+            rows = _read_rows(out_path, {c.id for c in subset})
+            if (lat := baseline_latency(rows)) is not None:
+                result["baseline_latency"] = lat
+            pre = "OPUS" if args.system == "opus" else "SLM"
+            cost = cost_per_1000_usd(
+                rows, _price(env, f"{pre}_USD_PER_MTOK_IN"), _price(env, f"{pre}_USD_PER_MTOK_OUT")
+            )
+            if cost is not None:
+                result.setdefault("running", {})["cost_per_1000_usd"] = cost
             print(f"wrote {write_result(result, args.results_dir)} (n={result['n']})")
     except (ConfigError, EvalSetError) as e:
         print(f"error: {e}", file=sys.stderr)

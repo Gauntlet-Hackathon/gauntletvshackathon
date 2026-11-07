@@ -8,6 +8,8 @@ defmodule RescueCloudWeb.FleetLive do
   """
   use RescueCloudWeb, :live_view
 
+  require Logger
+
   alias RescueCloud.Fleet
 
   @default_stale 300
@@ -17,11 +19,66 @@ defmodule RescueCloudWeb.FleetLive do
   @doc "Status for a heartbeat given the current time."
   def status(%{last_seen: last_seen}, now) do
     age = DateTime.diff(now, last_seen, :second)
+    {stale_after, offline_after} = thresholds()
 
     cond do
-      age <= conf(:stale_after, @default_stale) -> :active
-      age <= conf(:offline_after, @default_offline) -> :stale
+      age <= stale_after -> :active
+      age <= offline_after -> :stale
       true -> :offline
+    end
+  end
+
+  @doc """
+  `{stale_after, offline_after}` in seconds. Precedence per key: app env, then
+  `FLEET_STALE_AFTER_S` / `FLEET_OFFLINE_AFTER_S`, then defaults. Invalid values, or
+  stale >= offline, log one warning and fall back to the defaults.
+  """
+  def thresholds do
+    raw = {
+      conf(:stale_after, System.get_env("FLEET_STALE_AFTER_S")),
+      conf(:offline_after, System.get_env("FLEET_OFFLINE_AFTER_S"))
+    }
+
+    with {:ok, stale} <- parse_secs(elem(raw, 0), @default_stale),
+         {:ok, offline} <- parse_secs(elem(raw, 1), @default_offline),
+         true <- stale < offline do
+      {stale, offline}
+    else
+      _ ->
+        warn_once(raw)
+        {@default_stale, @default_offline}
+    end
+  end
+
+  defp parse_secs(nil, default), do: {:ok, default}
+  defp parse_secs(n, _) when is_integer(n) and n > 0, do: {:ok, n}
+
+  defp parse_secs(s, _) when is_binary(s) do
+    case Integer.parse(String.trim(s)) do
+      {n, ""} when n > 0 -> {:ok, n}
+      _ -> :error
+    end
+  end
+
+  defp parse_secs(_, _), do: :error
+
+  defp warn_once(raw) do
+    key = {__MODULE__, :warned, raw}
+
+    if :persistent_term.get(key, nil) == nil do
+      :persistent_term.put(key, true)
+
+      Logger.warning(
+        "Invalid fleet thresholds #{inspect(raw)} (need positive integer seconds, stale < offline); " <>
+          "using defaults #{@default_stale}/#{@default_offline}"
+      )
+    end
+  end
+
+  defp tick_ms do
+    case conf(:tick_ms, nil) do
+      nil -> thresholds() |> elem(0) |> Kernel.*(500) |> min(@default_tick_ms) |> max(100)
+      ms -> ms
     end
   end
 
@@ -39,7 +96,7 @@ defmodule RescueCloudWeb.FleetLive do
   def mount(_params, _session, socket) do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(RescueCloud.PubSub, Fleet.topic())
-      :timer.send_interval(conf(:tick_ms, @default_tick_ms), self(), :tick)
+      :timer.send_interval(tick_ms(), self(), :tick)
     end
 
     {:ok, socket |> assign(:page_title, "Fleet") |> load()}
@@ -64,7 +121,7 @@ defmodule RescueCloudWeb.FleetLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash}>
+    <Layouts.app flash={@flash} current="/fleet">
       <h1 id="fleet-title" class="text-2xl font-semibold">Fleet</h1>
       <p :if={@devices == []} id="fleet-empty">No devices have synced yet.</p>
       <table :if={@devices != []} id="fleet-table" class="table">

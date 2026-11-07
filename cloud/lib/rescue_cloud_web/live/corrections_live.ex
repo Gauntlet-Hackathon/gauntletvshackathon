@@ -107,7 +107,7 @@ defmodule RescueCloudWeb.CorrectionsLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash}>
+    <Layouts.app flash={@flash} current="/corrections">
       <h1 id="corrections-title" class="text-2xl font-semibold">Corrections</h1>
 
       <.form for={@form} id="correction-form" phx-submit="submit" class="mt-4 max-w-xl">

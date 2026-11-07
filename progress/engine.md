@@ -25,7 +25,12 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 engine #66 Mercury install added to the python CI job so pytest engine can use mmc
 2026-11-07 engine #66 E7: Mercury port (engine/mercury rules.m det + exhaustive switches, json_io.m, mercury_engine.m CLI, Makefile with --halt-at-warn); build.py --kind mercury publishes bin/mercury_engine; engine/tests/test_parity.py (fixtures, E4 grid, 3k random inputs, error shape, missing-arm compile error)
 2026-11-07 engine #156 EV12: python -m rescue_evals.baselines --system opus|slm --split dev|test [--mock] [--limit N]; writes evals/results/<system>/<model-id>.jsonl, scores via stored harness; tests in evals/tests/test_baselines_llm.py
+<<<<<<< HEAD
 2026-11-07 engine step3-A7: evals runner derives the follow-up field from abstain_reason (runner.FOLLOW_UP_FIELD / follow_up_field) instead of reading follow_up_field; tests in evals/tests/test_runner.py
 2026-11-07 engine step3-A3: runner writes metrics["calibration.ece"] (pooled extracted-field ECE from calibration.case_samples/pooled_ece; failures = wrong at confidence >= 0.75) into each result and so summary.json results; report treats it as lower-is-better; tests in evals/tests/test_runner.py
 2026-11-07 engine step-3 review: R1 provisional_tier on every abstain (schema, examples, fixtures); R2/R3/R4/R5/R8/R9/R11/R13 rule changes and R6/R10 notes in contracts/engine_rules.md, fixture C25; A2 build.py stamps the real rules_version into dist (python rules.py line, mercury version slot); A9 fallback rejects unknown enums; Python and Mercury in parity (engine/tests/test_review_fixes.py, test_parity.py)
 2026-11-07 engine step3-R1: replay_diff also diffs provisional_tier (provisional_tier_changed per row, counted as changed, md column); evals test that baseline engine outputs carry provisional_tier; tests in engine/tests/test_replay_diff.py, evals/tests/test_regex_baseline.py
+=======
+2026-11-07 engine #171 EV13: report.py columns accept system aliases (opus/slm), main block gains running.mean_ms_per_request, running.seconds_per_1000_requests, running.works_offline, consistency.pct_cases_changed; tests in evals/tests/test_report.py
+2026-11-07 engine #172 EV14: baseline rows record input/output_tokens + latency_ms; result docs get baseline_latency and (with *_USD_PER_MTOK_* env) running.cost_per_1000_usd; report.py adds the cost row and fills Opus/SLM latency from baseline_latency; tests in test_baselines_llm.py and test_report.py
+>>>>>>> origin/main

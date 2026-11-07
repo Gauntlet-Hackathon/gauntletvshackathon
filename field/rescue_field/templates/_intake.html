@@ -1,0 +1,30 @@
+<section id="intake" aria-label="Add requests">
+<h2>Add requests</h2>
+<form id="intake-single" action="/requests" method="post" data-kind="single">
+  <h3>Single request</h3>
+  <p><label for="single-raw-text">Request text</label><br>
+  <textarea id="single-raw-text" name="raw_text" rows="3" cols="60" required></textarea></p>
+  <p><label for="single-contact">Contact (optional)</label>
+  <input id="single-contact" name="contact" type="text"></p>
+  <p><label for="single-channel">Channel</label>
+  <select id="single-channel" name="channel">
+    <option value="form" selected>form</option><option value="sms">sms</option>
+    <option value="social">social</option><option value="call_note">call_note</option>
+  </select></p>
+  <button type="submit">Add request</button>
+</form>
+<form id="intake-paste" action="/requests/bulk" method="post" data-kind="paste">
+  <h3>Paste requests</h3>
+  <p><label for="paste-text">One request per line</label><br>
+  <textarea id="paste-text" name="text" rows="6" cols="60" required></textarea></p>
+  <button type="submit">Add pasted requests</button>
+</form>
+<form id="intake-csv" action="/requests/bulk" method="post" enctype="multipart/form-data" data-kind="csv">
+  <h3>CSV upload</h3>
+  <p><label for="csv-file">CSV file (column raw_text, optional channel, contact, lang_hint)</label><br>
+  <input id="csv-file" name="file" type="file" accept=".csv,text/csv" required></p>
+  <button type="submit">Upload CSV</button>
+</form>
+<p id="intake-status" role="status" aria-live="polite"></p>
+<p id="intake-error" role="alert"></p>
+</section>
