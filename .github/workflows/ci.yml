@@ -32,3 +32,76 @@ jobs:
       # - run: npm ci
       # - run: npm run lint
       # - run: npm test
+
+  # W0-5 go/no-go (#24). A separate job so its install time does not add to the `test` job.
+  mercury-spike:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      MERCURY_VERSION: 22.01.8-1~noble
+      # Tip of mercury_json's mercury_22_01 branch; master targets newer compilers.
+      MERCURY_JSON_SHA: 709853063027bc7a8400f205c098bdd5f6c169f9
+      INSTALL_LIMIT_SECONDS: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Mercury
+        run: |
+          set -euo pipefail
+          SECONDS=0
+          # The repo is plain http, so packages are trusted through this key alone.
+          # signed-by limits the key to this one repo.
+          curl -fsSL https://paul.bone.id.au/paul.asc -o /tmp/mercury.asc
+          sudo install -m 644 /tmp/mercury.asc /etc/apt/keyrings/mercury.asc
+          gpg --show-keys --with-fingerprint /etc/apt/keyrings/mercury.asc
+          echo "deb [signed-by=/etc/apt/keyrings/mercury.asc] http://dl.mercurylang.org/deb/ noble main" \
+            | sudo tee /etc/apt/sources.list.d/mercury.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            "mercury-devel=$MERCURY_VERSION" \
+            "mercury-tools=$MERCURY_VERSION" \
+            "mercury-hlc-dev=$MERCURY_VERSION"
+          mmc --version
+          echo "install_seconds=$SECONDS" | tee -a "$GITHUB_ENV"
+          echo "Mercury install: ${SECONDS}s (limit ${INSTALL_LIMIT_SECONDS}s)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build hello with mercury_json
+        run: |
+          set -euo pipefail
+          SECONDS=0
+          git clone -q https://github.com/juliensf/mercury-json.git "$RUNNER_TEMP/mercury-json"
+          git -C "$RUNNER_TEMP/mercury-json" checkout -q "$MERCURY_JSON_SHA"
+          cd engine/mercury
+          mmc -f hello.m "$RUNNER_TEMP"/mercury-json/src/*.m
+          mmc --grade hlc.gc --make -j4 hello
+          echo "hello build (includes mercury_json): ${SECONDS}s" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run hello
+        working-directory: engine/mercury
+        run: |
+          set -uo pipefail
+          status=0
+          check() { # check <name> <stdin> <expected exit> <expected stdout>
+            out="$(printf '%s' "$2" | ./hello 2>/dev/null)"
+            code=$?
+            if [ "$code" = "$3" ] && [ "$out" = "$4" ]; then
+              echo "ok   $1"
+            else
+              echo "FAIL $1: exit $code (wanted $3), stdout [$out] (wanted [$4])"
+              status=1
+            fi
+          }
+          check valid     '{"name": "Ada"}'  0 '{"name": "Ada", "status": "accepted"}'
+          check unicode   '{"name": "Zoë"}'  0 '{"name": "Zoë", "status": "accepted"}'
+          check no-name   '{"age": 3}'       0 '{"reason": "object has no string name", "status": "rejected"}'
+          check non-obj   '[1, 2]'           0 '{"reason": "array", "status": "rejected"}'
+          check malformed '{"name": '        1 ''
+          check empty     ''                 1 ''
+          exit "$status"
+
+      - name: Enforce the install time limit
+        run: |
+          if [ "$install_seconds" -ge "$INSTALL_LIMIT_SECONDS" ]; then
+            echo "::error::Mercury install took ${install_seconds}s; the go/no-go limit is ${INSTALL_LIMIT_SECONDS}s"
+            exit 1
+          fi
