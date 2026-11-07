@@ -5,16 +5,16 @@ from pathlib import Path
 
 import pytest
 
-from field_app.engine_client import EngineError
-from field_app.engine_client import decide as subprocess_decide
-from field_app.slm import STUB_MODEL_VERSION, FixtureExtractor
-from field_app.store import EventStore
+from rescue_field.engine_client import EngineError
+from rescue_field.engine_client import decide as subprocess_decide
 from rescue_field.pipeline import (
     DEFAULT_THRESHOLDS,
     PipelineConfig,
     process_request,
     read_list,
 )
+from rescue_field.slm import STUB_MODEL_VERSION, FixtureExtractor
+from rescue_field.store import EventStore
 from rescue_shared.contracts_io import CONTRACTS, validator_for
 from rescue_shared.ulid import is_ulid
 

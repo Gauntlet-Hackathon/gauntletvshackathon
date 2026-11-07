@@ -2,7 +2,7 @@
 
 import pytest
 
-import metrics as m
+from rescue_evals import metrics as m
 
 approx = pytest.approx
 
