@@ -1,5 +1,6 @@
 import copy
 import json
+import shlex
 import sys
 from pathlib import Path
 
@@ -22,7 +23,16 @@ def test_decide_returns_validated_output():
 
 
 def test_reads_engine_cmd_env(monkeypatch):
-    monkeypatch.setenv("ENGINE_CMD", f"{sys.executable} {FAKE} ok")
+    monkeypatch.setenv("ENGINE_CMD", shlex.join([sys.executable, FAKE, "ok"]))
+    assert decide(EXAMPLE)["outcome"] == "prioritized"
+
+
+def test_engine_cmd_with_space_in_path(monkeypatch, tmp_path):
+    d = tmp_path / "Gauntlet AI"
+    d.mkdir()
+    fake = d / "fake_engine.py"
+    fake.write_text(Path(FAKE).read_text())
+    monkeypatch.setenv("ENGINE_CMD", shlex.join([sys.executable, str(fake), "ok"]))
     assert decide(EXAMPLE)["outcome"] == "prioritized"
 
 
