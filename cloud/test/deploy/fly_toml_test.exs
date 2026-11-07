@@ -4,6 +4,8 @@ defmodule RescueCloud.Deploy.FlyTomlTest do
 
   @root Path.expand("../..", __DIR__)
   @fly_toml Path.join(@root, "fly.toml")
+  # The deploy runs from the repo root, so `build.dockerfile` is relative to the repo root.
+  @repo_root Path.expand("..", @root)
 
   setup_all do
     {:ok, fly} = Toml.decode_file(@fly_toml)
@@ -12,8 +14,8 @@ defmodule RescueCloud.Deploy.FlyTomlTest do
 
   test "is valid TOML with an app name and a Dockerfile build", %{fly: fly} do
     assert is_binary(fly["app"]) and fly["app"] != ""
-    assert fly["build"]["dockerfile"] == "Dockerfile"
-    assert File.exists?(Path.join(@root, "Dockerfile"))
+    assert fly["build"]["dockerfile"] == "cloud/Dockerfile"
+    assert File.exists?(Path.join(@repo_root, fly["build"]["dockerfile"]))
   end
 
   test "internal port matches the PORT the release listens on", %{fly: fly} do

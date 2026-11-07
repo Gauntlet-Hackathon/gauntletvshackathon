@@ -79,17 +79,15 @@ PR ─► ci.yml (test) + agent-review.yml (verdict, prompt and CLAUDE.md taken 
 `READY_LABEL` (night-safe) · `FIX_LANE` · `CI_WORKFLOW` (ci.yml) · `MAX_TURNS` (80) · `CLAUDE_CODE_VERSION` (latest; pin after the rehearsal) · `CLAUDE_PERMISSION_FLAGS` (`--dangerously-skip-permissions`; the runner is disposable and holds no push credentials) · `ESCALATE_MODEL` (opus) · `REVIEW_MODEL` (opus)
 
 ## Deploy cloud to Fly
-Config: `cloud/fly.toml`. Its app name `rescue-cloud-demo` is a **placeholder**; pick your own below (`<app>`). Nothing here has been deployed yet and no credentials are in the repo. Run every command from `cloud/`, logged in with `fly auth login`.
+Config: `cloud/fly.toml`. Its app name `rescue-cloud-demo` is a **placeholder**; pick your own below (`<app>`). Nothing here has been deployed yet and no credentials are in the repo. Run every command from the **repo root** (the image builds from the root so it can ship the frozen engine build), logged in with `fly auth login`.
 
 What `fly.toml` already does: builds `cloud/Dockerfile`; runs `/app/bin/migrate` as the `release_command` before each release (creates the DB if missing, then migrates); listens on `PORT=8080` = `internal_port`; HTTP health check `GET /healthz` (200 when the DB answers, 503 otherwise; excluded from the https redirect in `config/prod.exs`); one `shared-cpu-1x` 512 MB machine with auto-stop off for the demo; `ECTO_IPV6=true` and `ERL_AFLAGS=-proto_dist inet6_tcp` because Fly Postgres is IPv6-only on the private network.
 
 ```sh
-cd cloud
-
 # 1. Create the app from the checked-in config, without deploying. Answer "yes" to copying the config,
 #    "no" to any Postgres/Redis offer (step 2 does it) and "no" to deploying now.
-fly launch --copy-config --no-deploy --name <app>
-#    If it did not rewrite it, set app = "<app>" in fly.toml (do not commit your real app name if you prefer).
+fly launch --copy-config --no-deploy --config cloud/fly.toml --name <app>
+#    If it did not rewrite it, set app = "<app>" in cloud/fly.toml (do not commit your real app name if you prefer).
 
 # 2. Create a Postgres cluster and attach it (attach sets the DATABASE_URL secret on <app>).
 fly postgres create --name <app>-db --region iad --initial-cluster-size 1 --vm-size shared-cpu-1x --volume-size 1
@@ -99,12 +97,12 @@ fly postgres attach <app>-db --app <app>
 #    DEVICE_TOKENS is "device_id:token" pairs, comma-separated; give each laptop its own long random token
 #    and put the same value in that laptop's DEVICE_TOKEN.
 fly secrets set --app <app> \
-  SECRET_KEY_BASE="$(mix phx.gen.secret)" \
+  SECRET_KEY_BASE="$(openssl rand -base64 48)" \
   PHX_HOST="<app>.fly.dev" \
   DEVICE_TOKENS="laptop-dev-01:<long-random-token>,demo-field-01:<long-random-token>,laptop-02:<long-random-token>"
 
 # 4. Deploy (builds the image, runs bin/migrate, starts the machine once /healthz passes).
-fly deploy --app <app>
+fly deploy . --config cloud/fly.toml --dockerfile cloud/Dockerfile --app <app>
 
 # 5. Check it.
 fly status --app <app>                 # machine "started", check "passing"
@@ -112,7 +110,7 @@ curl -i https://<app>.fly.dev/healthz  # HTTP 200 {"status":"ok"...}; 503 means 
 fly logs --app <app>                   # if the release_command or the check fails
 ```
 
-Prod loads none of the committed dev tokens (`config/devices.exs`), so `DEVICE_TOKENS` must list every device that syncs, including `demo-field-01` for the demo; a device left out gets 401.
+Prod loads none of the committed dev tokens (`config/devices.exs`), so `DEVICE_TOKENS` must list every device that syncs and must include `demo-field-01:<token>` for the demo (the prod cloud accepts only `DEVICE_TOKENS`); a device left out gets 401.
 Then point each field laptop at it: `CLOUD_URL=https://<app>.fly.dev`, `DEVICE_ID`/`DEVICE_TOKEN` matching a `DEVICE_TOKENS` pair.
 If the deploy fails at `release_command` with a connection error, check `fly secrets list --app <app>` shows `DATABASE_URL` (re-run `fly postgres attach`) and that `ECTO_IPV6` is still in `[env]`.
 
