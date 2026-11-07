@@ -54,6 +54,17 @@ defmodule RescueCloudWeb.RecordsLive do
     end
   end
 
+  defp tier_kind("P1"), do: :alarm
+  defp tier_kind("P2"), do: :warn
+  defp tier_kind(_), do: :neutral
+
+  defp outcome_kind("abstain"), do: :warn
+  defp outcome_kind(_), do: :neutral
+
+  defp replay_kind("mismatch"), do: :alarm
+  defp replay_kind("not verified"), do: :neutral
+  defp replay_kind(_), do: :ok
+
   defp verification_label(nil), do: "not verified"
   defp verification_label(%{status: status}), do: status
 
@@ -74,7 +85,7 @@ defmodule RescueCloudWeb.RecordsLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current="/records">
-      <h1 id="records-title" class="text-2xl font-semibold">Records</h1>
+      <h1 id="records-title" class="text-3xl font-semibold">Records</h1>
 
       <.form
         for={@form}
@@ -99,7 +110,7 @@ defmodule RescueCloudWeb.RecordsLive do
       </.form>
 
       <p :if={@requests == []} id="records-empty">No matching requests.</p>
-      <table :if={@requests != []} id="records-table" class="table">
+      <table :if={@requests != []} id="records-table" class="table table-lg">
         <thead>
           <tr>
             <th>Request</th>
@@ -112,15 +123,21 @@ defmodule RescueCloudWeb.RecordsLive do
         </thead>
         <tbody>
           <tr :for={r <- @requests} id={"record-#{r.request_id}"}>
-            <td>
+            <td class="break-all">
               <.link patch={detail_path(r.request_id, @filters)} data-role="open">
                 {r.request_id}
               </.link>
             </td>
-            <td data-role="tier">{r.priority_tier}</td>
-            <td data-role="status">{r.status}</td>
-            <td data-role="location">{r.location_text}</td>
-            <td data-role="device">{r.device_id}</td>
+            <td data-role="tier">
+              <.status_badge :if={r.priority_tier} kind={tier_kind(r.priority_tier)}>
+                {r.priority_tier}
+              </.status_badge>
+            </td>
+            <td data-role="status">
+              <.status_badge :if={r.status} kind={:neutral}>{r.status}</.status_badge>
+            </td>
+            <td data-role="location" class="break-words">{r.location_text}</td>
+            <td data-role="device" class="break-all">{r.device_id}</td>
             <td data-role="received-at">{fmt(r.received_at)}</td>
           </tr>
         </tbody>
@@ -130,15 +147,26 @@ defmodule RescueCloudWeb.RecordsLive do
         No request with id {@selected_id}.
       </p>
       <section :if={@record} id="record-detail" class="mt-6 space-y-2">
-        <h2 class="text-xl font-semibold">Request {@record.request.request_id}</h2>
+        <h2 class="text-2xl font-semibold">Request {@record.request.request_id}</h2>
         <p data-role="raw-text">{@record.request.raw_text}</p>
         <dl class="grid grid-cols-2 gap-1 max-w-xl">
           <dt>Status</dt>
           <dd data-role="status">{@record.request.status}</dd>
           <dt>Outcome</dt>
-          <dd data-role="outcome">{@record.request.outcome}</dd>
+          <dd data-role="outcome">
+            <.status_badge :if={@record.request.outcome} kind={outcome_kind(@record.request.outcome)}>
+              {@record.request.outcome}
+            </.status_badge>
+          </dd>
           <dt>Tier</dt>
-          <dd data-role="tier">{@record.request.priority_tier}</dd>
+          <dd data-role="tier">
+            <.status_badge
+              :if={@record.request.priority_tier}
+              kind={tier_kind(@record.request.priority_tier)}
+            >
+              {@record.request.priority_tier}
+            </.status_badge>
+          </dd>
           <dt>Rule</dt>
           <dd data-role="rule-id">{@record.request.rule_id}</dd>
           <dt>Rules version</dt>
@@ -150,16 +178,18 @@ defmodule RescueCloudWeb.RecordsLive do
           <dt>Duplicate group</dt>
           <dd data-role="duplicate-group">{@record.request.duplicate_group}</dd>
           <dt>Replay</dt>
-          <dd
-            data-role="replay-status"
-            class={replay_status(@record, @verifications) == "mismatch" && "text-error font-semibold"}
-          >
-            {replay_status(@record, @verifications)}
+          <dd data-role="replay-status">
+            <.status_badge
+              :if={replay_status(@record, @verifications)}
+              kind={replay_kind(replay_status(@record, @verifications))}
+            >
+              {replay_status(@record, @verifications)}
+            </.status_badge>
           </dd>
         </dl>
 
-        <h3 class="text-lg font-semibold">Event history</h3>
-        <table id="record-events" class="table">
+        <h3 class="text-xl font-semibold">Event history</h3>
+        <table id="record-events" class="table table-lg">
           <thead>
             <tr>
               <th>Occurred (laptop)</th>
@@ -183,7 +213,12 @@ defmodule RescueCloudWeb.RecordsLive do
                 data-role="replay"
                 title={@verifications[e.event_id] && @verifications[e.event_id].detail}
               >
-                {if e.type == "decided", do: verification_label(@verifications[e.event_id])}
+                <.status_badge
+                  :if={e.type == "decided"}
+                  kind={replay_kind(verification_label(@verifications[e.event_id]))}
+                >
+                  {verification_label(@verifications[e.event_id])}
+                </.status_badge>
               </td>
             </tr>
           </tbody>
