@@ -40,7 +40,8 @@ B is a **candidate** of A when all hold:
 - B is earlier than A, ordering by `(received_at, request_id)`;
 - `A.received_at − B.received_at ≤ window_hours × 3600` seconds (inclusive);
 - `normalize_location` of both is equal and not `""`;
-- **contact_match** (normalized contacts equal and not `""`) **or** both `people_count` are non-null and equal.
+- **contact_match** (normalized contacts equal and not `""`) **or** both `people_count` are non-null, equal and at least 3 (a count-only
+  match; two households of 1–2 people at one address are common, so small equal counts alone never match).
 
 Each candidate is `{request_id, received_at, people_count, contact_match, priority_tier}` of B (the `engine_input.context.duplicate_candidates` shape), sorted oldest first.
 Every input request is a key in the result, with `[]` when it has no candidate. Candidates are **direct** matches only (no transitive closure).
@@ -52,3 +53,11 @@ by `(received_at, request_id)`; groups sorted by their oldest member.
 ## `within_tier_sort_key(extracted, received_at, request_id) -> tuple`
 Sort ascending within one tier (04 "Ordering within a tier"): `(−vulnerable_count, −people, received_at, request_id)`, where `vulnerable_count` is the number
 of `vulnerable` entries with confidence ≥ 0.5 and `people` is `people_count.value` (null counts as 0). Rank tiers P1, P2, P3 first, then use this key.
+
+## Request status order
+A request's status only moves forward, in this order (field and cloud alike):
+`received < extracted < decided < assigned < escalated < rescued`, with `closed_duplicate` ranked equal to `rescued`.
+Escalation follows an assignment (the assigned team asks for more help), so `assigned → escalated` is a forward move and
+`escalated → assigned` is not. A status event whose rank is not above the current status does not change it; skipping ahead
+(e.g. `decided → rescued`) is allowed. The field status API covers only the operator statuses (`assigned < escalated < rescued`,
+`field/rescue_field/status.py`); the cloud projection (`cloud/lib/rescue_cloud/projection.ex`) folds the full order.

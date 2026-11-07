@@ -40,20 +40,22 @@ if config_env() == :dev do
     ]
 end
 
+# DEVICE_TOKENS="id1:token1, id2:token2" -> %{"id1" => "token1", "id2" => "token2"}, in every env.
+# These pairs are added to the configured :devices map (a pair wins over a committed token for the
+# same id). Prod has no committed devices (config/config.exs), so there it is the whole device list.
+# Whitespace is trimmed; empty or malformed entries are skipped; unset/empty adds nothing.
+device_tokens =
+  for pair <- String.split(System.get_env("DEVICE_TOKENS") || "", ","),
+      [id, token] <- [String.split(pair, ":", parts: 2)],
+      id = String.trim(id),
+      token = String.trim(token),
+      id != "" and token != "",
+      into: %{},
+      do: {id, token}
+
+config :rescue_cloud, :extra_devices, device_tokens
+
 if config_env() == :prod do
-  # DEVICE_TOKENS="id1:token1, id2:token2" -> %{"id1" => "token1", "id2" => "token2"}.
-  # Whitespace is trimmed; empty or malformed entries are skipped; unset/empty keeps the default map.
-  device_tokens =
-    for pair <- String.split(System.get_env("DEVICE_TOKENS") || "", ","),
-        [id, token] <- [String.split(pair, ":", parts: 2)],
-        id = String.trim(id),
-        token = String.trim(token),
-        id != "" and token != "",
-        into: %{},
-        do: {id, token}
-
-  if device_tokens != %{}, do: config(:rescue_cloud, :devices, device_tokens)
-
   database_url =
     System.get_env("DATABASE_URL") ||
       raise """
