@@ -33,7 +33,7 @@ def _once(system: System, text: str) -> str:
     except Exception as e:
         return f"extract-error:{type(e).__name__}"
     try:
-        out = system.decide({"extracted": ex, "context": default_context()})
+        out = system.decide({"extracted": ex, "context": default_context(text, ex)})
     except Exception as e:
         return f"decide-error:{type(e).__name__}"
     return json.dumps({"extracted": ex, "decision": out}, sort_keys=True, default=str)

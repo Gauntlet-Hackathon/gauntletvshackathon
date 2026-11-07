@@ -13,6 +13,7 @@ Only the ``test`` split is scored. Set E needs ``--open-sealed``.
 from __future__ import annotations
 
 import argparse
+import functools
 import logging
 import sys
 import time
@@ -25,6 +26,7 @@ from typing import Any, Protocol
 from rescue_evals import metrics as M
 from rescue_evals import stats as S
 from rescue_evals.loaders import EvalCase, EvalSetError, load_cases
+from rescue_shared import frozen_config, logic
 from rescue_shared.models import Extracted
 
 log = logging.getLogger("rescue_evals.runner")
@@ -99,13 +101,28 @@ class GoldExtractionSystem:
 register_system("gold-extraction", lambda cases: GoldExtractionSystem(cases))
 
 
-def default_context() -> dict[str, Any]:
+@functools.cache
+def _frozen_lists() -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """(streets, hoax_markers) from contracts/fixtures/, the lists the field app loads."""
+    cfg = frozen_config.load_config()
+    return tuple(cfg["streets"]), tuple(cfg["hoax_markers"])
+
+
+def default_context(
+    raw_text: str | None = None, extracted: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """The engine context for one case. With the case's text and extraction, the street-list and
+    hoax-marker hits are computed exactly as the field pipeline does (``rescue_field.pipeline``),
+    so a landmark on the street list stays usable and a prank can abstain as ``possible_hoax``.
+    Duplicates are not modelled (cases are scored one at a time)."""
     from rescue_engine.fallback.rules import DEFAULT_THRESHOLDS
 
+    streets, hoax_markers = _frozen_lists()
+    location = (extracted or {}).get("location") or {}
     return {
         "duplicate_candidates": [],
-        "street_list_hits": [],
-        "hoax_marker_hits": 0,
+        "street_list_hits": logic.street_list_hits(location.get("text"), streets),
+        "hoax_marker_hits": logic.hoax_marker_hits(raw_text, hoax_markers) if raw_text else 0,
         "thresholds": dict(DEFAULT_THRESHOLDS),
     }
 
@@ -359,7 +376,9 @@ def run_set(
         out: dict[str, Any] = {}
         if pred_ex is not None:
             try:
-                out = system.decide({"extracted": pred_ex, "context": default_context()})
+                out = system.decide(
+                    {"extracted": pred_ex, "context": default_context(c.raw_text, pred_ex)}
+                )
             except Exception as e:
                 errors[c.id] = f"decide: {type(e).__name__}: {e}"
         t2 = time.perf_counter()
