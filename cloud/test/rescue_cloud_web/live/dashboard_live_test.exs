@@ -121,4 +121,10 @@ defmodule RescueCloudWeb.DashboardLiveTest do
     assert has_element?(view, "main#main")
     assert has_element?(view, "#replay-summary[aria-live=polite]")
   end
+
+  test "verify button disables while running and a loading indicator exists", %{conn: conn} do
+    {:ok, view, html} = live(conn, ~p"/")
+    assert has_element?(view, "#replay-verify[phx-disable-with]")
+    assert html =~ "Loading…"
+  end
 end

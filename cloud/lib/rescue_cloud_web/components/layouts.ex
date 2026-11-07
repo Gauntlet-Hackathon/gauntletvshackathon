@@ -74,7 +74,8 @@ defmodule RescueCloudWeb.Layouts do
     </header>
 
     <main id="main" tabindex="-1" class="px-4 py-8 text-lg sm:px-6 lg:px-8">
-      <div class="mx-auto max-w-7xl space-y-4">
+      <p id="loading-indicator" role="status" class="loading-indicator">Loading…</p>
+      <div class="mx-auto max-w-7xl space-y-4 phx-connected-content">
         {render_slot(@inner_block)}
       </div>
     </main>

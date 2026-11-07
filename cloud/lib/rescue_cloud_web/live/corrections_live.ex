@@ -116,7 +116,12 @@ defmodule RescueCloudWeb.CorrectionsLive do
         <.input field={@form[:new_value]} label="New value (JSON or plain text)" />
         <.input field={@form[:corrected_by]} label="Your name" />
         <.input field={@form[:note]} label="Note" />
-        <button id="correction-submit" type="submit" class="btn btn-primary">Submit correction</button>
+        <button
+          id="correction-submit"
+          type="submit"
+          phx-disable-with="Submitting…"
+          class="btn btn-primary"
+        >Submit correction</button>
       </.form>
 
       <h2 class="text-xl font-semibold mt-8">Review queue</h2>

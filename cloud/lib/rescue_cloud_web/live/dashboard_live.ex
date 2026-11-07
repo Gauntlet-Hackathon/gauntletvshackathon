@@ -91,7 +91,7 @@ defmodule RescueCloudWeb.DashboardLive do
           · <span id="replay-missing">{@replay["missing_version"]} missing version</span>
           · <span id="replay-errors">{@replay["error"]} engine errors</span>
         </p>
-        <.button id="replay-verify" phx-click="verify">Verify decisions</.button>
+        <.button id="replay-verify" phx-click="verify" phx-disable-with="Verifying…">Verify decisions</.button>
       </section>
     </Layouts.app>
     """

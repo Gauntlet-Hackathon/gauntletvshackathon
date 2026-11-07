@@ -8,11 +8,29 @@ defmodule RescueCloud.EvalResults do
 
   @doc "The parsed summary map, or `nil` when missing or unreadable."
   def summary do
-    with {:ok, bin} <- File.read(summary_path()),
-         {:ok, %{} = doc} <- Jason.decode(bin) do
-      doc
-    else
-      _ -> nil
+    case summary_status() do
+      {:ok, doc} -> doc
+      {:error, _} -> nil
+    end
+  end
+
+  @doc """
+  `{:ok, doc}`, `{:error, :missing}` (no file) or `{:error, :invalid}` (unreadable, bad JSON or not
+  a JSON object).
+  """
+  def summary_status do
+    case File.read(summary_path()) do
+      {:ok, bin} ->
+        case Jason.decode(bin) do
+          {:ok, %{} = doc} -> {:ok, doc}
+          _ -> {:error, :invalid}
+        end
+
+      {:error, :enoent} ->
+        {:error, :missing}
+
+      {:error, _} ->
+        {:error, :invalid}
     end
   end
 

@@ -38,12 +38,18 @@ defmodule RescueCloudWeb.EvalsLive do
   def handle_info(_, socket), do: {:noreply, socket}
 
   defp load(socket) do
-    summary = EvalResults.summary()
+    {summary, summary_error} =
+      case EvalResults.summary_status() do
+        {:ok, doc} -> {doc, nil}
+        {:error, reason} -> {nil, reason}
+      end
+
     models = Models.list()
     by_version = Map.new(models, &{&1.model_version, &1})
 
     assign(socket,
       summary: summary,
+      summary_error: summary_error,
       models: models,
       devices: Fleet.list_heartbeats(),
       approved: Enum.find(models, &(&1.status == "approved")),
@@ -113,7 +119,12 @@ defmodule RescueCloudWeb.EvalsLive do
     ~H"""
     <Layouts.app flash={@flash} current="/evals">
       <h1 id="evals-title" class="text-3xl font-semibold">Evals</h1>
-      <p :if={@summary == nil} id="evals-empty">No eval results published yet.</p>
+      <p :if={@summary_error == :missing} id="evals-empty">
+        No eval results yet: run <code>python -m rescue_evals.report</code>
+      </p>
+      <p :if={@summary_error == :invalid} id="evals-invalid" role="alert">
+        The eval results file is unreadable
+      </p>
 
       <section :if={@summary} id="evals-main">
         <h2 class="text-2xl font-semibold">Development sets A-D</h2>
