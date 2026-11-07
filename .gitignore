@@ -18,3 +18,5 @@ coverage/
 *.egg-info/
 .coverage
 htmlcov/
+# H12 (#178): the frozen demo engine build is committed; other dist/ folders stay ignored.
+!engine/dist/

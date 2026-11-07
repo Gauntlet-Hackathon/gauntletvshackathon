@@ -8,12 +8,14 @@
 # mercury_json's src/ directory (.github/actions/install-mercury sets both).
 # Sources are copied into BUILD_DIR so mmc's Mercury/ output never lands next to them.
 # --halt-at-warn makes any warning (unused import, missing switch arm, ...) a build error.
+# --mercury-linkage static links the Mercury runtime, stdlib and GC into the binary, so it runs
+# on images without the Mercury toolchain (only libc/libm are dynamic). H12 (#178).
 
 MMC ?= mmc
 GRADE ?= hlc.gc
 BUILD_DIR ?= build
 SOURCES := rules.m json_io.m mercury_engine.m
-MCFLAGS ?= --grade $(GRADE) --halt-at-warn
+MCFLAGS ?= --grade $(GRADE) --halt-at-warn --mercury-linkage static
 
 .PHONY: all clean
 
