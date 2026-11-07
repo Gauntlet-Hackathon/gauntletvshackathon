@@ -26,6 +26,10 @@ CREATE TABLE IF NOT EXISTS outbox (
     seq INTEGER PRIMARY KEY AUTOINCREMENT,
     event_id TEXT NOT NULL UNIQUE REFERENCES events(event_id)
 );
+CREATE TABLE IF NOT EXISTS meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 """
 
 
@@ -108,4 +112,61 @@ class EventStore:
 
     def all_events(self) -> list[dict[str, Any]]:
         rows = self._conn.execute("SELECT body FROM events ORDER BY seq").fetchall()
+        return [json.loads(r[0]) for r in rows]
+
+    def get_meta(self, key: str) -> str | None:
+        row = self._conn.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
+        return row[0] if row else None
+
+    def set_meta(self, values: dict[str, str]) -> None:
+        self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            self._upsert_meta(values)
+            self._conn.execute("COMMIT")
+        except BaseException:
+            self._conn.execute("ROLLBACK")
+            raise
+
+    def _upsert_meta(self, values: dict[str, str]) -> None:
+        for key, value in values.items():
+            self._conn.execute(
+                "INSERT INTO meta(key, value) VALUES (?, ?)"
+                " ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (key, value),
+            )
+
+    def append_remote_events(
+        self, events: Iterable[dict[str, Any]], meta: dict[str, str] | None = None
+    ) -> list[str]:
+        """Store events that came from the cloud (down-sync): no outbox row, they are not
+        ours to send. `meta` (e.g. the down-sync cursor) is written in the same transaction.
+        Existing event_ids are ignored. Returns the ids newly stored."""
+        stored: list[str] = []
+        self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            for ev in events:
+                cur = self._conn.execute(
+                    "INSERT OR IGNORE INTO events(event_id, request_id, type, occurred_at, body)"
+                    " VALUES (?, ?, ?, ?, ?)",
+                    (
+                        ev["event_id"],
+                        ev["request_id"],
+                        ev["type"],
+                        ev["occurred_at"],
+                        json.dumps(ev, separators=(",", ":")),
+                    ),
+                )
+                if cur.rowcount:
+                    stored.append(ev["event_id"])
+            self._upsert_meta(meta or {})
+            self._conn.execute("COMMIT")
+        except BaseException:
+            self._conn.execute("ROLLBACK")
+            raise
+        return stored
+
+    def request_events(self, request_id: str) -> list[dict[str, Any]]:
+        rows = self._conn.execute(
+            "SELECT body FROM events WHERE request_id = ? ORDER BY seq", (request_id,)
+        ).fetchall()
         return [json.loads(r[0]) for r in rows]
