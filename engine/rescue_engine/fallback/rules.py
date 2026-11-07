@@ -25,6 +25,9 @@ R_NAR_OLD = "R-NAR-02"
 R_NAR_NOT_REQUEST = "R-NAR-01"
 R_ABS_REQ = "R-ABS-REQ"
 R_ABS_LOC = "R-ABS-LOC"
+R_ABS_HOAX = "R-ABS-HOAX"
+R_ABS_CNT = "R-ABS-CNT"
+R_DUP = "R-DUP-01"
 
 Q_LOCATION = "What's the street address, or the nearest cross streets or landmark?"
 Q_REQUEST = "Is this a request for help? If so, what do you need and where are you?"
@@ -36,6 +39,9 @@ Q_CONFIRM = (
     "Please confirm: is anyone in immediate danger (rising water, injury, fire, trapped), "
     "and is a child, elderly or disabled person with you?"
 )
+
+Q_HOAX = "Can you confirm this request is real and tell us exactly what help you need?"
+Q_COUNTS = "We have different counts for this location. How many people need help right now?"
 
 R_ABS_HAZ = "R-ABS-HAZ"
 
