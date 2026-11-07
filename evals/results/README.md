@@ -135,7 +135,7 @@ promotion-gate pooling (`rescue_evals.report.pool_metrics`) over B+C+D, n=148.
 |---|---|---|---|---|---|---|
 | **pooled outcome accuracy** | 0.26 | 0.51 | 0.53 | 0.66 | 0.91 | 0.95 |
 | pooled urgent missed per 1,000 urgent (headline) | 896 | 188 | 563 | 542 | 42 | 21 |
-| pooled same, not counting P1-flagged follow-ups | 813 | | 354 | 438 | 0 | 21 |
+| pooled same, not counting P1-flagged follow-ups | 813 | 188 | 354 | 438 | 0 | 21 |
 | pooled Top-20 accuracy | 0.21 | 0.60 | 0.53 | 0.70 | 0.95 | 0.98 |
 | pooled is_request accuracy | 0.42 | 0.80 | 0.70 | 0.80 | 0.96 | 1 |
 | pooled ECE | 0.26 | 0.35 | 0.19 | 0.14 | 0.12 | 0.23 |
@@ -144,7 +144,7 @@ promotion-gate pooling (`rescue_evals.report.pool_metrics`) over B+C+D, n=148.
 | B Top-20 / duplicate F1 | 0.25 / 0.00 | 0.70 / 0.00 | 0.70 / 0.67 | 0.80 / 0.67 | 1.00 / 0.67 | 1.00 / 0.67 |
 | C outcome accuracy | 0.26 | 0.72 | 0.47 (CI 0.34-0.59) | 0.64 (CI 0.51-0.75) | 0.93 | 0.97 |
 | C urgent missed per 1,000 urgent | 1000 | 259 | 741 | 704 | 74 | 37 |
-| C same, not counting P1-flagged follow-ups | 889 | | 444 | 556 | 0 | 37 |
+| C same, not counting P1-flagged follow-ups | 889 | 259 | 444 | 556 | 0 | 37 |
 | C Top-20 accuracy | 0.15 | 0.55 | 0.40 | 0.65 | 0.90 | 0.95 |
 | C is_request accuracy | 0.43 | 0.76 | 0.76 | 0.86 | 0.98 | 1 |
 | D outcome accuracy | 0.24 | 0.07 | 0.41 (CI 0.28-0.57) | 0.49 (CI 0.34-0.64) | 0.83 | 0.88 |
