@@ -15,3 +15,4 @@ One line per merged change: date, lane, issue, what changed.
 2026-11-07 engine #63 EV7: evals/rescue_evals/report.py builds results table (regex/Opus/generic SLM/ours, sealed E separate) and writes summary.json + TABLE.md; tests in evals/tests/test_report.py
 2026-11-07 engine #59 E4: engine/tests/test_properties.py grid (3.6k inputs) exhaustiveness, 10x determinism, CLI batch parity, prompt-injection invariance
 2026-11-07 engine #60 EV8: evals/rescue_evals/calibration.py (reliability PNG + ECE per field, numpy/zlib PNG) and consistency.py (N reruns, % cases changed); tests in evals/tests/test_calibration.py
+2026-11-07 engine #54 E6: engine/rescue_engine/replay_diff.py re-decides the log's decided events with two engine versions, emits per-request tier/outcome diff as JSON + markdown; tests in engine/tests/test_replay_diff.py
